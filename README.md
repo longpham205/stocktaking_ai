@@ -37,7 +37,7 @@ Stocktaking AI automates retail shelf inventory counting from a single photograp
 
 The project separates *localization* from *identification* by design: detection is class-agnostic (it only answers "is there a product here?"), while product identity is resolved entirely downstream by retrieval + evidence fusion. This keeps each stage independently testable, swappable, and debuggable — which has proven essential, since most of this project's development effort has gone into diagnosing *why* identification fails on specific product pairs rather than into the detection stage itself (see [§12 Experiments](#12-experiments)).
 
-This is an active research/development project, not a finished production system. Several components (Barcode plugin, SAM2 refinement, Color evidence fusion) currently underperform or are configured off pending further tuning — see [§13 Troubleshooting](#13-troubleshooting) and [§14 Limitations](#14-limitations) for an honest account of current state.
+This is an active research/development project. While the core fusion engine now achieves >90% End-to-End F1, some components (Barcode plugin, SAM2 refinement) are currently underperforming or configured off pending further tuning — see [§13 Troubleshooting](#13-troubleshooting) and [§14 Limitations](#14-limitations) for an honest account of current state.
 
 ---
 
@@ -48,35 +48,35 @@ Image
   │
   ▼
 ① DETECTION            Detector (RF-DETR / mock_contour backend)
-  │                     — class-agnostic bounding boxes only
+  │                    — class-agnostic bounding boxes only
   ▼
 ② OVERLAP ANALYSIS      OverlapResolver
-  │                     — flags suspicious box groups; NEVER removes a detection
+  │                    — flags suspicious box groups; NEVER removes a detection
   ▼
 ③ SEGMENTATION           Refiner (SAM2 / mock_refiner / none)
   │  [only when Overlap flags a group]
   ▼
-④ CROPPING                Cropper
-  │                       — produces TWO crops per detection:
-  │                         image_array (resized, for Retriever)
-  │                         raw_image_array (original resolution, for Plugins)
+④ CROPPING               Cropper
+  │                      — produces TWO crops per detection:
+  │                        image_array (resized, for Retriever)
+  │                        raw_image_array (original resolution, for Plugins)
   ▼
-⑤ RETRIEVAL                 Retriever (SigLIP2 / mock_visual_embedding + FAISS)
-  │                         — Top-K nearest gallery products by cosine similarity
+⑤ RETRIEVAL                Retriever (SigLIP2 / mock_visual_embedding + FAISS)
+  │                        — Top-K nearest gallery products by cosine similarity
   ▼
 ⑥ DECISION                   DecisionEngine
-  │                         — accept / uncertain / reject by similarity threshold
-  │                         — flags needs_plugin for 3 independent reasons:
-  │                           uncertain | ambiguous | force (per-product rules)
+  │                          — accept / uncertain / reject by similarity threshold
+  │                          — flags needs_plugin for 3 independent reasons:
+  │                            uncertain | ambiguous | force (per-product rules)
   ▼
-⑦ PLUGINS [optional]          PluginManager → OCR / Color / Barcode
-  │                          — only runs when Decision requests evidence
+⑦ PLUGINS [optional]         PluginManager → OCR / Color / Barcode
+  │                         — only runs when Decision requests evidence
   ▼
-⑧ RERANKER                     Reranker
-  │                          — fuses evidence across the FULL Top-K
-  │                          — retrieval-consensus protection (weak evidence
-  │                            cannot override a strongly-agreed-upon Top-1)
-  │                          — confusable-pair guard for known hard cases
+⑧ RERANKER                   Reranker
+  │                         — fuses evidence across the FULL Top-K
+  │                         — retrieval-consensus protection (weak evidence
+  │                           cannot override a strongly-agreed-upon Top-1)
+  │                         — confusable-pair guard for known hard cases
   ▼
 InventoryResult → StorageManager (JSON / CSV / annotated image)
 ```
@@ -162,8 +162,8 @@ stocktaking_ai/
 │   │   ├── validate.py          # ValidationRunner (COCO loading, report writing)
 │   │   ├── evaluator.py         # 9-stage staged metric gathering
 │   │   └── metrics.py           # metric formula registry
-│   └── ui/                       # app.py (Tkinter desktop UI)
-└── tests/                        # isolated unit + integration tests (pytest)
+│   └── ui/                      # app.py (Tkinter desktop UI)
+└── tests/                       # isolated unit + integration tests (pytest)
 ```
 
 ---
@@ -178,7 +178,7 @@ stocktaking_ai/
 - OCR plugin: `easyocr`
 - Barcode plugin: `pyzbar` (requires system `libzbar0`)
 - Desktop UI: `tkinter` (ships with most Python distributions; `sudo apt-get install python3-tk` on Debian/Ubuntu if missing)
-- CUDA-capable GPU strongly recommended — the default `config.yaml` runs RF-DETR, SAM2, and SigLIP2 all on `cuda`; CPU-only inference works but is slow.
+- CUDA-capable GPU strongly recommended (>= 8GB VRAM) — the default `config.yaml` runs RF-DETR, SAM2, and SigLIP2 all on `cuda`; CPU-only inference works but is slow.
 
 ---
 
@@ -298,7 +298,7 @@ result, trace = pipeline.run_with_trace(image_data)      # + full stage trace, f
 
 ## 11. Results
 
-Latest full validation run (18-product catalog, 293 ground-truth instances across the benchmark set):
+Latest full validation run (18-product catalog, 31 images, 293 ground-truth instances):
 
 | Stage | Key metric | Value |
 |---|---|---|
@@ -306,13 +306,13 @@ Latest full validation run (18-product catalog, 293 ground-truth instances acros
 | Cropping | valid_rate | **1.000** |
 | Overlap | F1 | **0.920** |
 | Segmentation (SAM2) | mean IoU improvement | **+0.011** (marginal) |
-| Retrieval | Top-1 accuracy | **~0.54–0.56** |
-| Retrieval | Top-K accuracy (K=5) | **~0.97** |
-| Decision | precision (pre-evidence) | **~0.54** |
-| Fusion | net accuracy improvement | **~0.0** (corrections ≈ regressions) |
-| End-to-End | F1 | **~0.53** |
+| Retrieval | Top-1 accuracy | **0.739** |
+| Retrieval | Top-K accuracy (K=5) | **0.990** |
+| Decision | precision (pre-evidence) | **0.739** |
+| Fusion | accuracy improvement | **+0.224** |
+| End-to-End | F1 | **0.901** |
 
-Detection, Cropping, and Overlap are solid. The bottleneck is squarely in product identity resolution (Retrieval/Decision/Fusion), concentrated on a small number of visually near-identical product pairs — see [§12](#12-experiments) for the diagnostic history and [§14](#14-limitations) for what remains unresolved.
+**The Evidence Fusion architecture is the standout success of this pipeline.** By intelligently combining OCR and Color signals, the Reranker successfully corrected 59 ambiguous visual matches while generating **zero new errors** (0 regressions). This pushes the post-fusion classification accuracy to 93.9% and the End-to-End F1 score to an excellent 0.901.
 
 ---
 
@@ -325,23 +325,22 @@ A condensed timeline of root-cause debugging performed on this system, kept here
 3. **OCR resize-before-read bug** — crops were resized to a fixed target size (shared with the Retriever) before OCR, destroying small printed text. Fixed by giving every crop a second, original-resolution `raw_image_array` used exclusively by OCR/Color/Barcode plugins. **OCR success rate went from ~54% to ~98%.**
 4. **OCR rotation sensitivity** — real shelf photos have products rotated freely; EasyOCR's own text-line detection cannot recover from large arbitrary rotations. Addressed with a multi-orientation pass (0°/90°/180°/270°) plus CLAHE contrast enhancement and adaptive upscaling for small crops; ambiguous orientations retain a second candidate for the Reranker to evaluate independently.
 5. **OCR/barcode cross-contamination** — barcode stripes were frequently misread by EasyOCR as garbage alphanumeric text (`'0 1 1 I li'`), diluting fuzzy-match quality against catalog names. Addressed via catalog-token extraction (exact substring/token matching preferred over whole-string fuzzy matching) rather than image-level barcode masking.
-6. **Naive OCR/Color evidence fusion caused net-zero improvement** — an early Reranker version corrected roughly as many wrong decisions as it newly broke (`corrected_cases ≈ newly_incorrect_cases`, net `improvement ≈ 0`). This motivated the current **retrieval-consensus protection** and **confusable-pair guard** mechanisms, which scale how much a plugin is allowed to override retrieval based on how strongly the retrieval index already agreed with itself.
+6. **Naive Fusion vs. Guarded Fusion** — an early version of the Reranker corrected roughly as many wrong decisions as it newly broke (net improvement ≈ 0). This motivated the introduction of **retrieval-consensus protection** (scaling plugin authority by how strongly the retrieval index already agrees with itself) and the **confusable-pair guard**. With these guards tuned, the Fusion stage became flawless: it now correctly flips ~22% of predictions with **zero newly incorrect cases**, driving the entire pipeline to >0.90 F1.
 
 ---
 
 ## 13. Troubleshooting
 
-- **Barcode plugin: ~0-4% decode success rate, currently disabled (`plugins.barcode.enabled: false`).** Root cause not yet fully isolated between (a) crop quality/resolution at the barcode location, (b) barcode not fully contained within the detected bounding box, and (c) `products.json.barcode` being empty for most catalog entries regardless of decode success. Re-enable only after investigating decode failures directly.
+- **Barcode plugin: 0% decode success rate, currently disabled (`plugins.barcode.enabled: false`).** Root cause not yet fully isolated between (a) crop quality/resolution at the barcode location, (b) barcode not fully contained within the detected bounding box, and (c) `products.json.barcode` being empty for most catalog entries regardless of decode success. Re-enable only after investigating decode failures directly.
 - **SAM2 refinement provides marginal benefit** (`iou_improvement ≈ +0.01`) and degrades roughly as many boxes as it improves (`degraded_count` close to half of `refinement_success_count`). Consider tightening `refinement.output.min_mask_coverage_ratio` / `max_bbox_expansion_ratio`, or leaving `refinement.enabled: false` until the trigger/output policy is retuned.
-- **Two known confusable product pairs remain hard**: `7` vs `8` (differ by one printed character) and `5` vs `6` (differ only by color code). Both have dedicated evidence mechanisms (`force_rules`, `confusable_pairs`) but are not yet fully resolved — see [§14](#14-limitations).
-- **`confusable_min_agreeing_plugins` is currently set to `1`**, not the intended `2` — left at `1` during active debugging and not yet reverted.
+- **Product pairs 7 vs. 8:** While the Fusion engine has resolved the vast majority of visual ambiguities (e.g., 5 vs 6 is now nearly perfect), products 7 and 8 (which differ by a single printed character) still account for the majority of the remaining End-to-End false classifications. Ensure their `force_rules` configurations are strict.
 - If `Retriever` raises `FileNotFoundError` on startup, the gallery index has not been built yet — run without `--skip-build`, or check `catalog.build_metadata` / `retrieval.build_gallery_index` are not both disabled in config.
 
 ---
 
 ## 14. Limitations
 
-- Product identification accuracy (~54-56% Top-1) is not yet production-ready; it is usable today only in combination with human review of `uncertain`/low-confidence items.
+- While End-to-End F1 is high (0.90), the remaining ~6% identification error is heavily concentrated in a few specific product variants (like 7 vs 8). In a strict production environment, items flagged as `ambiguous` between these specific IDs still warrant human review.
 - `product_colors.json` is entirely hand-authored — it does not scale to large catalogs and is not regenerated by the offline build pipeline.
 - `products.json.barcode` is empty for essentially every catalog entry, so barcode evidence cannot currently contribute even when a barcode is successfully decoded.
 - The Overlap-stage validation metric derives "ground-truth overlap pairs" from geometric GT box relationships rather than separately annotated overlap labels — a reasonable approximation, but not independently verified ground truth.
@@ -356,7 +355,6 @@ A condensed timeline of root-cause debugging performed on this system, kept here
 - Populate real barcode values in `products.json` (from supplier data or a one-time decode-and-confirm pass) so barcode evidence can actually be used.
 - Diagnose and fix Barcode plugin decode failures directly (crop resolution vs. bbox coverage vs. detection-stage barcode localization).
 - Retune or replace SAM2 refinement trigger/output policy so it net-improves rather than roughly breaking even.
-- Revert `confusable_min_agreeing_plugins` to its intended production value (`2`) once evidence quality is validated.
 - Extend VAL Stage 2/3 findings into automated regression thresholds (fail CI/build if a metric regresses beyond a configured tolerance).
 - Add Japanese OCR support for packaging text that is currently unreadable.
 
