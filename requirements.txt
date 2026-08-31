@@ -1,0 +1,39 @@
+# =============================================================================
+# STOCKTAKING AI - PYTHON DEPENDENCIES
+# Version: 0.1.0
+# Target Runtime: Python >= 3.11
+# =============================================================================
+
+# Core
+numpy>=1.26,<3.0
+opencv-python-headless>=4.9
+PyYAML>=6.0
+pydantic>=2.6
+pydantic-settings>=2.2
+Pillow>=10.0
+matplotlib>=3.8   # VAL summary chart (src/validation/validate.py)
+
+# Retrieval (vector similarity search)
+faiss-cpu>=1.7
+
+# Plugins
+pytesseract>=0.3.10   # requires the system 'tesseract-ocr' binary
+pyzbar>=0.1.9          # requires the system 'libzbar0' shared library
+
+# -----------------------------------------------------------------------
+# Optional: real neural backends (not required for the default mock
+# backends). Enable via configs/config.yaml:
+#   detection.backend: "rf_detr"
+#   retrieval.backend: "siglip2"
+#   refinement.backend: "sam2"
+# -----------------------------------------------------------------------
+# torch>=2.2
+# torchvision>=0.17
+# transformers>=4.49        # SigLIP2 retrieval backend
+# rfdetr>=1.1               # RF-DETR detection backend
+# supervision>=0.24         # required by rfdetr for Detections handling
+# sam2>=1.0                 # SAM2 segmentation/refinement backend
+
+# Note: tkinter (used by src/ui/app.py) ships with most Python distributions.
+# On Debian/Ubuntu systems, if `import tkinter` fails, install it via:
+#   sudo apt-get install python3-tk

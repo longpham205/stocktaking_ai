@@ -1,0 +1,305 @@
+# =============================================================================
+# STOCKTAKING AI - CENTRAL CONFIGURATION
+# Version: 0.1.0
+# Single source of truth for runtime parameters across the pipeline.
+# =============================================================================
+
+# --- Application ---
+app:
+  name: "Stocktaking AI"
+  version: "0.1.0"
+  environment: "development" # development | production
+  device: "cuda" # cpu | cuda
+
+# --- Logging ---
+logging:
+  level: "INFO" # DEBUG | INFO | WARNING | ERROR
+  log_dir: "data/cache/logs"
+  log_to_file: true
+  log_to_console: true
+  max_bytes: 5242880
+  backup_count: 3
+
+# --- Paths ---
+paths:
+  gallery_dir: "data/gallery"
+  benchmark_dir: "data/benchmark"
+  benchmark_images_dir: "data/benchmark/images"
+  benchmark_labels_dir: "data/benchmark/_annotations.coco.json"
+  query_dir: "data/query"
+  output_dir: "data/outputs"
+  cache_dir: "data/cache"
+  metadata_dir: "data/metadata"
+  detector_weights_dir: "weights/detector"
+  retriever_weights_dir: "weights/retriever"
+  plugin_weights_dir: "weights/plugins"
+  refinement_weights_dir: "weights/refinement"
+
+# --- Product Catalog / Metadata ---
+catalog:
+  build_metadata: false
+  products_filename: "products.json"
+  product_ids_filename: "product_ids.json"
+  # External product ID -> product name mapping (IDs stored as strings)
+  id_mapping:
+    "1": "アネッサ パーフェクトUV スキンケアスプレー"
+    "2": "インテグレート アイブローペンシル（BR641）"
+    "3": "インテグレート フォルミングチークス（OR210）"
+    "4": "マキアージュ スポンジパフ"
+    "5": "マジョリカマジョルカ シャドーカスタマイズ（BE203）"
+    "6": "マジョリカマジョルカ シャドーカスタマイズ（PK300）"
+    "7": "外箱ABA"
+    "8": "外箱ABC"
+    "9": "7000000000"
+    "10": "7000000005"
+    "11": "7000000009"
+    "12": "7000000001"
+    "13": "7000000004"
+    "14": "7000000011"
+    "15": "7000000002"
+    "17": "7000000006"
+    "18": "8000000016"
+    "19": "7000000014"
+
+# --- Detection Module ---
+detection:
+  backend: "rf_detr" # mock_contour | rf_detr
+  weights_path: "weights/detector/model.pt"
+  confidence_threshold: 0.35
+  min_box_area_ratio: 0.001
+  max_box_area_ratio: 0.60
+  min_aspect_ratio: 0.15
+  max_aspect_ratio: 6.0
+  canny_threshold_1: 40
+  canny_threshold_2: 120
+  blur_kernel_size: 5
+  max_detections: 50
+  rf_detr:
+    variant: "base" # nano | small | medium | base | large
+    weights_path: "weights/detector/checkpoint_best_ema.pth"
+    device: "cuda"
+    inference:
+      optimize: true
+      compile: false
+      batch_size: 1
+      dtype: "float32" # float32 | float16
+      inplace: false
+
+# --- Detection Refinement / Segmentation ---
+refinement:
+  enabled: true
+  backend: "sam2" # none | sam2
+  trigger:
+    enabled: true
+    iou_threshold: 0.05
+    overlap_ratio_threshold: 0.20
+    min_overlapping_pairs: 1
+    require_multiple_detections: true
+  sam2:
+    model_type: "sam2.1_hiera_small"
+    checkpoint_path: "weights/refinement/sam2/sam2.1_hiera_small.pt"
+    model_config: ""
+    device: "cuda"
+    prompt_type: "box"
+    use_source_image: true
+    per_detection: true
+    mask_threshold: 0.50
+    min_mask_area_ratio: 0.001
+  output:
+    use_mask_bbox: true
+    fallback_to_detection_bbox: true
+    min_mask_coverage_ratio: 0.20
+    max_bbox_expansion_ratio: 1.50
+
+# --- Cropping Module ---
+cropping:
+  padding_pixels: 4
+  target_size: [512, 512]
+  use_refined_bbox: true
+
+# --- Retrieval Module ---
+retrieval:
+  backend: "siglip2" # mock_visual_embedding | siglip2
+  embedding_dim: 768
+  gallery_index_path: "data/cache/gallery_index.faiss"
+  gallery_metadata_path: "data/cache/gallery_metadata.json"
+  top_k: 5
+  color_hist_bins: 8
+  build_gallery_index: false
+  siglip2:
+    model_name: "google/siglip2-base-patch16-224"
+    weights_path: "weights/retriever/siglip2"
+    device: "cuda"
+
+# --- Decision Engine ---
+decision:
+  similarity_threshold: 0.55
+  min_confidence_accept: 0.60
+  uncertain_band: 0.15
+  detection_weight: 0.35
+  similarity_weight: 0.65
+  ambiguous_top_n: 3
+  ambiguous_margin: 0.05
+
+# --- Plugins ---
+plugins:
+  enabled: true
+  ocr:
+    enabled: true
+    language:
+      - en
+    device: "cuda"
+    min_text_length: 3
+    confidence_threshold: 0.10
+    upscale_enabled: true
+    upscale_max: 3
+    upscale_threshold_small: 300
+    upscale_threshold_medium: 600
+    clahe_enabled: true
+    clahe_clip_limit: 2.0
+    clahe_tile_grid_size: 8
+    rotation_enabled: true
+    rotation_angles:
+      - 90
+      - 180
+      - 270
+  color:
+    enabled: true
+    roi_enabled: true
+    clustering_size: 96
+    blur_kernel_size: 3
+    canny_threshold1: 30
+    canny_threshold2: 100
+    morphology_enabled: true
+    morphology_kernel_size: 5
+    min_area_ratio: 0.45
+    max_area_ratio: 0.75
+    target_area_ratio: 0.60
+    min_rectangularity: 0.80
+    min_aspect_ratio: 0.70
+    max_aspect_ratio: 2.50
+    roi_shrink_ratio: 0.08
+    fallback_center_roi: true
+    fallback_roi_width_ratio: 0.70
+    fallback_roi_height_ratio: 0.70
+    use_lab: true
+    remove_highlights: true
+    highlight_l_threshold: 245
+    min_dominant_chroma: 10.0
+    highlight_l_secondary_threshold: 200
+    highlight_chroma_threshold: 15.0
+    center_weight_enabled: true
+    center_weight_sigma_ratio: 0.6
+    kmeans_l_weight: 0.9
+    roi_detection_size: 256
+    fallback_lower_width_ratio: 0.2
+    fallback_lower_height_ratio: 0.2
+    fallback_lower_x_ratio: 0.5
+    fallback_lower_y_ratio: 0.5
+    lower_position_target_y: 0.50
+    lower_position_tolerance: 0.45
+    n_clusters: 3
+    kmeans_max_iter: 20
+    kmeans_epsilon: 0.5
+    kmeans_attempts: 3
+  barcode:
+    enabled: false
+  force_rules:
+    "5": ["color"]
+    "6": ["color"]
+    "7": ["ocr"]
+    "8": ["ocr"]
+
+# --- Reranking / Evidence Fusion ---
+rerank:
+  retrieval_protection:
+    enabled: true
+    consensus_mode: "count"  # "hybrid" | "count" | "weight"
+
+    consensus_start: 0.50
+    consensus_strong: 0.80
+
+    hybrid_weights:
+      count: 0.50
+      weighted: 0.30
+      margin: 0.20
+
+    margin_consensus_start: 0.10
+    margin_consensus_strong: 0.30
+
+    boost_ratio_min: 0.20
+    boost_ratio_max: 1.00
+
+    color_strong_ratio: 0.20
+    ocr_strong_ratio: 0.30
+    barcode_strong_ratio: 1.00
+
+    min_switch_margin: 0.05
+
+  confusable_pairs:
+    - ["7", "8"]
+  confusable_min_agreeing_plugins: 1
+
+  barcode:
+    weight: 1.00
+
+  ocr:
+    weight: 0.60
+    min_text_length: 2
+    fuzzy_threshold: 0.80
+
+  color:
+    enabled: true
+    weight: 0.20
+    references_path: "data/metadata/product_colors.json"
+    delta_e_strong: 5.0
+    delta_e_weak: 20.0
+    min_margin: 1.0
+    margin_scale: 5.0
+    l_weight: 0.1
+
+# --- Storage ---
+storage:
+  save_json: true
+  save_csv: true
+  save_annotated_image: true
+  json_filename: "result.json"
+  csv_filename: "result.csv"
+  annotated_image_filename: "result.jpg"
+  box_color: [0, 200, 0]
+  box_thickness: 6
+  font_scale: 1.5
+
+# --- Validation ---
+validation:
+  iou_match_threshold: 0.30
+  top_k: 5
+  confidence_threshold: 0.0
+  report_json_filename: "report.json"
+  report_csv_filename: "report.csv"
+  summary_filename: "summary.txt"
+  records_filename: "records.csv"
+  chart_filename: "validation_summary_chart.png"
+  annotated_images_dirname: "validation_images"
+  export_records: true
+  save_annotated_images: true
+  stages:
+    detection: true
+    cropping: true
+    overlap: true
+    segmentation: true
+    retrieval: true
+    decision: true
+    plugins: true
+    fusion: true
+    end_to_end: true
+  metrics:
+    detection: [precision, recall, f1, mean_iou]
+    cropping: [valid_rate, mean_iou]
+    overlap: [precision, recall, f1]
+    segmentation: [iou_improvement, improved_rate]
+    retrieval: [top1_accuracy, topk_accuracy, mrr, mean_rank, recall_at_k]
+    decision: [accuracy, precision, recall, f1, confusion_matrix]
+    plugins: [trigger_rate, success_rate, correction_rate]
+    fusion: [accuracy_before, accuracy_after, improvement, correction_rate]
+    end_to_end: [precision, recall, f1, confusion_matrix]

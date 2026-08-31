@@ -1,0 +1,111 @@
+# ==========================================
+# 1. PYTHON & VIRTUAL ENVIRONMENTS
+# ==========================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+venv/
+.venv/
+
+# ==========================================
+# 2. TESTING & DEBUGGING
+# ==========================================
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.hypothesis/
+
+# ==========================================
+# 3. IDE & OS FILES
+# ==========================================
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ==========================================
+# 4. CONFIGURATION & SECRETS
+# ==========================================
+.env
+.env.*
+
+# ==========================================
+# 5. PROJECT SPECIFIC: MODEL WEIGHTS
+# ==========================================
+# Bỏ qua tất cả file weights (.pth, .pt, safetensors, v.v.) nhưng giữ lại thư mục rỗng qua .gitkeep
+weights/**/*.pth
+weights/**/*.pt
+weights/**/*.safetensors
+weights/**/*.bin
+weights/**/*.msgpack
+weights/**/*.h5
+weights/**/*.onnx
+# Bỏ qua cả các file config của HuggingFace download về (siglip2)
+weights/retriever/siglip2/*.json
+weights/retriever/siglip2/*.jinja
+
+# Ngoại lệ: Giữ lại các file .gitkeep trong thư mục weights
+!weights/**/.gitkeep
+
+# ==========================================
+# 6. PROJECT SPECIFIC: CACHE, OUTPUTS & BUILD METADATA
+# ==========================================
+# Bỏ qua output kết quả inference / benchmark
+data/outputs/*
+!data/outputs/.gitkeep
+
+# Bỏ qua FAISS index và logs
+data/cache/*
+!data/cache/.gitkeep
+
+# Bỏ qua các file metadata ĐƯỢC GENERATE (Build outputs)
+data/metadata/products.json
+data/metadata/product_ids.json
+# (Lưu ý: KHÔNG bỏ qua data/metadata/product_colors.json vì đây là file code tay - "HAND-AUTHORED")
+
+# ==========================================
+# 7. PROJECT SPECIFIC: DATASETS (OPTIONAL)
+# ==========================================
+# Bỏ comment các dòng dưới đây nếu bạn KHÔNG muốn đẩy ảnh gallery/query thực tế lên Git
+# (Thường áp dụng khi dataset quá nặng)
+
+# data/gallery/*
+data/gallery/.gitkeep
+# data/query/*
+data/query/.gitkeep
+
+#temp
+data/
+docs/
+notebooks/
+weights/
+scripts/
+tests/  
+test.py
