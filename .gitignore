@@ -103,7 +103,6 @@ data/query/.gitkeep
 
 #temp
 data/
-docs/
 notebooks/
 weights/
 scripts/

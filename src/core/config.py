@@ -271,6 +271,104 @@ class BarcodePluginSection(BaseModel):
 
     enabled: bool
 
+    # --- confidence computation (see BarcodePlugin._compute_confidence) ---
+    quality_saturation: float = Field(
+        default=30.0, gt=0.0,
+        description="pyzbar `quality` value at/above which quality_signal saturates to 1.0.",
+    )
+    type_trust_default: float = Field(
+        default=0.70, ge=0.0, le=1.0,
+        description="Trust applied to a decoded symbology not listed in `type_trust`.",
+    )
+    type_trust: dict[str, float] = Field(
+        default_factory=lambda: {
+            "EAN13": 1.00,
+            "EAN8": 1.00,
+            "UPCA": 1.00,
+            "UPCE": 1.00,
+            "CODE128": 1.00,
+            "CODE39": 0.60,
+            "CODABAR": 0.60,
+            "QRCODE": 0.90,
+        },
+        description="Per-symbology trust weight in [0, 1], keyed by pyzbar `ZBarSymbol` name.",
+    )
+    ambiguity_penalty: float = Field(
+        default=0.50, ge=0.0, le=1.0,
+        description="Multiplier applied when a crop decodes >1 distinct barcode value.",
+    )
+
+    # --- presence pre-check (skip preprocessing tail when no barcode found) ---
+    presence_check_enabled: bool = True
+    presence_edge_canny_threshold1: int = Field(default=50, ge=0, le=255)
+    presence_edge_canny_threshold2: int = Field(default=150, ge=0, le=255)
+    presence_edge_density_min: float = Field(
+        default=0.01, ge=0.0, le=1.0,
+        description="Minimum fraction of edge pixels required to proceed past the cheapest gate.",
+    )
+    presence_sobel_ksize: int = Field(default=3, ge=1, le=31)
+    presence_blur_kernel: int = Field(default=21, ge=1, le=101)
+    presence_close_kernel_w: int = Field(default=21, ge=1, le=101)
+    presence_close_kernel_h: int = Field(default=7, ge=1, le=101)
+    presence_min_area_ratio: float = Field(
+        default=0.02, ge=0.0, le=1.0,
+        description="Minimum fraction of crop area the detected region must cover to count as a barcode.",
+    )
+    presence_roi_padding: int = Field(default=15, ge=0)
+
+    # --- preprocessing pipeline (applied cumulatively, early-exit on success) ---
+    preprocessing_enabled: bool = True
+
+    # 1. Deskew via parallel-line detection (Hough) — fallback when
+    #    presence-region detection is disabled or found no region.
+    deskew_enabled: bool = True
+    deskew_canny_threshold1: int = Field(default=50, ge=0, le=255)
+    deskew_canny_threshold2: int = Field(default=150, ge=0, le=255)
+    deskew_hough_threshold: int = Field(default=80, ge=1)
+    deskew_max_angle: float = Field(default=45.0, gt=0.0, le=90.0)
+
+    # 2. Upscale small crops
+    upscale_enabled: bool = True
+    upscale_threshold: int = Field(default=400, ge=1)
+    upscale_max_factor: float = Field(default=3.0, ge=1.0)
+    upscale_interpolation: Literal["cubic", "linear"] = "cubic"
+
+    # 3. Contrast enhancement (CLAHE)
+    clahe_enabled: bool = True
+    clahe_clip_limit: float = Field(default=2.0, gt=0.0)
+    clahe_tile_grid_size: int = Field(default=8, ge=1)
+
+    # 4. Adaptive threshold
+    adaptive_threshold_enabled: bool = True
+    adaptive_threshold_block_size: int = Field(default=11, ge=3)
+    adaptive_threshold_c: int = Field(default=2)
+
+    # 5. Denoise
+    denoise_enabled: bool = True
+    denoise_strength: float = Field(default=10.0, gt=0.0)
+
+    # 6. Sharpen (applied after upscale)
+    sharpen_enabled: bool = True
+    sharpen_blur_sigma: float = Field(default=3.0, gt=0.0)
+    sharpen_amount: float = Field(default=1.5, gt=0.0)
+
+    # 7. Fallback: fixed-angle rotation, last resort after all transforms above
+    rotation_fallback_enabled: bool = True
+    rotation_fallback_angles: list[int] = Field(default_factory=lambda: [90, 180, 270])
+
+    @model_validator(mode="after")
+    def validate_barcode_section(self) -> "BarcodePluginSection":
+        for symbology, trust in self.type_trust.items():
+            if not (0.0 <= trust <= 1.0):
+                raise ValueError(f"type_trust['{symbology}']={trust} must be in [0, 1]")
+
+        if self.adaptive_threshold_block_size % 2 == 0:
+            raise ValueError("adaptive_threshold_block_size must be odd")
+
+        if self.presence_close_kernel_w < 1 or self.presence_close_kernel_h < 1:
+            raise ValueError("presence_close_kernel_w/h must be >= 1")
+
+        return self
 
 class PluginsSection(BaseModel):
     """Plugin system configuration."""

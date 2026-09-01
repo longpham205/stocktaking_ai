@@ -125,7 +125,7 @@ retrieval:
   gallery_metadata_path: "data/cache/gallery_metadata.json"
   top_k: 5
   color_hist_bins: 8
-  build_gallery_index: true
+  build_gallery_index: false
   siglip2:
     model_name: "google/siglip2-base-patch16-224"
     weights_path: "weights/retriever/siglip2"
@@ -202,11 +202,78 @@ plugins:
     kmeans_max_iter: 20
     kmeans_epsilon: 0.5
     kmeans_attempts: 3
+
   barcode:
-    enabled: false
+    enabled: true
+
+    # --- confidence computation ---
+    quality_saturation: 30
+    type_trust_default: 0.70
+    type_trust:
+      EAN13: 1.00
+      EAN8: 1.00
+      UPCA: 1.00
+      UPCE: 1.00
+      CODE128: 1.00
+      CODE39: 0.60
+      CODABAR: 0.60
+      QRCODE: 0.90
+    ambiguity_penalty: 0.50
+
+    # --- presence pre-check (skip pipeline early when no barcode found) ---
+    presence_check_enabled: true
+    presence_edge_canny_threshold1: 50
+    presence_edge_canny_threshold2: 150
+    presence_edge_density_min: 0.01
+    presence_sobel_ksize: 3
+    presence_blur_kernel: 21
+    presence_close_kernel_w: 21
+    presence_close_kernel_h: 7
+    presence_min_area_ratio: 0.02
+    presence_roi_padding: 15
+
+    # --- preprocessing pipeline (cumulative, early-exit on success) ---
+    preprocessing_enabled: true
+
+    deskew_enabled: true
+    deskew_canny_threshold1: 50
+    deskew_canny_threshold2: 150
+    deskew_hough_threshold: 80
+    deskew_max_angle: 45.0
+
+    upscale_enabled: true
+    upscale_threshold: 400
+    upscale_max_factor: 3.0
+    upscale_interpolation: "cubic"
+
+    clahe_enabled: true
+    clahe_clip_limit: 2.0
+    clahe_tile_grid_size: 8
+
+    adaptive_threshold_enabled: true
+    adaptive_threshold_block_size: 11
+    adaptive_threshold_c: 2
+
+    denoise_enabled: true
+    denoise_strength: 10.0
+
+    sharpen_enabled: true
+    sharpen_blur_sigma: 3.0
+    sharpen_amount: 1.5
+
+    rotation_fallback_enabled: true
+    rotation_fallback_angles:
+      - 90
+      - 180
+      - 270
+
   force_rules:
-    "5": ["color"]
-    "6": ["color"]
+    "1": ["barcode"]
+    "2": ["barcode"]
+    "3": ["barcode"]
+    "4": ["barcode"]
+    "5": ["barcode", "color"]
+    "6": ["barcode", "color"]
     "7": ["ocr"]
     "8": ["ocr"]
 
@@ -214,7 +281,7 @@ plugins:
 rerank:
   retrieval_protection:
     enabled: true
-    consensus_mode: "count"  # "hybrid" | "count" | "weight"
+    consensus_mode: "hybrid"  # "hybrid" | "count" | "weight"
 
     consensus_start: 0.10
     consensus_strong: 0.80

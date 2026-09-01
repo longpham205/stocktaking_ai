@@ -14,6 +14,12 @@ OCR orientation handling:
 
       For ambiguous OCR orientations, the orientation-specific OCR confidence
       is preferred over the global OCR confidence.
+
+Barcode matching:
+    - Decoded values and catalog values are both normalized before
+      comparison (digits only, UPC-A aligned to EAN-13 by prepending a
+      leading zero) since the two encode the same identifier and
+      catalog/decoder data commonly mixes the two forms.
 """
 
 from __future__ import annotations
@@ -331,6 +337,9 @@ class Reranker:
 
         result.rerank_debug = {
             "retrieval_guard": retrieval_guard,
+            "barcode_preprocessing_stage": plugin_result.evidence.get("barcode", {}).get(
+                "preprocessing_stage"
+            ),
             "switch_reverted": switch_reverted,
             "plugin_confidence": plugin_confidence,
             "ocr_orientation_candidates": ocr_candidates,
@@ -1245,12 +1254,44 @@ class Reranker:
     # BARCODE MATCH LOGIC
     # ----------------------------------------------------------------------
 
+    @staticmethod
+    def _normalize_barcode(value: str) -> str:
+        """Normalize a barcode value for comparison.
+
+        Strips non-digit characters and aligns UPC-A (12 digits) to
+        EAN-13/JAN (13 digits) by prepending a leading zero, since the
+        two encode the same identifier and catalog/decoder data commonly
+        mixes the two forms.
+        """
+        digits = re.sub(r"[^0-9]", "", str(value))
+        if len(digits) == 12:
+            digits = "0" + digits
+        return digits
+
+    @classmethod
+    def _extract_barcode_matches(cls, plugin_result: PluginResult) -> set[str]:
+        """Extract decoded barcode values, normalized for comparison."""
+        barcode_evidence = plugin_result.evidence.get("barcode")
+        if not barcode_evidence:
+            return set()
+
+        matches: set[str] = set()
+        for entry in barcode_evidence.get("barcodes", []):
+            raw = entry.get("data")
+            if not raw:
+                continue
+            normalized = cls._normalize_barcode(raw)
+            if normalized:
+                matches.add(normalized)
+
+        return matches
+
     def _barcode_match_strength(
         self,
         product_id: str,
         barcode_matches: set[str],
     ) -> float:
-        """Return exact barcode match strength."""
+        """Return exact barcode match strength (after normalization)."""
         if not barcode_matches:
             return 0.0
 
@@ -1258,7 +1299,7 @@ class Reranker:
         if not product:
             return 0.0
 
-        catalog_barcode = str(product.get("barcode", "")).strip()
+        catalog_barcode = self._normalize_barcode(product.get("barcode", ""))
         return 1.0 if (catalog_barcode and catalog_barcode in barcode_matches) else 0.0
 
     # ----------------------------------------------------------------------
@@ -1269,19 +1310,6 @@ class Reranker:
     def _normalize_text(text: str) -> str:
         """Normalize OCR/catalog text for matching."""
         return "".join(char for char in text.upper().strip() if char.isalnum())
-
-    @staticmethod
-    def _extract_barcode_matches(plugin_result: PluginResult) -> set[str]:
-        """Extract decoded barcode values."""
-        barcode_evidence = plugin_result.evidence.get("barcode")
-        if not barcode_evidence:
-            return set()
-
-        return {
-            str(entry.get("data", "")).strip()
-            for entry in barcode_evidence.get("barcodes", [])
-            if entry.get("data")
-        }
 
     @staticmethod
     def _extract_generic_boost(plugin_result: PluginResult, exclude: set[str]) -> float:
