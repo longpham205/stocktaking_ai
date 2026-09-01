@@ -2,25 +2,25 @@
 
 > AI-powered retail product inventory counting system — detects, segments, retrieves, and identifies individual products from shelf photos, fusing visual retrieval with OCR, Color, and Barcode evidence to resolve visually near-identical product variants.
 
-## **📑 Table of Contents**
+## ** Table of Contents**
 
-* [1\. Executive Summary](https://www.google.com/search?q=%231-executive-summary)  
-* [2\. System Architecture & Pipeline](https://www.google.com/search?q=%232-system-architecture--pipeline)  
-* [3\. Key Modules & Features](https://www.google.com/search?q=%233-key-modules--features)  
-* [4\. Project Structure](https://www.google.com/search?q=%234-project-structure)  
-* [5\. System Requirements](https://www.google.com/search?q=%235-system-requirements)  
-* [6\. Installation & Environment Setup](https://www.google.com/search?q=%236-installation--environment-setup)  
-* [7\. Dataset & Metadata Specification](https://www.google.com/search?q=%237-dataset--metadata-specification)  
-* [8\. Configuration Schema](https://www.google.com/search?q=%238-configuration-schema)  
-* [9\. System Execution Guide](https://www.google.com/search?q=%239-system-execution-guide)  
-* [10\. Input & Output Specifications](https://www.google.com/search?q=%2310-input--output-specifications)  
-* [11\. Quantitative Performance Evaluation](https://www.google.com/search?q=%2311-quantitative-performance-evaluation)  
-* [12\. Engineering Insights & Experimental Log](https://www.google.com/search?q=%2312-engineering-insights--experimental-log)  
-* [13\. Current Runtime Status](https://www.google.com/search?q=%2313-current-runtime-status)  
-* [14\. Technical Limitations](https://www.google.com/search?q=%2314-technical-limitations)  
-* [15\. System Roadmap](https://www.google.com/search?q=%2315-system-roadmap)  
-* [16\. Citation](https://www.google.com/search?q=%2316-citation)  
-* [17\. License](https://www.google.com/search?q=%2317-license)
+- [1. Executive Summary](#1-executive-summary)
+- [2. System Architecture & Pipeline](#2-system-architecture--pipeline)
+- [3. Key Modules & Features](#3-key-modules--features)
+- [4. Project Structure](#4-project-structure)
+- [5. System Requirements](#5-system-requirements)
+- [6. Installation & Environment Setup](#6-installation--environment-setup)
+- [7. Dataset & Metadata Specification](#7-dataset--metadata-specification)
+- [8. Configuration Schema](#8-configuration-schema)
+- [9. System Execution Guide](#9-system-execution-guide)
+- [10. Input & Output Specifications](#10-input--output-specifications)
+- [11. Quantitative Performance Evaluation](#11-quantitative-performance-evaluation)
+- [12. Engineering Insights & Experimental Log](#12-engineering-insights--experimental-log)
+- [13. Current Runtime Status](#13-current-runtime-status)
+- [14. Technical Limitations](#14-technical-limitations)
+- [15. System Roadmap](#15-system-roadmap)
+- [16. Citation](#16-citation)
+- [17. License](#17-license)
 
 ## **1\. Executive Summary**
 
