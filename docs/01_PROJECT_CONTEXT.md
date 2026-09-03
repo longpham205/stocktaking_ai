@@ -183,6 +183,7 @@ stocktaking_ai/
 
 # 5. High-Level Architecture
 
+```text
 Desktop UI / CLI
                        │
                        ▼
@@ -213,6 +214,7 @@ Detection      OverlapResolver ──► Refiner (optional)  Retrieval
                              InventoryResult
                                     ▼
                              StorageManager
+```
 
 # **6\. Current Scope (v0.1.0 extended)**
 
