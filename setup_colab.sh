@@ -113,8 +113,7 @@ PYTHON_MINOR=$(python3 -c "import sys; print(sys.version_info.minor)")
 [[ "${PYTHON_MAJOR}" -eq 3 ]] || fail "Python 3 is required."
 
 if [[ "${PYTHON_MINOR}" -lt 11 || "${PYTHON_MINOR}" -ge 13 ]]; then
-    warn "Project targets Python >=3.11,<3.13."
-    warn "Detected Python ${PYTHON_MAJOR}.${PYTHON_MINOR}."
+    fail "Unsupported Python version: ${PYTHON_MAJOR}.${PYTHON_MINOR}. Project requires Python >=3.11,<3.13."
 fi
 
 log "Installing Linux system packages"
