@@ -64,7 +64,7 @@ catalog:
 detection:
   backend: "rf_detr" # mock_contour | rf_detr
   weights_path: "weights/detector/model.pt"
-  confidence_threshold: 0.35
+  confidence_threshold: 0.70
   min_box_area_ratio: 0.001
   max_box_area_ratio: 0.60
   min_aspect_ratio: 0.15
@@ -330,7 +330,7 @@ storage:
   csv_filename: "result.csv"
   annotated_image_filename: "result.jpg"
   box_color: [0, 200, 0]
-  box_thickness: 3
+  box_thickness: 6
   font_scale: 1.5
 
 # --- Validation ---

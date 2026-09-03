@@ -1,8 +1,3 @@
-"""Dominant color extraction plugin.
-
-Extracts dominant color evidence from a product crop.
-"""
-
 from __future__ import annotations
 
 import cv2
@@ -26,10 +21,8 @@ class ColorPlugin:
         self._config = config.plugins.color
 
         logger.info(
-            "ColorPlugin initialized "
-            "(enabled=%s n_clusters=%d roi_enabled=%s "
-            "roi_detection_size=%d clustering_size=%d "
-            "kmeans_l_weight=%.2f)",
+            "ColorPlugin initialized (enabled=%s n_clusters=%d roi_enabled=%s "
+            "roi_detection_size=%d clustering_size=%d kmeans_l_weight=%.2f)",
             self._config.enabled,
             self._config.n_clusters,
             self._config.roi_enabled,
@@ -57,9 +50,9 @@ class ColorPlugin:
             }
         return self.run(crop)
 
-    # =========================================================================
-    # Main pipeline
-    # =========================================================================
+    # ------------------------------------------------------------------
+    # MAIN PIPELINE
+    # ------------------------------------------------------------------
 
     def run(self, crop: CropImage) -> dict:
         """Extract dominant color evidence from a product crop."""
@@ -71,11 +64,10 @@ class ColorPlugin:
 
             # 2. Resize ROI for K-Means
             clustering_size = max(16, int(self._config.clustering_size))
-            small = self._resize_for_clustering(roi_image, clustering_size)
-
-            # 2b. Center-based pixel weights
+            small = self._resize_image(roi_image, clustering_size)
             small_h, small_w = small.shape[:2]
 
+            # Center-based pixel weights
             if self._config.center_weight_enabled:
                 yy, xx = np.mgrid[0:small_h, 0:small_w]
                 center_y, center_x = small_h / 2.0, small_w / 2.0
@@ -89,15 +81,14 @@ class ColorPlugin:
             else:
                 pixel_weights = np.ones(small_h * small_w, dtype=np.float32)
 
-            # 3. Convert to Lab
+            # 3. Convert to target color space
             lab = cv2.cvtColor(small, cv2.COLOR_BGR2LAB)
             clustering_image = lab if self._config.use_lab else small
 
-            # 4. Flatten pixels
             clustering_pixels = clustering_image.reshape(-1, 3)
             lab_pixels = lab.reshape(-1, 3)
 
-            # 5. Remove extreme highlights + low-chroma glare
+            # 4. Filter highlights and low-chroma glare
             if self._config.remove_highlights and self._config.use_lab:
                 l_channel = lab_pixels[:, 0].astype(np.float32)
                 a_channel = lab_pixels[:, 1].astype(np.float32) - 128.0
@@ -124,7 +115,7 @@ class ColorPlugin:
                 mask = np.ones(clustering_pixels.shape[0], dtype=bool)
                 filtered_weights = pixel_weights
 
-            # 6. K-Means
+            # 5. K-Means Clustering
             pixels = filtered_pixels.astype(np.float32)
             n_clusters = max(1, min(int(self._config.n_clusters), pixels.shape[0]))
 
@@ -136,7 +127,6 @@ class ColorPlugin:
 
             l_weight = float(self._config.kmeans_l_weight)
             kmeans_input = pixels.copy()
-
             if self._config.use_lab:
                 kmeans_input[:, 0] = kmeans_input[:, 0] * l_weight
 
@@ -150,29 +140,22 @@ class ColorPlugin:
             )
             labels = labels.flatten()
 
-            # Recompute centers from ORIGINAL (unweighted) pixels
+            # Recompute unweighted centers
             overall_mean = pixels.mean(axis=0)
             centers = np.zeros((n_clusters, 3), dtype=np.float32)
-
             for cluster_idx in range(n_clusters):
                 cluster_mask = labels == cluster_idx
-                if np.any(cluster_mask):
-                    centers[cluster_idx] = pixels[cluster_mask].mean(axis=0)
-                else:
-                    centers[cluster_idx] = overall_mean
+                centers[cluster_idx] = pixels[cluster_mask].mean(axis=0) if np.any(cluster_mask) else overall_mean
 
-            # 7. Analyze clusters
+            # 6. Analyze clusters
             if self._config.center_weight_enabled:
                 counts = np.bincount(labels, weights=filtered_weights, minlength=n_clusters)
             else:
                 counts = np.bincount(labels, minlength=n_clusters).astype(np.float32)
 
             order = np.argsort(counts)[::-1]
-            total_pixels = float(np.sum(counts))
-            if total_pixels <= 0:
-                total_pixels = float(pixels.shape[0])
+            total_pixels = float(np.sum(counts)) if np.sum(counts) > 0 else float(pixels.shape[0])
 
-            # Batch convert centers to Lab and BGR for high performance
             ordered_centers = centers[order]
             if self._config.use_lab:
                 labs_batch = ordered_centers
@@ -194,15 +177,14 @@ class ColorPlugin:
                     round(float(lab_center[1]), 3),
                     round(float(lab_center[2]), 3),
                 ])
-
                 palette.append(self._bgr_to_hex(bgr_center))
                 percentages.append(round(float(counts[cluster_idx]) / total_pixels, 4))
 
-            # 8. Representative / dominant color selection
+            # 7. Select dominant color
             min_chroma = float(self._config.min_dominant_chroma)
             chroma_qualified_order = []
 
-            for i, cluster_idx in enumerate(order):
+            for i, _ in enumerate(order):
                 candidate_lab = labs_batch[i]
                 a_val = float(candidate_lab[1]) - 128.0
                 b_val = float(candidate_lab[2]) - 128.0
@@ -226,12 +208,10 @@ class ColorPlugin:
                 int(representative_bgr[0]),
             ]
 
-            # 9. Debug metadata
-            pixels_removed = int(lab_pixels.shape[0] - filtered_pixels.shape[0])
             debug_info = {
                 "pixels_used": int(pixels.shape[0]),
                 "pixels_before_filter": int(lab_pixels.shape[0]),
-                "highlight_pixels_removed": pixels_removed,
+                "highlight_pixels_removed": int(lab_pixels.shape[0] - filtered_pixels.shape[0]),
                 "n_clusters": n_clusters,
                 "clustering_size": clustering_size,
                 "roi_detection_size": int(self._config.roi_detection_size),
@@ -271,9 +251,9 @@ class ColorPlugin:
             "latency_ms": elapsed["elapsed_ms"],
         }
 
-    # =========================================================================
-    # ROI detection
-    # =========================================================================
+    # ------------------------------------------------------------------
+    # ROI DETECTION
+    # ------------------------------------------------------------------
 
     def _extract_powder_roi(self, image: np.ndarray) -> tuple[np.ndarray, dict]:
         """Detect the large rectangular powder region."""
@@ -290,9 +270,7 @@ class ColorPlugin:
                 "fallback_used": True,
             }
 
-        detection_image = self._resize_for_detection(
-            image, int(self._config.roi_detection_size)
-        )
+        detection_image = self._resize_image(image, int(self._config.roi_detection_size))
         det_h, det_w = detection_image.shape[:2]
 
         gray = cv2.cvtColor(detection_image, cv2.COLOR_BGR2GRAY)
@@ -328,9 +306,8 @@ class ColorPlugin:
             if perimeter <= 0:
                 continue
 
-            epsilon = 0.03 * perimeter
-            approx = cv2.approxPolyDP(contour, epsilon, True)
-            if len(approx) < 4 or len(approx) > 8:
+            approx = cv2.approxPolyDP(contour, 0.03 * perimeter, True)
+            if not (4 <= len(approx) <= 8):
                 continue
 
             x, y, w, h = cv2.boundingRect(approx)
@@ -340,7 +317,7 @@ class ColorPlugin:
             bbox_area = float(w * h)
             area_ratio = bbox_area / image_area
 
-            if area_ratio < float(self._config.min_area_ratio) or area_ratio > float(self._config.max_area_ratio):
+            if not (float(self._config.min_area_ratio) <= area_ratio <= float(self._config.max_area_ratio)):
                 continue
 
             rectangularity = contour_area / bbox_area if bbox_area > 0 else 0.0
@@ -348,7 +325,7 @@ class ColorPlugin:
                 continue
 
             aspect_ratio = w / float(h)
-            if aspect_ratio < float(self._config.min_aspect_ratio) or aspect_ratio > float(self._config.max_aspect_ratio):
+            if not (float(self._config.min_aspect_ratio) <= aspect_ratio <= float(self._config.max_aspect_ratio)):
                 continue
 
             candidate_center_x = x + w / 2.0
@@ -356,8 +333,7 @@ class ColorPlugin:
 
             dx = (candidate_center_x - center_x) / max(center_x, 1.0)
             dy = (candidate_center_y - center_y) / max(center_y, 1.0)
-            distance = float(np.sqrt(dx * dx + dy * dy))
-            center_score = max(0.0, 1.0 - distance)
+            center_score = max(0.0, 1.0 - float(np.sqrt(dx * dx + dy * dy)))
 
             candidate_center_y_norm = candidate_center_y / max(float(det_h), 1.0)
             candidate_center_x_norm = candidate_center_x / max(float(det_w), 1.0)
@@ -365,8 +341,7 @@ class ColorPlugin:
             horizontal_score = 1.0 - abs(candidate_center_x_norm - 0.5) * 2.0
             target_y = float(self._config.lower_position_target_y)
             tolerance = max(float(self._config.lower_position_tolerance), 1e-6)
-            vertical_distance = abs(candidate_center_y_norm - target_y)
-            vertical_score = max(0.0, 1.0 - vertical_distance / tolerance)
+            vertical_score = max(0.0, 1.0 - abs(candidate_center_y_norm - target_y) / tolerance)
 
             lower_position_score = float(np.clip(0.5 * horizontal_score + 0.5 * vertical_score, 0.0, 1.0))
 
@@ -396,7 +371,6 @@ class ColorPlugin:
             best = candidates[0]
             x, y, w, h = best["bbox"]
 
-            # Correct Bounding Box Scaling Fix
             scale_x = width / float(det_w)
             scale_y = height / float(det_h)
 
@@ -405,14 +379,9 @@ class ColorPlugin:
             x2 = max(x1 + 1, min(width, int(round((x + w) * scale_x))))
             y2 = max(y1 + 1, min(height, int(round((y + h) * scale_y))))
 
-            orig_w = x2 - x1
-            orig_h = y2 - y1
-
             roi = image[y1:y2, x1:x2]
-            shrunken_roi = self._shrink_roi(roi)
-
-            return shrunken_roi, {
-                "bbox": [x1, y1, orig_w, orig_h],
+            return self._shrink_roi(roi), {
+                "bbox": [x1, y1, x2 - x1, y2 - y1],
                 "area_ratio": best["area_ratio"],
                 "rectangularity": best["rectangularity"],
                 "score": round(float(best["score"]), 4),
@@ -422,9 +391,9 @@ class ColorPlugin:
 
         return self._lower_roi_fallback(image)
 
-    # =========================================================================
-    # Helpers
-    # =========================================================================
+    # ------------------------------------------------------------------
+    # UTILITIES & HELPERS
+    # ------------------------------------------------------------------
 
     def _shrink_roi(self, roi: np.ndarray) -> np.ndarray:
         """Shrink ROI slightly towards center to eliminate potential package edges."""
@@ -447,10 +416,8 @@ class ColorPlugin:
         cx, cy = w // 2, h // 2
         rw, rh = int(w * 0.5), int(h * 0.5)
 
-        x = max(0, cx - rw // 2)
-        y = max(0, cy - rh // 2)
-        w_box = min(w - x, rw)
-        h_box = min(h - y, rh)
+        x, y = max(0, cx - rw // 2), max(0, cy - rh // 2)
+        w_box, h_box = min(w - x, rw), min(h - y, rh)
 
         return image[y: y + h_box, x: x + w_box], [x, y, w_box, h_box]
 
@@ -460,16 +427,11 @@ class ColorPlugin:
         fw = int(w * float(self._config.fallback_lower_width_ratio))
         fh = int(h * float(self._config.fallback_lower_height_ratio))
 
-        x = max(0, (w - fw) // 2)
-        y = max(0, int(h * float(self._config.fallback_lower_y_ratio)))
-        w_box = min(w - x, fw)
-        h_box = min(h - y, fh)
+        x, y = max(0, (w - fw) // 2), max(0, int(h * float(self._config.fallback_lower_y_ratio)))
+        w_box, h_box = min(w - x, fw), min(h - y, fh)
 
-        roi = image[y: y + h_box, x: x + w_box]
-        bbox = [x, y, w_box, h_box]
-
-        return roi, {
-            "bbox": bbox,
+        return image[y: y + h_box, x: x + w_box], {
+            "bbox": [x, y, w_box, h_box],
             "area_ratio": (w_box * h_box) / float(w * h),
             "rectangularity": 1.0,
             "score": 0.0,
@@ -477,18 +439,9 @@ class ColorPlugin:
             "fallback_used": True,
         }
 
-    def _resize_for_detection(self, image: np.ndarray, target_size: int) -> np.ndarray:
-        """Resize image preserving aspect ratio for ROI detection."""
-        h, w = image.shape[:2]
-        if max(h, w) <= target_size:
-            return image
-
-        scale = target_size / float(max(h, w))
-        new_w, new_h = max(1, int(round(w * scale))), max(1, int(round(h * scale)))
-        return cv2.resize(image, (new_w, new_h), interpolation=cv2.INTER_AREA)
-
-    def _resize_for_clustering(self, image: np.ndarray, target_size: int) -> np.ndarray:
-        """Resize ROI image for fast K-Means clustering."""
+    @staticmethod
+    def _resize_image(image: np.ndarray, target_size: int) -> np.ndarray:
+        """Resize image preserving aspect ratio."""
         h, w = image.shape[:2]
         if max(h, w) <= target_size:
             return image
@@ -499,23 +452,20 @@ class ColorPlugin:
 
     @staticmethod
     def _bgr_to_lab_batch(bgr_array: np.ndarray) -> np.ndarray:
-        """Convert array of BGR vectors (N, 3) to Lab space in a single batch call."""
+        """Convert array of BGR vectors (N, 3) to Lab space."""
         bgr_reshaped = bgr_array.reshape(-1, 1, 3).astype(np.uint8)
-        lab_reshaped = cv2.cvtColor(bgr_reshaped, cv2.COLOR_BGR2LAB)
-        return lab_reshaped.reshape(-1, 3).astype(np.float32)
+        return cv2.cvtColor(bgr_reshaped, cv2.COLOR_BGR2LAB).reshape(-1, 3).astype(np.float32)
 
     @staticmethod
     def _lab_to_bgr_batch(lab_array: np.ndarray) -> np.ndarray:
-        """Convert array of Lab vectors (N, 3) to BGR space in a single batch call."""
+        """Convert array of Lab vectors (N, 3) to BGR space."""
         lab_reshaped = lab_array.reshape(-1, 1, 3).astype(np.uint8)
-        bgr_reshaped = cv2.cvtColor(lab_reshaped, cv2.COLOR_LAB2BGR)
-        return bgr_reshaped.reshape(-1, 3).astype(np.uint8)
+        return cv2.cvtColor(lab_reshaped, cv2.COLOR_LAB2BGR).reshape(-1, 3).astype(np.uint8)
 
     @staticmethod
     def _bgr_to_hex(bgr_pixel: np.ndarray) -> str:
         """Convert a BGR pixel array to HEX string."""
-        b, g, r = int(bgr_pixel[0]), int(bgr_pixel[1]), int(bgr_pixel[2])
-        return f"#{r:02x}{g:02x}{b:02x}"
+        return f"#{int(bgr_pixel[2]):02x}{int(bgr_pixel[1]):02x}{int(bgr_pixel[0]):02x}"
 
     @staticmethod
     def _validate_image(image: np.ndarray) -> np.ndarray:

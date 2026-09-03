@@ -1,27 +1,7 @@
 """Validation mode execution runner (VAL).
 
-Responsibility: load COCO-style ground truth, run the exact same
-`InventoryPipeline` used in production (via `run_with_trace` so
-intermediate stage results are available for staged VAL metrics — see
-02_MODULE_SPECIFICATION.md, Section 9.1 and VAL spec Section 15), and
-forward everything to `Evaluator`. Also produces the human-facing report
-artifacts: JSON/CSV/summary, a flat `records.csv` for notebooks, a
-per-stage bar chart PNG, and color-coded annotated benchmark images.
-
-Expected benchmark layout:
-
-    <benchmark_dir>/
-    ├── images/
-    │   ├── *.jpg
-    │   └── ...
-    └── _annotations.coco.json
-
-Ground truth `category_id` is the same stable internal product_id used
-everywhere else in this codebase (see src/catalog/metadata.py) — per
-project convention, COCO categories are authored with `category_id`
-equal to the numeric product_id from `config.catalog.id_mapping` /
-`product_ids.json`. No separate product-ID system is created for VAL
-(VAL spec, Section 1).
+Responsibility: load COCO-style ground truth, run the exact same `InventoryPipeline`
+used in production, and forward everything to `Evaluator`. Also produces report artifacts.
 """
 
 from __future__ import annotations
@@ -46,20 +26,16 @@ from src.validation.evaluator import (
 
 logger = get_logger(__name__)
 
-_COLOR_TP = (0, 200, 0)  # green (BGR)
-_COLOR_FP = (0, 0, 220)  # red
-_COLOR_FN = (0, 140, 255)  # orange
+_COLOR_TP = (0, 200, 0)    # Green (BGR)
+_COLOR_FP = (0, 0, 220)    # Red (BGR)
+_COLOR_FN = (0, 140, 255)  # Orange (BGR)
 
 
 class ValidationRunner:
     """Executes Validation Mode: COCO benchmark -> real pipeline -> VAL report."""
 
     def __init__(self, config: AppConfig) -> None:
-        """Initializes the ValidationRunner, its pipeline, and evaluator once.
-
-        Args:
-            config: Fully validated application configuration.
-        """
+        """Initializes ValidationRunner, pipeline, and evaluator."""
         self._config = config
         self._pipeline = InventoryPipeline(config)
         self._evaluator = Evaluator(config)
@@ -68,18 +44,7 @@ class ValidationRunner:
         logger.info("ValidationRunner initialized.")
 
     def run(self, benchmark_dir: str) -> dict:
-        """Runs validation over a COCO-annotated benchmark directory.
-
-        Args:
-            benchmark_dir: Root directory containing `images/` and
-                `_annotations.coco.json`.
-
-        Returns:
-            The full VAL report dictionary produced by the Evaluator.
-
-        Raises:
-            FileNotFoundError: If `_annotations.coco.json` is missing.
-        """
+        """Runs validation over a COCO-annotated benchmark directory."""
         benchmark_root = Path(benchmark_dir)
         images_dir = benchmark_root / "images"
         annotations_path = benchmark_root / "_annotations.coco.json"
@@ -91,8 +56,8 @@ class ValidationRunner:
             )
 
         coco_images, ground_truth_by_image_id = self._load_coco_annotations(annotations_path)
-
         records: list[ImageEvalInput] = []
+
         for coco_image in coco_images:
             image_path = images_dir / coco_image["file_name"]
             if not image_path.is_file():
@@ -139,23 +104,8 @@ class ValidationRunner:
     # =========================================================================
 
     @staticmethod
-    def _load_coco_annotations(
-        annotations_path: Path,
-    ) -> tuple[list[dict], dict[int, list[GroundTruthObject]]]:
-        """Loads and indexes a COCO-style annotations file.
-
-        Args:
-            annotations_path: Path to `_annotations.coco.json`.
-
-        Returns:
-            Tuple of:
-                - `images`: the COCO `images[]` list, unchanged.
-                - `ground_truth_by_image_id`: mapping of COCO image id to
-                  its list of GroundTruthObject instances.
-
-        Raises:
-            ValueError: If the file is not valid COCO JSON.
-        """
+    def _load_coco_annotations(annotations_path: Path) -> tuple[list[dict], dict[int, list[GroundTruthObject]]]:
+        """Loads and indexes a COCO-style annotations file."""
         with annotations_path.open("r", encoding="utf-8") as file_handle:
             try:
                 data = json.load(file_handle)
@@ -164,8 +114,8 @@ class ValidationRunner:
 
         images = data.get("images", [])
         annotations = data.get("annotations", [])
-
         ground_truth_by_image_id: dict[int, list[GroundTruthObject]] = {}
+
         for annotation in annotations:
             image_id = annotation["image_id"]
             x, y, w, h = annotation["bbox"]
@@ -189,11 +139,7 @@ class ValidationRunner:
     # =========================================================================
 
     def _write_reports(self, report: dict) -> None:
-        """Writes the VAL report as JSON, per-image CSV, records.csv, and a text summary.
-
-        Args:
-            report: The report dictionary produced by the Evaluator.
-        """
+        """Writes the VAL report as JSON, per-image CSV, records.csv, and a text summary."""
         validation_config = self._config.validation
 
         json_path = self._output_dir / validation_config.report_json_filename
@@ -201,43 +147,42 @@ class ValidationRunner:
             json.dump(report, file_handle, indent=2, default=str, ensure_ascii=False)
         logger.info("Saved VAL report JSON to '%s'", json_path)
 
-        csv_path = self._output_dir / validation_config.report_csv_filename
         per_image = report.get("per_image", [])
         if per_image:
+            csv_path = self._output_dir / validation_config.report_csv_filename
             with csv_path.open("w", encoding="utf-8", newline="") as file_handle:
                 writer = csv.DictWriter(file_handle, fieldnames=list(per_image[0].keys()))
                 writer.writeheader()
                 writer.writerows(per_image)
             logger.info("Saved VAL per-image report CSV to '%s'", csv_path)
 
-        if validation_config.export_records:
-            records_rows = report.get("records", [])
+        records_rows = report.get("records", [])
+        if validation_config.export_records and records_rows:
             records_path = self._output_dir / validation_config.records_filename
-            if records_rows:
-                with records_path.open("w", encoding="utf-8", newline="") as file_handle:
-                    writer = csv.DictWriter(file_handle, fieldnames=list(records_rows[0].keys()))
-                    writer.writeheader()
-                    writer.writerows(records_rows)
-                logger.info("Saved flat per-crop records to '%s'", records_path)
+            with records_path.open("w", encoding="utf-8", newline="") as file_handle:
+                writer = csv.DictWriter(file_handle, fieldnames=list(records_rows[0].keys()))
+                writer.writeheader()
+                writer.writerows(records_rows)
+            logger.info("Saved flat per-crop records to '%s'", records_path)
 
         self._write_summary(report)
 
     def _write_summary(self, report: dict) -> None:
-        """Writes a human-readable text summary covering every enabled stage.
+        """Writes a human-readable text summary covering every enabled stage."""
+        lines = [
+            "STOCKTAKING AI - VALIDATION SUMMARY",
+            "=" * 60,
+            f"Total images evaluated : {report['dataset']['total_images']}",
+            f"IoU match threshold     : {report['configuration']['iou_match_threshold']}",
+            f"Top-K (retrieval eval)  : {report['configuration']['top_k']}",
+            "-" * 60,
+        ]
 
-        Args:
-            report: The report dictionary produced by the Evaluator.
-        """
-        lines = ["STOCKTAKING AI - VALIDATION SUMMARY", "=" * 60]
-        lines.append(f"Total images evaluated : {report['dataset']['total_images']}")
-        lines.append(f"IoU match threshold     : {report['configuration']['iou_match_threshold']}")
-        lines.append(f"Top-K (retrieval eval)  : {report['configuration']['top_k']}")
-        lines.append("-" * 60)
-
-        for stage_name in (
+        stages = (
             "detection", "cropping", "overlap", "segmentation",
             "retrieval", "decision", "plugins", "fusion", "end_to_end",
-        ):
+        )
+        for stage_name in stages:
             stage_report = report.get(stage_name)
             lines.append(f"[{stage_name.upper()}]")
             if stage_report == "skipped_by_config":
@@ -260,20 +205,11 @@ class ValidationRunner:
         logger.info("Saved VAL summary to '%s'", summary_path)
 
     # =========================================================================
-    # Annotated images (green=TP, red=FP, orange dashed=FN)
+    # Annotated images
     # =========================================================================
 
     def _save_annotated_images(self, records: list[ImageEvalInput]) -> None:
-        """Saves one color-coded annotated image per benchmark image.
-
-        Green solid = correct prediction (TP). Red solid = wrong
-        prediction (FP — bbox matched a GT but wrong product_id, or no
-        GT matched at all). Orange dashed = ground-truth object with no
-        matching prediction (FN, fully missed).
-
-        Args:
-            records: Evaluated benchmark images (with pipeline results).
-        """
+        """Saves one color-coded annotated image per benchmark image."""
         images_out_dir = self._output_dir / self._config.validation.annotated_images_dirname
         ensure_dir(images_out_dir)
         iou_threshold = self._config.validation.iou_match_threshold
@@ -287,14 +223,14 @@ class ValidationRunner:
             gt_boxes = [gt.bbox for gt in non_crowd_gt]
             gt_ids = [gt.product_id for gt in non_crowd_gt]
 
-            def class_ok(pred_index: int, gt_index: int, _p=pred_ids, _g=gt_ids) -> bool:
-                return _p[pred_index] == _g[gt_index]
+            def class_ok(pred_index: int, gt_index: int) -> bool:
+                return pred_ids[pred_index] == gt_ids[gt_index]
 
             matches, unmatched_pred, unmatched_gt = greedy_iou_match(
                 pred_boxes, gt_boxes, iou_threshold, class_ok=class_ok if pred_ids and gt_ids else None
             )
 
-            for pred_index, _gt_index, _iou in matches:
+            for pred_index, _, _ in matches:
                 self._draw_box(image, pred_boxes[pred_index], _COLOR_TP, f"{pred_ids[pred_index]} OK", dashed=False)
             for pred_index in unmatched_pred:
                 self._draw_box(image, pred_boxes[pred_index], _COLOR_FP, f"{pred_ids[pred_index]} WRONG", dashed=False)
@@ -308,15 +244,7 @@ class ValidationRunner:
 
     @staticmethod
     def _draw_box(image, bbox: BoundingBox, color: tuple[int, int, int], label: str, dashed: bool) -> None:
-        """Draws a single labeled bounding box (solid or dashed) onto an image.
-
-        Args:
-            image: BGR image array, modified in place.
-            bbox: Box to draw.
-            color: BGR color.
-            label: Text label drawn above the box.
-            dashed: Whether to draw a dashed rectangle (used for FN/missed).
-        """
+        """Draws a single labeled bounding box onto an image."""
         x1, y1, x2, y2 = int(bbox.x1), int(bbox.y1), int(bbox.x2), int(bbox.y2)
         if dashed:
             _draw_dashed_rectangle(image, (x1, y1), (x2, y2), color, thickness=2, dash_length=10)
@@ -329,14 +257,9 @@ class ValidationRunner:
     # =========================================================================
 
     def _save_chart(self, report: dict) -> None:
-        """Saves a bar chart PNG (precision/recall/f1 per enabled stage).
-
-        Args:
-            report: The report dictionary produced by the Evaluator.
-        """
+        """Saves a bar chart PNG (precision/recall/f1 per enabled stage)."""
         try:
             import matplotlib
-
             matplotlib.use("Agg")
             import matplotlib.pyplot as plt
         except ImportError:
@@ -345,6 +268,7 @@ class ValidationRunner:
 
         stage_names = ["detection", "overlap", "decision", "fusion", "end_to_end"]
         precisions, recalls, f1s, labels = [], [], [], []
+
         for stage_name in stage_names:
             stage_report = report.get(stage_name)
             if not isinstance(stage_report, dict):
@@ -353,7 +277,8 @@ class ValidationRunner:
                 isinstance(stage_report.get(key), (int, float)) for key in ("precision", "recall", "f1")
             )
             if not has_all_three:
-                continue  # e.g. fusion uses accuracy_before/after instead — don't plot a misleading 0
+                continue
+
             labels.append(stage_name)
             precisions.append(stage_report["precision"])
             recalls.append(stage_report["recall"])
@@ -381,26 +306,17 @@ class ValidationRunner:
         logger.info("Saved validation summary chart to '%s'", chart_path)
 
 
-def _draw_dashed_rectangle(image, pt1, pt2, color, thickness: int = 2, dash_length: int = 10) -> None:
-    """Draws a dashed rectangle outline (cv2 has no built-in dashed style).
-
-    Args:
-        image: BGR image array, modified in place.
-        pt1: Top-left corner (x, y).
-        pt2: Bottom-right corner (x, y).
-        color: BGR color.
-        thickness: Line thickness.
-        dash_length: Length of each dash segment, in pixels.
-    """
+def _draw_dashed_rectangle(image, pt1: tuple[int, int], pt2: tuple[int, int], color: tuple[int, int, int], thickness: int = 2, dash_length: int = 10) -> None:
+    """Draws a dashed rectangle outline."""
     x1, y1 = pt1
     x2, y2 = pt2
-    for (start, end) in [((x1, y1), (x2, y1)), ((x1, y2), (x2, y2))]:
+    for start, end in [((x1, y1), (x2, y1)), ((x1, y2), (x2, y2))]:
         _draw_dashed_line(image, start, end, color, thickness, dash_length)
-    for (start, end) in [((x1, y1), (x1, y2)), ((x2, y1), (x2, y2))]:
+    for start, end in [((x1, y1), (x1, y2)), ((x2, y1), (x2, y2))]:
         _draw_dashed_line(image, start, end, color, thickness, dash_length)
 
 
-def _draw_dashed_line(image, pt1, pt2, color, thickness: int, dash_length: int) -> None:
+def _draw_dashed_line(image, pt1: tuple[int, int], pt2: tuple[int, int], color: tuple[int, int, int], thickness: int, dash_length: int) -> None:
     """Draws a single dashed line segment."""
     x1, y1 = pt1
     x2, y2 = pt2
@@ -415,17 +331,5 @@ def _draw_dashed_line(image, pt1, pt2, color, thickness: int, dash_length: int) 
 
 
 def _format_kv(data: dict) -> str:
-    """Formats a flat dict as a compact, single-line 'k=v k=v ...' string.
-
-    Args:
-        data: A stage's metric dict.
-
-    Returns:
-        A compact string, skipping large nested containers.
-    """
-    parts = []
-    for key, value in data.items():
-        if isinstance(value, (dict, list)):
-            continue
-        parts.append(f"{key}={value}")
-    return " ".join(parts)
+    """Formats a flat dict as a compact single-line 'k=v k=v ...' string."""
+    return " ".join(f"{k}={v}" for k, v in data.items() if not isinstance(v, (dict, list)))

@@ -1,42 +1,3 @@
-"""Barcode decoding plugin.
-
-Decodes 1D/2D barcodes present within a product crop via `pyzbar`. Runs
-on `crop.raw_image_array` (original resolution) rather than
-`crop.image_array` — barcodes become unreadable once downsized to the
-retrieval crop size.
-
-Pipeline (applied cumulatively, early-exit on first successful decode):
-    -1. Presence pre-check: cheap edge-density gate that rejects crops
-        with almost no edge structure at all before any decode attempt.
-    0.  Raw decode — succeeds for most well-framed crops.
-    1.  Barcode region detection via gradient anisotropy: barcode bars
-        produce strong, spatially-dense gradient energy along one axis
-        and weak energy along the perpendicular axis, regardless of
-        rotation — a signature text and flat regions don't share. If no
-        such region is found after step 0 fails, the crop very likely
-        has no barcode, so the expensive preprocessing tail (CLAHE,
-        threshold, denoise, sharpen, rotation fallback) is skipped
-        entirely.
-    2.  Deskew, seeded from the detected region's angle when available
-        (falls back to a dedicated Hough pass otherwise) — barcode bars
-        are a strong parallel-line pattern, so this recovers arbitrary
-        skew angles, not just 90° multiples.
-    3.  Upscale small crops, cropped to the detected region first (when
-        available) so resolution isn't spent on irrelevant background.
-    4.  CLAHE contrast enhancement.
-    5.  Adaptive threshold binarization.
-    6.  Denoise.
-    7.  Sharpen.
-    8.  Fallback: fixed-angle rotation (90/180/270) — last resort for
-        cases the region/Hough estimate missed or misjudged.
-
-Barcode matching (see Reranker):
-    Decoded values and catalog values are both normalized before
-    comparison (digits only, UPC-A aligned to EAN-13/JAN by prepending
-    a leading zero) since the two encode the same identifier and
-    catalog/decoder data commonly mixes the two forms.
-"""
-
 from __future__ import annotations
 
 import cv2
@@ -57,21 +18,15 @@ class BarcodePlugin:
     name = "barcode"
 
     def __init__(self, config: AppConfig) -> None:
-        """Initializes the barcode plugin with its configuration.
-
-        Args:
-            config: Fully validated application configuration.
-        """
+        """Initializes the barcode plugin with its configuration."""
         self._config = config.plugins.barcode
-
         self._quality_saturation = max(float(self._config.quality_saturation), 1e-6)
         self._type_trust = dict(self._config.type_trust)
         self._type_trust_default = float(self._config.type_trust_default)
         self._ambiguity_penalty = float(self._config.ambiguity_penalty)
 
         logger.info(
-            "BarcodePlugin initialized (enabled=%s, preprocessing_enabled=%s, "
-            "presence_check_enabled=%s)",
+            "BarcodePlugin initialized (enabled=%s, preprocessing_enabled=%s, presence_check_enabled=%s)",
             self._config.enabled,
             self._config.preprocessing_enabled,
             self._config.presence_check_enabled,
@@ -86,21 +41,7 @@ class BarcodePlugin:
     # ------------------------------------------------------------------
 
     def run(self, crop: CropImage) -> dict:
-        """Decodes barcodes, applying preprocessing steps only as needed.
-
-        Args:
-            crop: The cropped product image to analyze.
-
-        Returns:
-            A dictionary with keys:
-                barcodes: List of {"data": str, "type": str, "quality": int}.
-                confidence: Plugin confidence in [0, 1] — how much this
-                    plugin's decode result should be trusted, independent
-                    of whether it matches any specific catalog candidate.
-                preprocessing_stage: Name of the stage that produced a
-                    result, "no_barcode_region" if the presence check
-                    rejected the crop, or "none" if every stage failed.
-        """
+        """Decodes barcodes, applying preprocessing steps only as needed."""
         with timer() as elapsed:
             decoded_objects: list = []
             stage_used = "none"
@@ -124,8 +65,7 @@ class BarcodePlugin:
             confidence = self._compute_confidence(barcodes)
 
         logger.info(
-            "BarcodePlugin decoded %d barcode(s) for crop_id='%s' "
-            "stage='%s' confidence=%.3f (%.2f ms)",
+            "BarcodePlugin decoded %d barcode(s) for crop_id='%s' stage='%s' confidence=%.3f (%.2f ms)",
             len(barcodes),
             crop.crop_id,
             stage_used,
@@ -148,12 +88,11 @@ class BarcodePlugin:
         """Try decode, applying cumulative preprocessing steps on failure."""
         cfg = self._config
 
-        # Stage -1: cheapest possible gate — reject crops with almost no
-        # edge structure before spending anything else on them.
+        # Stage -1: Edge pre-check
         if cfg.presence_check_enabled and not self._has_sufficient_edges(gray):
             return [], "no_barcode_region"
 
-        # Stage 0: raw decode
+        # Stage 0: Raw decode
         result = pyzbar.decode(gray)
         if result:
             return result, "raw"
@@ -161,10 +100,7 @@ class BarcodePlugin:
         if not cfg.preprocessing_enabled:
             return [], "none"
 
-        # Stage 1: locate a barcode-like region via gradient anisotropy.
-        # A real attempt was already made (stage 0) and failed, so if no
-        # such region exists anywhere in the crop, it very likely
-        # contains no barcode at all — skip the expensive tail.
+        # Stage 1: Barcode region detection via gradient anisotropy
         region = None
         if cfg.presence_check_enabled:
             region = self._detect_barcode_region(gray)
@@ -173,9 +109,7 @@ class BarcodePlugin:
 
         working = gray
 
-        # Stage 2: deskew — seed the angle from the detected region when
-        # available (cheaper and more robust than a second Hough pass),
-        # otherwise fall back to a dedicated Hough estimate.
+        # Stage 2: Deskew
         if cfg.deskew_enabled:
             angle = region["angle"] if region is not None else self._estimate_skew_angle(working)
             if abs(angle) > 0.5:
@@ -184,8 +118,7 @@ class BarcodePlugin:
                 if result:
                     return result, "deskew"
 
-        # Stage 3: upscale — crop to the detected region first (+
-        # padding) so upscaling isn't wasted on irrelevant background.
+        # Stage 3: Upscale
         if cfg.upscale_enabled:
             if region is not None:
                 working = self._crop_to_region(working, region["bbox"])
@@ -196,38 +129,35 @@ class BarcodePlugin:
                 if result:
                     return result, "upscale"
 
-        # Stage 4: CLAHE contrast
+        # Stage 4: CLAHE contrast enhancement
         if cfg.clahe_enabled:
             working = self._apply_clahe(working)
             result = pyzbar.decode(working)
             if result:
                 return result, "clahe"
 
-        # Stage 5: adaptive threshold (not carried forward — denoise and
-        # sharpen operate better on continuous grayscale than on a
-        # binary mask)
+        # Stage 5: Adaptive threshold
         if cfg.adaptive_threshold_enabled:
             thresholded = self._adaptive_threshold(working)
             result = pyzbar.decode(thresholded)
             if result:
                 return result, "adaptive_threshold"
 
-        # Stage 6: denoise
+        # Stage 6: Denoise
         if cfg.denoise_enabled:
             working = self._denoise(working)
             result = pyzbar.decode(working)
             if result:
                 return result, "denoise"
 
-        # Stage 7: sharpen
+        # Stage 7: Sharpen
         if cfg.sharpen_enabled:
             working = self._sharpen(working)
             result = pyzbar.decode(working)
             if result:
                 return result, "sharpen"
 
-        # Stage 8: fallback fixed-angle rotation — last resort for cases
-        # the region/Hough estimate missed or misjudged.
+        # Stage 8: Fallback fixed-angle rotation
         if cfg.rotation_fallback_enabled:
             h, w = working.shape[:2]
             center = (w / 2, h / 2)
@@ -241,11 +171,11 @@ class BarcodePlugin:
         return [], "none"
 
     # ------------------------------------------------------------------
-    # PRESENCE PRE-CHECK
+    # PREPROCESSING HELPER STAGES
     # ------------------------------------------------------------------
 
     def _has_sufficient_edges(self, gray: np.ndarray) -> bool:
-        """Cheapest possible gate: reject crops with almost no edges at all."""
+        """Reject crops with insufficient edge density."""
         edges = cv2.Canny(
             gray,
             self._config.presence_edge_canny_threshold1,
@@ -255,23 +185,14 @@ class BarcodePlugin:
         return density >= self._config.presence_edge_density_min
 
     def _detect_barcode_region(self, gray: np.ndarray) -> dict | None:
-        """Locate a barcode-like region via gradient anisotropy.
-
-        Returns:
-            None when no barcode-like region exists (strong signal
-            there's no barcode in this crop). Otherwise a dict with
-            "bbox" (x, y, w, h), "angle" (degrees, long-axis oriented),
-            and "area_ratio".
-        """
+        """Locate barcode-like region via gradient anisotropy."""
         cfg = self._config
 
         gx = cv2.Sobel(gray, cv2.CV_32F, 1, 0, ksize=cfg.presence_sobel_ksize)
         gy = cv2.Sobel(gray, cv2.CV_32F, 0, 1, ksize=cfg.presence_sobel_ksize)
         anisotropy = cv2.absdiff(cv2.convertScaleAbs(gx), cv2.convertScaleAbs(gy))
 
-        blurred = cv2.blur(
-            anisotropy, (cfg.presence_blur_kernel, cfg.presence_blur_kernel)
-        )
+        blurred = cv2.blur(anisotropy, (cfg.presence_blur_kernel, cfg.presence_blur_kernel))
         _, thresh = cv2.threshold(blurred, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
         kernel = cv2.getStructuringElement(
@@ -291,9 +212,7 @@ class BarcodePlugin:
         (_, _), (rw, rh), rect_angle = cv2.minAreaRect(largest)
         x, y, w, h = cv2.boundingRect(largest)
 
-        # Normalize angle toward the region's long axis so it represents
-        # the barcode's true rotation rather than an arbitrary minAreaRect
-        # convention.
+        # Normalize angle toward the long axis
         angle = rect_angle if rw < rh else rect_angle - 90.0
 
         return {
@@ -302,34 +221,20 @@ class BarcodePlugin:
             "area_ratio": float(area_ratio),
         }
 
-    def _crop_to_region(
-        self, gray: np.ndarray, bbox: tuple[int, int, int, int]
-    ) -> np.ndarray:
-        """Crop to the detected barcode region with padding, clamped to bounds."""
+    def _crop_to_region(self, gray: np.ndarray, bbox: tuple[int, int, int, int]) -> np.ndarray:
+        """Crop to bounding box with padding, safely clamped to bounds."""
         x, y, w, h = bbox
         pad = int(self._config.presence_roi_padding)
         h_img, w_img = gray.shape[:2]
 
-        x0 = max(0, x - pad)
-        y0 = max(0, y - pad)
-        x1 = min(w_img, x + w + pad)
-        y1 = min(h_img, y + h + pad)
+        x0, y0 = max(0, x - pad), max(0, y - pad)
+        x1, y1 = min(w_img, x + w + pad), min(h_img, y + h + pad)
 
         cropped = gray[y0:y1, x0:x1]
         return cropped if cropped.size > 0 else gray
 
-    # ------------------------------------------------------------------
-    # STAGE 2: DESKEW
-    # ------------------------------------------------------------------
-
     def _estimate_skew_angle(self, gray: np.ndarray) -> float:
-        """Estimate skew angle from the dominant parallel-line direction.
-
-        Fallback used only when region detection is disabled or didn't
-        run; barcode bars are a strong parallel-line pattern, so Hough
-        Line Transform reliably recovers arbitrary (non-90°-multiple)
-        skew angles.
-        """
+        """Estimate skew angle via Hough parallel line detection."""
         cfg = self._config
         edges = cv2.Canny(gray, cfg.deskew_canny_threshold1, cfg.deskew_canny_threshold2)
         lines = cv2.HoughLines(edges, 1, np.pi / 180, threshold=cfg.deskew_hough_threshold)
@@ -344,13 +249,11 @@ class BarcodePlugin:
             if -cfg.deskew_max_angle <= angle <= cfg.deskew_max_angle:
                 angles.append(angle)
 
-        if not angles:
-            return 0.0
-
-        return float(np.median(angles))
+        return float(np.median(angles)) if angles else 0.0
 
     @staticmethod
     def _rotate_image(gray: np.ndarray, angle: float) -> np.ndarray:
+        """Rotates image around center while filling border artifacts."""
         h, w = gray.shape[:2]
         center = (w / 2, h / 2)
         matrix = cv2.getRotationMatrix2D(center, angle, 1.0)
@@ -362,11 +265,8 @@ class BarcodePlugin:
             borderMode=cv2.BORDER_REPLICATE,
         )
 
-    # ------------------------------------------------------------------
-    # STAGE 3: UPSCALE
-    # ------------------------------------------------------------------
-
     def _upscale(self, gray: np.ndarray) -> np.ndarray:
+        """Upscales image up to configured max factor."""
         cfg = self._config
         h, w = gray.shape[:2]
         scale = min(cfg.upscale_threshold / max(min(h, w), 1), cfg.upscale_max_factor)
@@ -375,11 +275,8 @@ class BarcodePlugin:
         interp = cv2.INTER_CUBIC if cfg.upscale_interpolation == "cubic" else cv2.INTER_LINEAR
         return cv2.resize(gray, None, fx=scale, fy=scale, interpolation=interp)
 
-    # ------------------------------------------------------------------
-    # STAGE 4: CONTRAST (CLAHE)
-    # ------------------------------------------------------------------
-
     def _apply_clahe(self, gray: np.ndarray) -> np.ndarray:
+        """Applies CLAHE histogram equalization."""
         cfg = self._config
         clahe = cv2.createCLAHE(
             clipLimit=cfg.clahe_clip_limit,
@@ -387,11 +284,8 @@ class BarcodePlugin:
         )
         return clahe.apply(gray)
 
-    # ------------------------------------------------------------------
-    # STAGE 5: ADAPTIVE THRESHOLD
-    # ------------------------------------------------------------------
-
     def _adaptive_threshold(self, gray: np.ndarray) -> np.ndarray:
+        """Applies Gaussian adaptive thresholding."""
         cfg = self._config
         return cv2.adaptiveThreshold(
             gray,
@@ -402,28 +296,22 @@ class BarcodePlugin:
             cfg.adaptive_threshold_c,
         )
 
-    # ------------------------------------------------------------------
-    # STAGE 6: DENOISE
-    # ------------------------------------------------------------------
-
     def _denoise(self, gray: np.ndarray) -> np.ndarray:
+        """Applies Fast Non-Local Means Denoising."""
         return cv2.fastNlMeansDenoising(gray, h=self._config.denoise_strength)
 
-    # ------------------------------------------------------------------
-    # STAGE 7: SHARPEN
-    # ------------------------------------------------------------------
-
     def _sharpen(self, gray: np.ndarray) -> np.ndarray:
+        """Sharpens image via Unsharp Masking."""
         cfg = self._config
         blurred = cv2.GaussianBlur(gray, (0, 0), cfg.sharpen_blur_sigma)
         return cv2.addWeighted(gray, cfg.sharpen_amount, blurred, 1.0 - cfg.sharpen_amount, 0)
 
     # ------------------------------------------------------------------
-    # CONFIDENCE
+    # CONFIDENCE CALCULATION
     # ------------------------------------------------------------------
 
     def _compute_confidence(self, barcodes: list[dict]) -> float:
-        """Combine decode quality, symbology trust, and cross-value ambiguity."""
+        """Computes confidence score based on decode quality, type trust, and ambiguity."""
         if not barcodes:
             return 0.0
 

@@ -89,10 +89,9 @@ def get_python_version(python: str) -> tuple[int, int, int]:
 
     try:
         major, minor, micro = map(int, completed.stdout.strip().split())
+        return major, minor, micro
     except ValueError:
         fail(f"Could not parse Python version: {completed.stdout.strip()}")
-
-    return major, minor, micro
 
 
 def ensure_project_files() -> None:
@@ -148,50 +147,36 @@ def detect_nvidia_gpu() -> bool:
 
 def install_torch(venv_python: Path, has_gpu: bool) -> None:
     """Install PyTorch build based on CUDA availability."""
-    if has_gpu:
-        log("NVIDIA GPU detected.")
-        log("Installing PyTorch with CUDA 12.8 support ...")
-        run([
-            venv_python,
-            "-m",
-            "pip",
-            "install",
-            "torch",
-            "torchvision",
-            "--index-url",
-            PYTORCH_CUDA_INDEX,
-        ])
-    else:
-        log("No NVIDIA GPU detected.")
-        log("Installing CPU-only PyTorch ...")
-        run([
-            venv_python,
-            "-m",
-            "pip",
-            "install",
-            "torch",
-            "torchvision",
-            "--index-url",
-            PYTORCH_CPU_INDEX,
-        ])
+    index_url = PYTORCH_CUDA_INDEX if has_gpu else PYTORCH_CPU_INDEX
+    mode_str = "CUDA 12.8 support" if has_gpu else "CPU-only"
+
+    log(f"Installing PyTorch with {mode_str} ...")
+    run([
+        venv_python,
+        "-m",
+        "pip",
+        "install",
+        "torch",
+        "torchvision",
+        "--index-url",
+        index_url,
+    ])
 
 
 def verify_torch(venv_python: Path, has_gpu: bool) -> None:
     """Verify PyTorch installation and runtime device access."""
     log("Verifying PyTorch installation ...")
 
+    script = (
+        "import torch; "
+        "print('PyTorch:', torch.__version__); "
+        "print('CUDA available:', torch.cuda.is_available()); "
+        "print('CUDA version:', torch.version.cuda); "
+        "print('GPU:', torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'CPU')"
+    )
+
     result = subprocess.run(
-        [
-            str(venv_python),
-            "-c",
-            (
-                "import torch; "
-                "print('PyTorch:', torch.__version__); "
-                "print('CUDA available:', torch.cuda.is_available()); "
-                "print('CUDA version:', torch.version.cuda); "
-                "print('GPU:', torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'CPU')"
-            ),
-        ],
+        [str(venv_python), "-c", script],
         cwd=str(PROJECT_ROOT),
         text=True,
         capture_output=True,
@@ -200,7 +185,6 @@ def verify_torch(venv_python: Path, has_gpu: bool) -> None:
 
     if result.stdout:
         print(result.stdout.strip())
-
     if result.stderr:
         print(result.stderr.strip(), file=sys.stderr)
 
@@ -345,7 +329,7 @@ def main() -> int:
 
     log(f"Using Python {major}.{minor}.{micro} ({system_python})")
 
-    if not ((major == 3 and minor == 11) or (major == 3 and minor == 12)):
+    if not (major == 3 and minor in (11, 12)):
         warn(
             f"Project targets Python >=3.11,<3.13. "
             f"Detected {major}.{minor}.{micro}; continuing anyway."

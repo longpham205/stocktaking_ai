@@ -1,8 +1,3 @@
-"""OCR (text extraction) plugin.
-
-Extracts discriminative packaging text from a product crop using EasyOCR.
-"""
-
 from __future__ import annotations
 
 import re
@@ -30,19 +25,21 @@ class OcrPlugin:
     INFORMATION_SCORE_NORMALIZER = 2.5
 
     # Text-Type Weights
-    TYPE_WEIGHT_ALPHABETIC = 1.00
-    TYPE_WEIGHT_MIXED = 0.82
-    TYPE_WEIGHT_NUMERIC = 0.42
-    TYPE_WEIGHT_OTHER = 0.20
+    TYPE_WEIGHTS = {
+        "alphabetic": 1.00,
+        "mixed": 0.82,
+        "numeric": 0.42,
+        "other": 0.20,
+    }
 
-    # Orientation Score (Information content is intentionally the strongest signal)
+    # Orientation Score
     INFORMATION_WEIGHT = 0.45
     TEXT_AMOUNT_WEIGHT = 0.20
     FRAGMENT_WEIGHT = 0.15
     CONFIDENCE_WEIGHT = 0.12
     QUALITY_WEIGHT = 0.08
 
-    # Weak OCR fragments penalty settings
+    # Weak OCR fragments penalty
     WEAK_FRAGMENT_PENALTY = 0.15
     MIN_WEAK_PENALTY_FACTOR = 0.70
 
@@ -88,9 +85,7 @@ class OcrPlugin:
     def _languages(self) -> List[str]:
         """Normalize configured language value to a list."""
         language = self._config.language
-        if isinstance(language, list):
-            return [str(value) for value in language]
-        return [str(language)]
+        return [str(v) for v in language] if isinstance(language, list) else [str(language)]
 
     def _load_reader(self) -> Any:
         """Load EasyOCR reader exactly once."""
@@ -98,13 +93,12 @@ class OcrPlugin:
             import easyocr
         except ImportError as exc:
             raise ImportError(
-                "OCR plugin requires the optional dependency 'easyocr'. "
+                "OCR plugin requires optional dependency 'easyocr'. "
                 "Install it with: pip install easyocr"
             ) from exc
 
         device = str(self._config.device).lower().strip()
-        gpu = device == "cuda"
-        return easyocr.Reader(self._languages(), gpu=gpu)
+        return easyocr.Reader(self._languages(), gpu=(device == "cuda"))
 
     # ------------------------------------------------------------------
     # PUBLIC API
@@ -126,10 +120,9 @@ class OcrPlugin:
                 return self._empty_result()
 
             processed = self._preprocess(image)
-            rotations = self._get_rotations()
             orientation_results: List[Dict[str, Any]] = []
 
-            for rotation in rotations:
+            for rotation in self._get_rotations():
                 rotated = self._rotate(processed, rotation)
                 result = self._run_ocr(rotated, rotation)
                 result["score"] = self._score_result(result)
@@ -157,10 +150,6 @@ class OcrPlugin:
 
             fragments = best_result.get("fragments", [])
             text = self._merge_fragments(fragments)
-            text_length = len(text)
-            confidence = float(best_result.get("confidence", 0.0))
-            max_fragment_confidence = float(best_result.get("max_fragment_confidence", 0.0))
-            mean_fragment_confidence = float(best_result.get("mean_fragment_confidence", 0.0))
 
         logger.info(
             "OcrPlugin extracted text='%s' rotation=%d score=%.4f "
@@ -170,13 +159,13 @@ class OcrPlugin:
             text,
             int(best_result.get("rotation", 0)),
             float(best_result.get("score", 0.0)),
-            confidence,
+            float(best_result.get("confidence", 0.0)),
             float(best_result.get("information_score", 0.0)),
-            max_fragment_confidence,
-            mean_fragment_confidence,
+            float(best_result.get("max_fragment_confidence", 0.0)),
+            float(best_result.get("mean_fragment_confidence", 0.0)),
             len(fragments),
             int(best_result.get("useful_fragment_count", 0)),
-            text_length,
+            len(text),
             len(orientation_candidates),
             len(orientation_candidates) > 1,
             crop.crop_id,
@@ -184,8 +173,10 @@ class OcrPlugin:
         )
 
         output = self._build_output(
-            text=text, text_length=text_length, best_result=best_result,
-            orientation_results=orientation_results, orientation_candidates=orientation_candidates,
+            text=text,
+            best_result=best_result,
+            orientation_results=orientation_results,
+            orientation_candidates=orientation_candidates,
         )
         output["latency_ms"] = elapsed["elapsed_ms"]
         return output
@@ -197,52 +188,35 @@ class OcrPlugin:
     def _build_output(
         self,
         text: str,
-        text_length: int,
         best_result: Dict[str, Any],
         orientation_results: List[Dict[str, Any]],
         orientation_candidates: List[Dict[str, Any]],
     ) -> Dict[str, Any]:
         """Build public OCR result and preserve useful diagnostics."""
         fragments = best_result.get("fragments", [])
-
-        ocr_boxes = [
-            self._build_fragment_output(fragment, best_result.get("rotation", 0))
-            for fragment in fragments
-        ]
-        orientation_scores = [
-            self._build_orientation_diagnostic(result)
-            for result in orientation_results
-        ]
-        candidate_outputs = [
-            self._build_orientation_candidate(result)
-            for result in orientation_candidates
-        ]
+        rotation = best_result.get("rotation", 0)
 
         return {
             "text": text,
-            "text_length": text_length,
+            "text_length": len(text),
             "confidence": float(best_result.get("confidence", 0.0)),
             "max_fragment_confidence": float(best_result.get("max_fragment_confidence", 0.0)),
             "mean_fragment_confidence": float(best_result.get("mean_fragment_confidence", 0.0)),
             "fragments": fragments,
-            "rotation": int(best_result.get("rotation", 0)),
+            "rotation": int(rotation),
             "score": float(best_result.get("score", 0.0)),
             "information_score": float(best_result.get("information_score", 0.0)),
             "useful_fragment_count": int(best_result.get("useful_fragment_count", 0)),
             "useful_text_length": int(best_result.get("useful_text_length", 0)),
             "image_shape": best_result.get("image_shape", []),
-            "ocr_boxes": ocr_boxes,
-            "orientation_scores": orientation_scores,
-            "orientation_candidates": candidate_outputs,
+            "ocr_boxes": [self._build_fragment_output(f, rotation) for f in fragments],
+            "orientation_scores": [self._build_orientation_diagnostic(r) for r in orientation_results],
+            "orientation_candidates": [self._build_orientation_candidate(r) for r in orientation_candidates],
             "orientation_ambiguous": len(orientation_candidates) > 1,
             "orientation_candidate_count": len(orientation_candidates),
         }
 
-    def _build_fragment_output(
-        self,
-        fragment: Dict[str, Any],
-        default_rotation: int,
-    ) -> Dict[str, Any]:
+    def _build_fragment_output(self, fragment: Dict[str, Any], default_rotation: int) -> Dict[str, Any]:
         """Build a compact OCR fragment representation."""
         return {
             "text": fragment.get("text", ""),
@@ -258,9 +232,9 @@ class OcrPlugin:
 
     def _build_orientation_candidate(self, result: Dict[str, Any]) -> Dict[str, Any]:
         """Build an orientation candidate for downstream reranking."""
-        fragments = result.get("fragments", [])
+        rotation = result.get("rotation", 0)
         return {
-            "rotation": int(result.get("rotation", 0)),
+            "rotation": int(rotation),
             "score": float(result.get("score", 0.0)),
             "confidence": float(result.get("confidence", 0.0)),
             "max_fragment_confidence": float(result.get("max_fragment_confidence", 0.0)),
@@ -270,16 +244,14 @@ class OcrPlugin:
             "text_length": int(result.get("text_length", 0)),
             "useful_text_length": int(result.get("useful_text_length", 0)),
             "useful_fragment_count": int(result.get("useful_fragment_count", 0)),
-            "fragments": [
-                self._build_fragment_output(f, result.get("rotation", 0))
-                for f in fragments
-            ],
+            "fragments": [self._build_fragment_output(f, rotation) for f in result.get("fragments", [])],
         }
 
     def _build_orientation_diagnostic(self, result: Dict[str, Any]) -> Dict[str, Any]:
         """Build a compact diagnostic representation."""
+        rotation = result.get("rotation", 0)
         return {
-            "rotation": int(result.get("rotation", 0)),
+            "rotation": int(rotation),
             "score": float(result.get("score", 0.0)),
             "confidence": float(result.get("confidence", 0.0)),
             "information_score": float(result.get("information_score", 0.0)),
@@ -291,10 +263,7 @@ class OcrPlugin:
             "max_confidence": float(result.get("max_fragment_confidence", 0.0)),
             "mean_confidence": float(result.get("mean_fragment_confidence", 0.0)),
             "image_shape": result.get("image_shape", []),
-            "fragments": [
-                self._build_fragment_output(f, result.get("rotation", 0))
-                for f in result.get("fragments", [])
-            ],
+            "fragments": [self._build_fragment_output(f, rotation) for f in result.get("fragments", [])],
         }
 
     # ------------------------------------------------------------------
@@ -307,9 +276,7 @@ class OcrPlugin:
             return None
         if image.ndim not in (2, 3) or image.shape[0] < 2 or image.shape[1] < 2:
             return None
-        if not np.all(np.isfinite(image)):
-            return None
-        return image
+        return image if np.all(np.isfinite(image)) else None
 
     def _preprocess(self, image: np.ndarray) -> np.ndarray:
         """Preprocess image using adaptive upscale and CLAHE."""
@@ -325,10 +292,7 @@ class OcrPlugin:
 
         clahe = cv2.createCLAHE(
             clipLimit=float(self._config.clahe_clip_limit),
-            tileGridSize=(
-                int(self._config.clahe_tile_grid_size),
-                int(self._config.clahe_tile_grid_size),
-            ),
+            tileGridSize=(int(self._config.clahe_tile_grid_size), int(self._config.clahe_tile_grid_size)),
         )
         l_channel = clahe.apply(l_channel)
         lab = cv2.merge((l_channel, a_channel, b_channel))
@@ -355,10 +319,10 @@ class OcrPlugin:
         for angle in self._config.rotation_angles:
             try:
                 angle_deg = int(angle) % 360
+                if angle_deg not in rotations:
+                    rotations.append(angle_deg)
             except (TypeError, ValueError):
                 continue
-            if angle_deg not in rotations:
-                rotations.append(angle_deg)
         return rotations
 
     def _rotate(self, image: np.ndarray, angle: int) -> np.ndarray:
@@ -428,31 +392,23 @@ class OcrPlugin:
 
         useful_fragments = [f for f in fragments if f.get("useful", False)]
         useful_text_length = sum(int(f.get("alnum_length", 0)) for f in useful_fragments)
-        useful_fragment_count = len(useful_fragments)
-
-        confidence = self._calculate_ocr_confidence(useful_fragments, mean_confidence)
-        information_score = self._calculate_information_score(useful_fragments)
 
         return {
             "fragments": fragments,
-            "confidence": confidence,
+            "confidence": self._calculate_ocr_confidence(useful_fragments, mean_confidence),
             "max_fragment_confidence": max_confidence,
             "mean_fragment_confidence": mean_confidence,
             "text_length": len(text),
             "useful_text_length": useful_text_length,
-            "useful_fragment_count": useful_fragment_count,
-            "information_score": information_score,
+            "useful_fragment_count": len(useful_fragments),
+            "information_score": self._calculate_information_score(useful_fragments),
             "text": text,
             "rotation": int(rotation),
             "image_shape": list(image.shape[:2]),
             "score": 0.0,
         }
 
-    def _calculate_ocr_confidence(
-        self,
-        useful_fragments: List[Dict[str, Any]],
-        mean_confidence: float,
-    ) -> float:
+    def _calculate_ocr_confidence(self, useful_fragments: List[Dict[str, Any]], mean_confidence: float) -> float:
         """Calculate OCR evidence quality."""
         if not useful_fragments:
             return float(np.clip(mean_confidence * self.NON_USEFUL_CONFIDENCE_FACTOR, 0.0, 1.0))
@@ -468,10 +424,7 @@ class OcrPlugin:
             weighted_sum += confidence * weight
             weight_sum += weight
 
-        if weight_sum <= 0.0:
-            return 0.0
-
-        return float(np.clip(weighted_sum / weight_sum, 0.0, 1.0))
+        return float(np.clip(weighted_sum / weight_sum, 0.0, 1.0)) if weight_sum > 0.0 else 0.0
 
     def _normalize_bbox(self, bbox: Any) -> List[List[float]]:
         """Convert EasyOCR bbox to JSON-friendly 4-point format."""
@@ -491,13 +444,7 @@ class OcrPlugin:
         """Evaluate OCR fragment usefulness and intrinsic quality."""
         normalized = self._normalize_text(text)
         if not normalized:
-            return {
-                "quality": 0.0,
-                "useful": False,
-                "length": 0,
-                "alnum_length": 0,
-                "text_type": "other",
-            }
+            return {"quality": 0.0, "useful": False, "length": 0, "alnum_length": 0, "text_type": "other"}
 
         alnum = re.sub(r"[^A-Za-z0-9À-ỹぁ-んァ-ヶ一-龯]", "", normalized)
         alnum_length = len(alnum)
@@ -515,37 +462,16 @@ class OcrPlugin:
             text_type = "other"
 
         if alnum_length <= 1:
-            return {
-                "quality": 0.02,
-                "useful": False,
-                "length": len(normalized),
-                "alnum_length": alnum_length,
-                "text_type": text_type,
-            }
-
+            return {"quality": 0.02, "useful": False, "length": len(normalized), "alnum_length": alnum_length, "text_type": text_type}
         if alnum_length == 2:
-            return {
-                "quality": 0.15,
-                "useful": False,
-                "length": len(normalized),
-                "alnum_length": alnum_length,
-                "text_type": text_type,
-            }
+            return {"quality": 0.15, "useful": False, "length": len(normalized), "alnum_length": alnum_length, "text_type": text_type}
 
         length_quality = min(alnum_length / self.QUALITY_LENGTH_NORMALIZER, 1.0)
-        type_weights = {
-            "alphabetic": self.TYPE_WEIGHT_ALPHABETIC,
-            "mixed": self.TYPE_WEIGHT_MIXED,
-            "numeric": self.TYPE_WEIGHT_NUMERIC,
-            "other": self.TYPE_WEIGHT_OTHER,
-        }
-        type_weight = type_weights.get(text_type, self.TYPE_WEIGHT_OTHER)
+        type_weight = self.TYPE_WEIGHTS.get(text_type, self.TYPE_WEIGHTS["other"])
         quality = length_quality * type_weight
 
         symbol_count = sum(not c.isalnum() for c in normalized)
-        symbol_ratio = symbol_count / len(normalized) if normalized else 0.0
-
-        if symbol_ratio > self.HIGH_SYMBOL_RATIO:
+        if (symbol_count / len(normalized) if normalized else 0.0) > self.HIGH_SYMBOL_RATIO:
             quality *= self.HIGH_SYMBOL_PENALTY
 
         useful = alnum_length >= 3 and text_type != "other"
@@ -564,13 +490,6 @@ class OcrPlugin:
             return 0.0
 
         total_information = 0.0
-        type_weights = {
-            "alphabetic": self.TYPE_WEIGHT_ALPHABETIC,
-            "mixed": self.TYPE_WEIGHT_MIXED,
-            "numeric": self.TYPE_WEIGHT_NUMERIC,
-            "other": self.TYPE_WEIGHT_OTHER,
-        }
-
         for fragment in fragments:
             length = int(fragment.get("alnum_length", 0))
             if length <= 0:
@@ -583,7 +502,7 @@ class OcrPlugin:
                 contribution = 0.08
             else:
                 length_score = min(length / self.QUALITY_LENGTH_NORMALIZER, 1.0)
-                type_weight = type_weights.get(text_type, self.TYPE_WEIGHT_OTHER)
+                type_weight = self.TYPE_WEIGHTS.get(text_type, self.TYPE_WEIGHTS["other"])
                 contribution = length_score * type_weight
 
             total_information += contribution
@@ -611,19 +530,12 @@ class OcrPlugin:
         useful_fragment_count = len(useful_fragments)
         fragment_score = min(useful_fragment_count / self.INFORMATION_FRAGMENT_NORMALIZER, 1.0)
 
-        mean_useful_confidence = float(
-            np.mean([float(f.get("confidence", 0.0)) for f in useful_fragments])
-        )
-        mean_quality = float(
-            np.mean([float(f.get("quality", 0.0)) for f in useful_fragments])
-        )
+        mean_useful_confidence = float(np.mean([float(f.get("confidence", 0.0)) for f in useful_fragments]))
+        mean_quality = float(np.mean([float(f.get("quality", 0.0)) for f in useful_fragments]))
 
         weak_fragments = [f for f in fragments if not f.get("useful", False)]
         weak_ratio = len(weak_fragments) / max(len(fragments), 1)
-        weak_penalty = max(
-            self.MIN_WEAK_PENALTY_FACTOR,
-            1.0 - (self.WEAK_FRAGMENT_PENALTY * weak_ratio),
-        )
+        weak_penalty = max(self.MIN_WEAK_PENALTY_FACTOR, 1.0 - (self.WEAK_FRAGMENT_PENALTY * weak_ratio))
 
         score = (
             self.INFORMATION_WEIGHT * information_score
@@ -631,8 +543,7 @@ class OcrPlugin:
             + self.FRAGMENT_WEIGHT * fragment_score
             + self.CONFIDENCE_WEIGHT * mean_useful_confidence
             + self.QUALITY_WEIGHT * mean_quality
-        )
-        score *= weak_penalty
+        ) * weak_penalty
 
         if useful_fragment_count == 1 and useful_chars <= 2:
             score = min(score, self.SINGLE_FRAGMENT_CAP)
@@ -652,17 +563,7 @@ class OcrPlugin:
 
         return float(np.clip(score, 0.0, 1.0))
 
-    def _select_best_result(self, results: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Select the best orientation for backward compatibility."""
-        candidates = self._get_orientation_candidates(results)
-        if not candidates:
-            return self._empty_orientation_result()
-        return max(candidates, key=self._orientation_sort_key)
-
-    def _select_orientation_candidates(
-        self,
-        results: List[Dict[str, Any]],
-    ) -> List[Dict[str, Any]]:
+    def _select_orientation_candidates(self, results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Return Top-1 and, when ambiguous, Top-2 orientations."""
         candidates = self._get_orientation_candidates(results)
         if not candidates:
@@ -678,21 +579,12 @@ class OcrPlugin:
         score_2 = float(second.get("score", 0.0))
         score_gap = abs(score_1 - score_2)
 
-        second_has_meaningful_text = (
-            int(second.get("useful_text_length", 0)) >= self.MIN_AMBIGUOUS_USEFUL_CHARS
-        )
-        second_has_information = (
-            float(second.get("information_score", 0.0)) >= self.MIN_AMBIGUOUS_INFORMATION_SCORE
-        )
+        second_has_meaningful_text = int(second.get("useful_text_length", 0)) >= self.MIN_AMBIGUOUS_USEFUL_CHARS
+        second_has_information = float(second.get("information_score", 0.0)) >= self.MIN_AMBIGUOUS_INFORMATION_SCORE
 
-        if (
-            score_gap <= self.ORIENTATION_AMBIGUITY_MARGIN
-            and second_has_meaningful_text
-            and second_has_information
-        ):
+        if score_gap <= self.ORIENTATION_AMBIGUITY_MARGIN and second_has_meaningful_text and second_has_information:
             logger.debug(
-                "OCR orientation ambiguous: "
-                "top1_rotation=%d top1_score=%.4f "
+                "OCR orientation ambiguous: top1_rotation=%d top1_score=%.4f "
                 "top2_rotation=%d top2_score=%.4f gap=%.4f",
                 int(best.get("rotation", 0)),
                 score_1,
@@ -704,14 +596,10 @@ class OcrPlugin:
 
         return [best]
 
-    def _get_orientation_candidates(
-        self,
-        results: List[Dict[str, Any]],
-    ) -> List[Dict[str, Any]]:
+    def _get_orientation_candidates(self, results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Filter unusable orientation results."""
         if not results:
             return []
-
         non_empty = [r for r in results if r.get("fragments", [])]
         return non_empty if non_empty else results
 
@@ -732,7 +620,7 @@ class OcrPlugin:
     # ------------------------------------------------------------------
 
     def _confidence_threshold(self) -> float:
-        """Return configured OCR confidence threshold (kept for backward compatibility)."""
+        """Return configured OCR confidence threshold."""
         value = getattr(self._config, "confidence_threshold", 0.50)
         try:
             return float(np.clip(float(value), 0.0, 1.0))
@@ -766,17 +654,9 @@ class OcrPlugin:
 
         return " ".join(texts)
 
-    def _empty_orientation_result(
-        self,
-        rotation: int = 0,
-        image_shape: Any = None,
-    ) -> Dict[str, Any]:
+    def _empty_orientation_result(self, rotation: int = 0, image_shape: Any = None) -> Dict[str, Any]:
         """Return a consistent empty orientation result."""
-        shape = (
-            list(image_shape[:2])
-            if isinstance(image_shape, (tuple, list))
-            else []
-        )
+        shape = list(image_shape[:2]) if isinstance(image_shape, (tuple, list)) else []
         return {
             "fragments": [],
             "confidence": 0.0,
