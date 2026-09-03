@@ -4,16 +4,16 @@
 # Stocktaking AI - Google Colab Setup
 # ============================================================
 # Purpose:
-#   - Prepare Google Colab environment and install dependencies
-#   - Conditionally install PyTorch (CUDA/CPU) with pinned packaging tools
-#   - Download & extract assets (weights & data) from Google Drive
-#   - Verify asset integrity against manifest
+#   - Create a dedicated Python 3.12 virtual environment (.venv-colab)
+#   - Install PyTorch (CUDA/CPU) with pinned packaging tools
+#   - Download & extract project assets (weights & data)
+#   - Validate assets integrity against assets_manifest.json
 # ============================================================
 
 set -Eeuo pipefail
 
 # Trap unexpected errors with line number context
-trap 'echo -e "\n[error] Setup stopped at line ${LINENO}\n[error] Command: ${BASH_COMMAND}"' ERR
+trap 'echo -e "\n[ERROR] Setup stopped at line ${LINENO}\n[ERROR] Command: ${BASH_COMMAND}"' ERR
 
 # ------------------------------------------------------------
 # Configuration
@@ -26,6 +26,11 @@ MANIFEST_FILE="${PROJECT_ROOT}/assets_manifest.json"
 VERIFY_SCRIPT="${PROJECT_ROOT}/scripts/verify_manifest.py"
 CONFIG_FILE="${PROJECT_ROOT}/configs/config.yaml"
 
+# Dedicated Python environment for the project
+VENV_DIR="${PROJECT_ROOT}/.venv-colab"
+PYTHON_BIN="${VENV_DIR}/bin/python"
+PIP_BIN="${VENV_DIR}/bin/pip"
+
 WEIGHTS_FILE_ID="1c-vusZjXSafgXFLbeaFzU6MRuBQGS4-k"
 DATA_FILE_ID="1QHuoY2Wmo49jKrEcf-wvSfA4mU7YL1o5"
 
@@ -33,7 +38,7 @@ PYTORCH_CUDA_INDEX="https://download.pytorch.org/whl/cu128"
 PYTORCH_CPU_INDEX="https://download.pytorch.org/whl/cpu"
 
 # ------------------------------------------------------------
-# Logging & Helper Functions
+# Helpers
 # ------------------------------------------------------------
 log() {
     echo -e "\n============================================================\n[setup] $1\n============================================================"
@@ -50,7 +55,7 @@ fail() {
 
 verify_group() {
     local group="$1"
-    python3 "${VERIFY_SCRIPT}" --group "${group}"
+    "${PYTHON_BIN}" "${VERIFY_SCRIPT}" --group "${group}"
 }
 
 download_from_drive() {
@@ -62,7 +67,7 @@ download_from_drive() {
     echo "Google Drive ID: ${file_id}"
     echo "Output: ${output_path}"
 
-    python3 -m gdown "https://drive.google.com/uc?id=${file_id}" -O "${output_path}"
+    "${PYTHON_BIN}" -m gdown "https://drive.google.com/uc?id=${file_id}" -O "${output_path}"
 
     [[ -f "${output_path}" ]] || fail "Download failed: ${output_path}"
     [[ -s "${output_path}" ]] || fail "Downloaded file is empty: ${output_path}"
@@ -82,7 +87,7 @@ extract_zip() {
 }
 
 # ------------------------------------------------------------
-# Initialization & Project Verification
+# Project Verification
 # ------------------------------------------------------------
 cd "${PROJECT_ROOT}"
 
@@ -102,23 +107,18 @@ done
 echo "Required project files: OK"
 
 # ------------------------------------------------------------
-# Environment & System Dependencies
+# System Environment & Linux Packages
 # ------------------------------------------------------------
-log "Checking Python"
+log "Checking Colab Python"
 python3 --version
-
-PYTHON_MAJOR=$(python3 -c "import sys; print(sys.version_info.major)")
-PYTHON_MINOR=$(python3 -c "import sys; print(sys.version_info.minor)")
-
-[[ "${PYTHON_MAJOR}" -eq 3 ]] || fail "Python 3 is required."
-
-if [[ "${PYTHON_MINOR}" -lt 11 || "${PYTHON_MINOR}" -ge 13 ]]; then
-    fail "Unsupported Python version: ${PYTHON_MAJOR}.${PYTHON_MINOR}. Project requires Python >=3.11,<3.13."
-fi
+echo -e "\nColab system Python is NOT modified.\nProject will use Python 3.12 inside:\n${VENV_DIR}"
 
 log "Installing Linux system packages"
 apt-get update -y
 apt-get install -y \
+    python3.12 \
+    python3.12-venv \
+    python3.12-dev \
     libzbar0 \
     libglib2.0-0 \
     libsm6 \
@@ -128,17 +128,43 @@ apt-get install -y \
     git
 echo "System packages: OK"
 
-log "Preparing pip / setuptools"
-python3 -m pip install --upgrade pip
-python3 -m pip install "setuptools==78.1.0" wheel "jedi>=0.16"
+log "Checking Python 3.12"
+command -v python3.12 >/dev/null 2>&1 || fail "python3.12 was not installed successfully."
+python3.12 --version
 
-echo -e "\nPackaging versions:"
-python3 -m pip --version
-python3 -c "import setuptools; print('setuptools:', setuptools.__version__)"
-python3 -c "import jedi; print('jedi:', jedi.__version__)"
+PY312_MAJOR=$(python3.12 -c "import sys; print(sys.version_info.major)")
+PY312_MINOR=$(python3.12 -c "import sys; print(sys.version_info.minor)")
+
+if [[ "${PY312_MAJOR}" -ne 3 || "${PY312_MINOR}" -ne 12 ]]; then
+    fail "Expected Python 3.12, found ${PY312_MAJOR}.${PY312_MINOR}"
+fi
 
 # ------------------------------------------------------------
-# GPU Detection & PyTorch Setup
+# Virtual Environment & Packaging Tools
+# ------------------------------------------------------------
+log "Creating Python 3.12 virtual environment"
+if [[ -d "${VENV_DIR}" ]]; then
+    echo -e "Existing Colab virtual environment found:\n${VENV_DIR}"
+else
+    python3.12 -m venv "${VENV_DIR}"
+fi
+
+[[ -x "${PYTHON_BIN}" ]] || fail "Virtual environment Python not found."
+
+echo -e "\nVirtual environment Python:"
+"${PYTHON_BIN}" --version
+
+log "Preparing pip / setuptools"
+"${PYTHON_BIN}" -m pip install --upgrade pip
+"${PYTHON_BIN}" -m pip install "setuptools==78.1.0" wheel "jedi>=0.16"
+
+echo -e "\nPackaging versions:"
+"${PYTHON_BIN}" -m pip --version
+"${PYTHON_BIN}" -c "import setuptools; print('setuptools:', setuptools.__version__)"
+"${PYTHON_BIN}" -c "import jedi; print('jedi:', jedi.__version__)"
+
+# ------------------------------------------------------------
+# GPU Detection & PyTorch Installation
 # ------------------------------------------------------------
 log "Checking NVIDIA GPU"
 HAS_GPU=0
@@ -149,21 +175,23 @@ if command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi -L >/dev/null 2>&1; then
     nvidia-smi -L
 fi
 
-echo -e "\nRuntime mode: $((HAS_GPU == 1)) ? 'GPU' : 'CPU'"
+echo -e "\nRuntime mode: $( [[ "${HAS_GPU}" -eq 1 ]] && echo "GPU" || echo "CPU" )"
 
 log "Installing PyTorch"
 if [[ "${HAS_GPU}" -eq 1 ]]; then
     echo -e "Installing CUDA-enabled PyTorch...\nIndex: ${PYTORCH_CUDA_INDEX}"
-    python3 -m pip install --index-url "${PYTORCH_CUDA_INDEX}" torch torchvision
+    "${PYTHON_BIN}" -m pip install --index-url "${PYTORCH_CUDA_INDEX}" torch torchvision
 else
     echo -e "Installing CPU-only PyTorch...\nIndex: ${PYTORCH_CPU_INDEX}"
-    python3 -m pip install --index-url "${PYTORCH_CPU_INDEX}" torch torchvision
+    "${PYTHON_BIN}" -m pip install --index-url "${PYTORCH_CPU_INDEX}" torch torchvision
 fi
 
 log "Verifying PyTorch"
-python3 - <<'PY'
+"${PYTHON_BIN}" - <<'PY'
 import torch
+import sys
 
+print("Python:", sys.version)
 print("PyTorch:", torch.__version__)
 print("CUDA available:", torch.cuda.is_available())
 print("Torch CUDA version:", torch.version.cuda)
@@ -171,13 +199,15 @@ print("Device:", torch.cuda.get_device_name(0) if torch.cuda.is_available() else
 PY
 
 log "Installing project dependencies"
-python3 -m pip install -r "${REQUIREMENTS_FILE}"
+"${PYTHON_BIN}" -m pip install -r "${REQUIREMENTS_FILE}"
 
 log "Re-checking PyTorch after requirements.txt"
-python3 - <<'PY'
+"${PYTHON_BIN}" - <<'PY'
 import torch
 import setuptools
+import sys
 
+print("Python:", sys.version)
 print("PyTorch:", torch.__version__)
 print("setuptools:", setuptools.__version__)
 print("CUDA available:", torch.cuda.is_available())
@@ -186,11 +216,11 @@ if torch.cuda.is_available():
 PY
 
 log "Installing gdown"
-python3 -m pip install "gdown"
-python3 -m gdown --version
+"${PYTHON_BIN}" -m pip install gdown
+"${PYTHON_BIN}" -m gdown --version
 
 # ------------------------------------------------------------
-# Project Configuration
+# Project Device Configuration
 # ------------------------------------------------------------
 log "Configuring project device"
 if [[ -f "${CONFIG_FILE}" ]]; then
@@ -205,7 +235,7 @@ if [[ -f "${CONFIG_FILE}" ]]; then
             cp "${CONFIG_BACKUP}" "${CONFIG_FILE}"
             echo 'Restored original GPU configuration.'
         else
-            echo 'Keeping current GPU configuration.'
+            echo -e 'GPU detected.\nKeeping current configuration.'
         fi
     fi
 
@@ -218,7 +248,7 @@ fi
 mkdir -p "${DOWNLOAD_DIR}"
 
 # ------------------------------------------------------------
-# Download Assets (Weights & Data)
+# Asset Setup (Weights & Data)
 # ------------------------------------------------------------
 log "Checking weights"
 if verify_group "weights"; then
@@ -245,7 +275,7 @@ else
 fi
 
 # ------------------------------------------------------------
-# Final Verification & Environment Summary
+# Final Asset Verification
 # ------------------------------------------------------------
 log "Final asset verification"
 
@@ -255,16 +285,23 @@ verify_group "weights" && echo "PASS" || fail "Weights verification failed."
 echo -e "\n============ DATA ============"
 verify_group "data" && echo "PASS" || fail "Data verification failed."
 
+# ------------------------------------------------------------
+# Environment Summary
+# ------------------------------------------------------------
 log "Environment summary"
+
 echo -e "\nProject:\n  ${PROJECT_ROOT}"
+
 echo -e "\nPython:"
-python3 --version
+"${PYTHON_BIN}" --version
+
+echo -e "\nPython executable:\n${PYTHON_BIN}"
 
 echo -e "\nPyTorch:"
-python3 -c "import torch; print(torch.__version__)"
+"${PYTHON_BIN}" -c "import torch; print(torch.__version__)"
 
 echo -e "\nCUDA:"
-python3 -c "import torch; print(torch.cuda.is_available())"
+"${PYTHON_BIN}" -c "import torch; print(torch.cuda.is_available())"
 
 if [[ "${HAS_GPU}" -eq 1 ]]; then
     echo -e "\nGPU:"
@@ -272,8 +309,10 @@ if [[ "${HAS_GPU}" -eq 1 ]]; then
 fi
 
 echo -e "\nAssets:\n  weights: VERIFIED\n  data:    VERIFIED"
+
 echo -e "\n============================================================"
-echo "              COLAB SETUP COMPLETED SUCCESSFULLY"
-echo -e "============================================================"
-echo -e "\nNext step:\n\n  python3 run.py --help\n\nor run your Colab notebook.\n"
+echo "       COLAB SETUP COMPLETED SUCCESSFULLY"
+echo "============================================================"
+echo -e "\nProject Python:\n  ${PYTHON_BIN}"
+echo -e "\nRun project:\n\n  ${PYTHON_BIN} run.py --help\n"
 echo "============================================================"
