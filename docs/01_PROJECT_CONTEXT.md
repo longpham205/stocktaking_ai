@@ -18,7 +18,7 @@ class-agnostic; identification is resolved entirely by a downstream
 visual-retrieval + evidence-fusion pipeline. This separation was not
 incidental — it is the direct result of a debugging process that
 repeatedly found identification, not localization, to be the actual
-bottleneck (see Section 10).
+bottleneck.
 
 The complete inventory process consists of:
 
@@ -26,11 +26,11 @@ The complete inventory process consists of:
 - Overlap Analysis
 - Segmentation Refinement (optional, geometry-triggered)
 - Product Cropping (dual-resolution)
-- Image Retrieval (Top-K visual similarity)
+- Image Retrieval (Top-K visual similarity via SigLIP2 + FAISS)
 - Decision (accept/uncertain/reject + plugin trigger policy)
 - Plugin Evidence Gathering (OCR / Color / Barcode, optional)
 - Evidence Fusion / Reranking
-- Inventory Result Generation
+- Inventory Result Generation & Export
 
 ---
 
@@ -46,7 +46,7 @@ The complete inventory process consists of:
   production pipeline* — never a simplified parallel evaluation path —
   at the granularity of each individual stage, so regressions can be
   attributed to a specific stage rather than only observed end-to-end.
-- Provide a desktop UI for demonstration and interactive validation
+- Provide a desktop UI (Tkinter) for demonstration and interactive validation
   review.
 
 ---
@@ -101,8 +101,7 @@ tuning surfaces, VAL stage/metric selection — live in
 `configs/config.yaml`. This extends to the evidence-fusion layer:
 `Reranker`'s per-plugin weights, retrieval-consensus protection curve,
 and confusable-pair list are all configuration, not hard-coded
-constants, specifically so that tuning the fusion strategy (an ongoing,
-iterative process — see Section 10) never requires a code change.
+constants, specifically so that tuning the fusion strategy never requires a code change.
 
 ## 3.5 Dual-Resolution Cropping
 
@@ -111,16 +110,14 @@ Every `CropImage` carries two pixel arrays: `image_array` (resized to
 `raw_image_array` (original resolution, boundary-clipped only, consumed
 exclusively by OCR/Color/Barcode plugins). This exists because a single
 shared resized crop was found to destroy small printed packaging text
-before OCR ever saw it (Section 10, Experiment 3) — Retrieval and
-Plugins have fundamentally different resolution needs and must not share
-one preprocessed array.
+before OCR ever saw it — Retrieval and Plugins have fundamentally 
+different resolution needs and must not share one preprocessed array.
 
 ## 3.6 Evidence Fusion Is Consensus-Aware, Not Additive
 
 Early evidence fusion simply added a plugin's confidence boost to
 whichever candidate was already winning. This was found to correct
-roughly as many wrong decisions as it broke (Section 10, Experiment 6).
-The current `Reranker` instead:
+roughly as many wrong decisions as it broke. The current `Reranker` instead:
 
 - Scales how much any single plugin is allowed to influence the outcome
   by how strongly Retrieval's own Top-K already agrees with itself
@@ -137,43 +134,55 @@ The current `Reranker` instead:
 
 ```text
 stocktaking_ai/
+├── .env
+├── .gitignore
 ├── README.md
 ├── requirements.txt
-├── run.py
+├── setup.bat                    # One-click E2E setup script for Windows
+├── setup.sh                     # Automated setup script for Linux
+├── setup.command                # One-click setup script for macOS
+├── run.py                       # CLI entry point (Build -> Infer / Validate / UI)
+├── test.py                      # Rapid manual testing entry script
+├── assets_manifest.json         # Checksum and structure integrity manifest
 ├── configs/
-│   └── config.yaml
+│   └── config.yaml              # Master runtime configuration
 ├── data/
-│   ├── gallery/
-│   ├── metadata/            # products.json, product_ids.json, product_colors.json
-│   ├── benchmark/            # COCO images/ + _annotations.coco.json
-│   ├── query/
-│   ├── outputs/
-│   └── cache/
-├── weights/
+│   ├── gallery/                 # Reference product images for vector indexing
+│   ├── metadata/                # SKU catalogs, color maps, and ID mappings
+│   ├── benchmark/               # COCO-formatted evaluation datasets
+│   ├── query/                   # Input shelf images for inference
+│   ├── outputs/                 # Exported results (JSON, CSV, annotated visuals)
+│   └── cache/                   # Serialized FAISS vector index & metadata cache
+├── debug/                       # Standalone diagnostic and verification scripts
+├── docs/                        # Architecture specs, context, and developer guidelines
+├── notebooks/                   # Analytical and pipeline evaluation Jupyter notebooks
 ├── scripts/
+│   ├── setup.py                 # Core environment and asset initialization logic
+│   ├── generate_manifest.py     # Asset manifest generation script
+│   └── verify_manifest.py       # Integrity verification script
+├── weights/                     # Model checkpoints (RF-DETR, SAM2, SigLIP2)
+│   ├── detector/                # Detection model weights
+│   ├── refinement/              # Segmentation model weights
+│   └── retriever/               # Vision encoder offline weights
 ├── src/
-│   ├── core/
-│   ├── models/
-│   ├── catalog/
-│   ├── detection/            # detector.py, backends/, cropper.py
-│   ├── pipeline/             # pipeline.py, overlap.py, build.py
-│   ├── segmentation/          # refiner.py, backends/
-│   ├── retrieval/              # retriever.py, backends/, gallery_builder.py
-│   ├── decision/                # decision.py, reranker.py
-│   ├── plugins/                  # manager.py, ocr.py, color.py, barcode.py
-│   ├── storage/
-│   ├── inference/
-│   ├── validation/                # validate.py, evaluator.py, metrics.py
-│   └── ui/
-└── tests/
-```
-
----
+│   ├── catalog/                 # Metadata compilation and catalog indexing
+│   ├── core/                    # System configuration, logging, and common utilities
+│   ├── decision/                # Similarity thresholding & multi-evidence reranking
+│   ├── detection/               # Object detection backends and dual-crop generation
+│   ├── inference/               # Production batch/single-image inference engine
+│   ├── models/                  # Domain Data Transfer Objects (Pydantic / Dataclasses)
+│   ├── pipeline/                # Master orchestrator, overlap resolution, and offline build
+│   ├── plugins/                 # Secondary evidence plugins (OCR, Color, Barcode)
+│   ├── retrieval/               # SigLIP2 embedding extraction and FAISS indexer
+│   ├── segmentation/            # SAM2 instance mask boundary refinement
+│   ├── storage/                 # CSV/JSON output persistence and visualization overlay
+│   ├── ui/                      # Desktop Graphical Interface (Tkinter dashboard)
+│   └── validation/              # 9-stage evaluation suite and metric calculators
+└── tests/                       # Unit and integration pytest test suite
 
 # 5. High-Level Architecture
 
-```text
-                 Desktop UI / CLI
+Desktop UI / CLI
                        │
                        ▼
              Inference / Validation Runner
@@ -203,62 +212,37 @@ Detection      OverlapResolver ──► Refiner (optional)  Retrieval
                              InventoryResult
                                     ▼
                              StorageManager
-```
 
----
+# **6\. Current Scope (v0.1.0 extended)**
 
-# 6. Current Scope (v0.1.0 extended)
+## **Implemented**
 
-## Implemented
-- Full 8-stage runtime pipeline (Detection through Reranker/Fusion),
-  with `run_with_trace()` for full-fidelity validation.
-- Pluggable backends for Detection (mock_contour, RF-DETR), Retrieval
-  (mock_visual_embedding, SigLIP2), Refinement (none, mock_refiner,
-  SAM2).
-- Dual-resolution cropping.
-- Three-reason plugin trigger policy (uncertain / ambiguous / force).
-- Evidence-driven Reranker with retrieval-consensus protection and a
-  confusable-pair guard.
-- 9-stage staged validation (VAL) sharing one detection↔ground-truth
-  match per image across all stages, with a standalone metric-formula
-  registry (`metrics.py`), full per-crop flat export (`records.csv`),
-  color-coded annotated benchmark images, a per-stage metrics chart, and
-  a full per-stage latency breakdown.
-- Desktop UI with a Total-Items-Counted panel + per-product breakdown
-  (this is a counting system, not just a classifier), zoomable
-  annotated/gallery-match viewers, and a runtime similarity-threshold
-  override that never reloads a model.
+* Full 8-stage runtime pipeline (Detection through Reranker/Fusion), with `run_with_trace()` for full-fidelity validation.  
+* Pluggable backends for Detection (mock\_contour, RF-DETR), Retrieval (mock\_visual\_embedding, SigLIP2), Refinement (none, mock\_refiner, SAM2).  
+* Automated cross-platform setup scripts (`setup.bat`, `setup.sh`, `setup.command`).  
+* Dual-resolution cropping.  
+* Three-reason plugin trigger policy (uncertain / ambiguous / force).  
+* Evidence-driven Reranker with retrieval-consensus protection and a confusable-pair guard.  
+* 9-stage staged validation (VAL) sharing one detection↔ground-truth match per image across all stages, with a standalone metric-formula registry (`metrics.py`), full per-crop flat export (`records.csv`), color-coded annotated benchmark images, a per-stage metrics chart, and a full per-stage latency breakdown.  
+* Desktop UI with a Total-Items-Counted panel \+ per-product breakdown (this is a counting system, not just a classifier), zoomable annotated/gallery-match viewers, and a runtime similarity-threshold override that never reloads a model.
 
-## Known-incomplete / actively being tuned
-- Barcode plugin: currently disabled (near-zero decode success rate in
-  practice; root cause not fully isolated — see `03_DEVELOPMENT_RULES.md`
-  known-issues appendix).
-- `products.json.barcode` is empty for essentially every catalog entry.
-- `data/metadata/product_colors.json` is hand-authored, not generated by
-  the offline build pipeline.
-- SAM2 segmentation refinement provides only marginal net benefit and
-  degrades roughly as many boxes as it improves.
-- The confusable pair `7` vs `8` (differ by one printed character)
-  remains the weakest point in the system even after evidence fusion.
-- `confusable_min_agreeing_plugins` is temporarily set to `1` for active
-  debugging; the intended production value is `2`.
+## **Known-incomplete / actively being tuned**
 
-## Explicitly excluded (deferred)
-- Detector/Retriever/Plugin dependency-injection frameworks or
-  registries beyond the existing lightweight dispatcher pattern.
-- Distributed / real-time camera inference.
-- Automatic color-reference generation from gallery photos (proposed,
-  not implemented).
-- Hungarian (optimal) matching in VAL — greedy IoU matching is used
-  throughout by deliberate choice for v0.1.0 simplicity.
+* Barcode plugin: currently disabled in config (`plugins.barcode.enabled: false`) pending comprehensive re-validation and catalog metadata integration.  
+* `products.json.barcode` is empty for essentially every catalog entry.  
+* `data/metadata/product_colors.json` is hand-authored, not generated by the offline build pipeline.  
+* SAM2 segmentation refinement provides only marginal net benefit and degrades roughly as many boxes as it improves.  
+* Fine-grained identification errors (\~6%) remain concentrated among near-identical packaging variants differing solely by minor text descriptors (e.g., net weight).
 
----
+## **Explicitly excluded (deferred)**
 
-# 7. Project Vision
+* Detector/Retriever/Plugin dependency-injection frameworks or registries beyond the existing lightweight dispatcher pattern.  
+* Distributed / real-time camera inference.  
+* Automatic color-reference generation from gallery photos (proposed, not implemented).  
+* Hungarian (optimal) matching in VAL — greedy IoU matching is used throughout by deliberate choice for v0.1.0 simplicity.
 
-Architectural integrity and stage-level testability take priority over
-feature volume. Every debugging session in this project's history (see
-`03_DEVELOPMENT_RULES.md`, Appendix: Debugging History) was resolvable
-specifically *because* each stage exposes its own inputs/outputs
-independently through `PipelineTrace` — this property must be preserved
-as the system evolves.
+# **7\. Project Vision**
+
+Architectural integrity and stage-level testability take priority over feature volume. Every debugging session in this project's history was resolvable specifically *because* each stage exposes its own inputs/outputs independently through `PipelineTrace` — this property must be preserved as the system evolves.
+
+
