@@ -5,12 +5,15 @@
 # ============================================================
 # Purpose:
 #   - Prepare Google Colab environment and install dependencies
-#   - Install CUDA/CPU PyTorch conditionally based on GPU presence
-#   - Download and extract weights.zip & data.zip from Google Drive
-#   - Validate assets integrity via assets_manifest.json
+#   - Conditionally install PyTorch (CUDA/CPU) with pinned packaging tools
+#   - Download & extract assets (weights & data) from Google Drive
+#   - Verify asset integrity against manifest
 # ============================================================
 
-set -euo pipefail
+set -Eeuo pipefail
+
+# Trap unexpected errors with line number context
+trap 'echo -e "\n[error] Setup stopped at line ${LINENO}\n[error] Command: ${BASH_COMMAND}"' ERR
 
 # ------------------------------------------------------------
 # Configuration
@@ -30,27 +33,24 @@ PYTORCH_CUDA_INDEX="https://download.pytorch.org/whl/cu128"
 PYTORCH_CPU_INDEX="https://download.pytorch.org/whl/cpu"
 
 # ------------------------------------------------------------
-# Logging Helpers
+# Logging & Helper Functions
 # ------------------------------------------------------------
 log() {
-    echo -e "\n[setup] $1"
+    echo -e "\n============================================================\n[setup] $1\n============================================================"
 }
 
 warn() {
-    echo -e "\n[warning] $1"
+    echo -e "\n[WARNING] $1"
 }
 
 fail() {
-    echo -e "\n[error] $1"
+    echo -e "\n[ERROR] $1"
     exit 1
 }
 
-# ------------------------------------------------------------
-# Asset Helpers
-# ------------------------------------------------------------
 verify_group() {
     local group="$1"
-    python3 "${VERIFY_SCRIPT}" --group "${group}" >/dev/null 2>&1
+    python3 "${VERIFY_SCRIPT}" --group "${group}"
 }
 
 download_from_drive() {
@@ -58,38 +58,38 @@ download_from_drive() {
     local output_file="$2"
     local output_path="${DOWNLOAD_DIR}/${output_file}"
 
-    echo -e "\nDownloading ${output_file}..."
+    log "Downloading ${output_file}"
     echo "Google Drive ID: ${file_id}"
+    echo "Output: ${output_path}"
 
     python3 -m gdown "https://drive.google.com/uc?id=${file_id}" -O "${output_path}"
 
-    if [[ ! -f "${output_path}" ]]; then
-        fail "Download failed: ${output_path}"
-    fi
+    [[ -f "${output_path}" ]] || fail "Download failed: ${output_path}"
+    [[ -s "${output_path}" ]] || fail "Downloaded file is empty: ${output_path}"
 
-    echo "Downloaded: ${output_path}"
+    echo "Download completed."
+    ls -lh "${output_path}"
 }
 
 extract_zip() {
     local zip_file="$1"
 
-    if [[ ! -f "${zip_file}" ]]; then
-        fail "ZIP file not found: ${zip_file}"
-    fi
+    [[ -f "${zip_file}" ]] || fail "ZIP file not found: ${zip_file}"
 
-    log "Extracting $(basename "${zip_file}")..."
-    unzip -o "${zip_file}" -d "${PROJECT_ROOT}"
+    log "Extracting $(basename "${zip_file}")"
+    unzip -oq "${zip_file}" -d "${PROJECT_ROOT}"
     echo "Extraction completed."
 }
 
 # ------------------------------------------------------------
-# Initialization & File Verification
+# Initialization & Project Verification
 # ------------------------------------------------------------
 cd "${PROJECT_ROOT}"
-log "Project root:"
+
+log "Project root"
 echo "${PROJECT_ROOT}"
 
-log "Checking project files..."
+log "Checking project files"
 REQUIRED_FILES=(
     "${REQUIREMENTS_FILE}"
     "${MANIFEST_FILE}"
@@ -97,33 +97,29 @@ REQUIRED_FILES=(
 )
 
 for file in "${REQUIRED_FILES[@]}"; do
-    if [[ ! -f "${file}" ]]; then
-        fail "Missing required file: ${file}"
-    fi
+    [[ -f "${file}" ]] || fail "Missing required file: ${file}"
 done
 echo "Required project files: OK"
 
 # ------------------------------------------------------------
-# Python & System Dependencies Setup
+# Environment & System Dependencies
 # ------------------------------------------------------------
-log "Checking Python version..."
+log "Checking Python"
 python3 --version
 
 PYTHON_MAJOR=$(python3 -c "import sys; print(sys.version_info.major)")
 PYTHON_MINOR=$(python3 -c "import sys; print(sys.version_info.minor)")
 
-if [[ "${PYTHON_MAJOR}" -ne 3 ]]; then
-    fail "Python 3 is required."
-fi
+[[ "${PYTHON_MAJOR}" -eq 3 ]] || fail "Python 3 is required."
 
 if [[ "${PYTHON_MINOR}" -lt 11 || "${PYTHON_MINOR}" -ge 13 ]]; then
     warn "Project targets Python >=3.11,<3.13."
     warn "Detected Python ${PYTHON_MAJOR}.${PYTHON_MINOR}."
 fi
 
-log "Installing Linux system packages..."
-sudo apt-get update -y
-sudo apt-get install -y \
+log "Installing Linux system packages"
+apt-get update -y
+apt-get install -y \
     libzbar0 \
     libglib2.0-0 \
     libsm6 \
@@ -133,13 +129,19 @@ sudo apt-get install -y \
     git
 echo "System packages: OK"
 
-log "Upgrading pip..."
-python3 -m pip install --upgrade pip setuptools wheel
+log "Preparing pip / setuptools"
+python3 -m pip install --upgrade pip
+python3 -m pip install "setuptools==78.1.0" wheel "jedi>=0.16"
+
+echo -e "\nPackaging versions:"
+python3 -m pip --version
+python3 -c "import setuptools; print('setuptools:', setuptools.__version__)"
+python3 -c "import jedi; print('jedi:', jedi.__version__)"
 
 # ------------------------------------------------------------
-# GPU Detection & PyTorch Installation
+# GPU Detection & PyTorch Setup
 # ------------------------------------------------------------
-log "Checking NVIDIA GPU..."
+log "Checking NVIDIA GPU"
 HAS_GPU=0
 
 if command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi -L >/dev/null 2>&1; then
@@ -148,60 +150,68 @@ if command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi -L >/dev/null 2>&1; then
     nvidia-smi -L
 fi
 
-log "Installing PyTorch..."
+echo -e "\nRuntime mode: $((HAS_GPU == 1)) ? 'GPU' : 'CPU'"
+
+log "Installing PyTorch"
 if [[ "${HAS_GPU}" -eq 1 ]]; then
-    echo "Installing CUDA-enabled PyTorch..."
-    python3 -m pip install torch torchvision --index-url "${PYTORCH_CUDA_INDEX}"
+    echo -e "Installing CUDA-enabled PyTorch...\nIndex: ${PYTORCH_CUDA_INDEX}"
+    python3 -m pip install --index-url "${PYTORCH_CUDA_INDEX}" torch torchvision
 else
-    echo "No NVIDIA GPU detected."
-    echo "Installing CPU-only PyTorch..."
-    python3 -m pip install torch torchvision --index-url "${PYTORCH_CPU_INDEX}"
+    echo -e "Installing CPU-only PyTorch...\nIndex: ${PYTORCH_CPU_INDEX}"
+    python3 -m pip install --index-url "${PYTORCH_CPU_INDEX}" torch torchvision
 fi
 
-log "Verifying PyTorch..."
+log "Verifying PyTorch"
 python3 - <<'PY'
 import torch
 
 print("PyTorch:", torch.__version__)
 print("CUDA available:", torch.cuda.is_available())
-print("CUDA version:", torch.version.cuda)
-
-if torch.cuda.is_available():
-    print("GPU:", torch.cuda.get_device_name(0))
-else:
-    print("GPU: CPU")
+print("Torch CUDA version:", torch.version.cuda)
+print("Device:", torch.cuda.get_device_name(0) if torch.cuda.is_available() else "CPU")
 PY
 
-log "Installing project dependencies..."
+log "Installing project dependencies"
 python3 -m pip install -r "${REQUIREMENTS_FILE}"
 
-log "Installing gdown..."
-python3 -m pip install --upgrade gdown
+log "Re-checking PyTorch after requirements.txt"
+python3 - <<'PY'
+import torch
+import setuptools
+
+print("PyTorch:", torch.__version__)
+print("setuptools:", setuptools.__version__)
+print("CUDA available:", torch.cuda.is_available())
+if torch.cuda.is_available():
+    print("GPU:", torch.cuda.get_device_name(0))
+PY
+
+log "Installing gdown"
+python3 -m pip install "gdown"
+python3 -m gdown --version
 
 # ------------------------------------------------------------
-# Project Configuration Setup
+# Project Configuration
 # ------------------------------------------------------------
+log "Configuring project device"
 if [[ -f "${CONFIG_FILE}" ]]; then
-    log "Checking project device configuration..."
     CONFIG_BACKUP="${CONFIG_FILE}.colab.orig"
 
     if [[ "${HAS_GPU}" -eq 0 ]]; then
-        if [[ ! -f "${CONFIG_BACKUP}" ]]; then
-            cp "${CONFIG_FILE}" "${CONFIG_BACKUP}"
-        fi
+        [[ -f "${CONFIG_BACKUP}" ]] || cp "${CONFIG_FILE}" "${CONFIG_BACKUP}"
         sed -i 's/device: "cuda"/device: "cpu"/g' "${CONFIG_FILE}"
-        echo "No GPU detected."
-        echo 'Changed device: "cuda" -> device: "cpu"'
+        echo 'Configured device: "cpu"'
     else
         if [[ -f "${CONFIG_BACKUP}" ]]; then
             cp "${CONFIG_BACKUP}" "${CONFIG_FILE}"
-            echo "GPU detected."
-            echo "Restored original config."
+            echo 'Restored original GPU configuration.'
         else
-            echo "GPU detected."
-            echo "Keeping current configuration."
+            echo 'Keeping current GPU configuration.'
         fi
     fi
+
+    echo -e "\nCurrent device configuration:"
+    grep -n "device:" "${CONFIG_FILE}" || true
 else
     warn "Config file not found: ${CONFIG_FILE}"
 fi
@@ -209,68 +219,45 @@ fi
 mkdir -p "${DOWNLOAD_DIR}"
 
 # ------------------------------------------------------------
-# Asset Downloads & Verification
+# Download Assets (Weights & Data)
 # ------------------------------------------------------------
-log "Checking weights..."
+log "Checking weights"
 if verify_group "weights"; then
-    echo "Weights already exist and match assets_manifest.json."
-    echo "Skipping weights download."
+    echo -e "Weights already exist and match assets_manifest.json.\nSkipping weights download."
 else
     warn "Weights are missing or do not match the manifest."
     download_from_drive "${WEIGHTS_FILE_ID}" "weights.zip"
     extract_zip "${DOWNLOAD_DIR}/weights.zip"
 
-    log "Verifying weights..."
-    if verify_group "weights"; then
-        echo "Weights verification: PASSED"
-    else
-        fail "Weights verification FAILED."
-    fi
+    log "Verifying weights"
+    verify_group "weights" && echo "Weights verification: PASSED" || fail "Weights verification FAILED."
 fi
 
-log "Checking data..."
+log "Checking data"
 if verify_group "data"; then
-    echo "Data already exists and matches assets_manifest.json."
-    echo "Skipping data download."
+    echo -e "Data already exists and matches assets_manifest.json.\nSkipping data download."
 else
     warn "Data is missing or does not match the manifest."
     download_from_drive "${DATA_FILE_ID}" "data.zip"
     extract_zip "${DOWNLOAD_DIR}/data.zip"
 
-    log "Verifying data..."
-    if verify_group "data"; then
-        echo "Data verification: PASSED"
-    else
-        fail "Data verification FAILED."
-    fi
+    log "Verifying data"
+    verify_group "data" && echo "Data verification: PASSED" || fail "Data verification FAILED."
 fi
 
 # ------------------------------------------------------------
 # Final Verification & Environment Summary
 # ------------------------------------------------------------
-log "Running final asset verification..."
+log "Final asset verification"
 
 echo -e "\n========== WEIGHTS =========="
-if verify_group "weights"; then
-    echo "PASS"
-else
-    echo "FAIL"
-    fail "Weights verification failed."
-fi
+verify_group "weights" && echo "PASS" || fail "Weights verification failed."
 
 echo -e "\n============ DATA ============"
-if verify_group "data"; then
-    echo "PASS"
-else
-    echo "FAIL"
-    fail "Data verification failed."
-fi
+verify_group "data" && echo "PASS" || fail "Data verification failed."
 
-echo "============================================================"
-echo "                 COLAB SETUP COMPLETED"
-echo "============================================================"
+log "Environment summary"
 echo -e "\nProject:\n  ${PROJECT_ROOT}"
-
 echo -e "\nPython:"
 python3 --version
 
@@ -286,6 +273,8 @@ if [[ "${HAS_GPU}" -eq 1 ]]; then
 fi
 
 echo -e "\nAssets:\n  weights: VERIFIED\n  data:    VERIFIED"
-echo "============================================================"
-echo -e "Next step:\n\n  python3 run.py --help\n\nor run your Colab notebook."
+echo -e "\n============================================================"
+echo "              COLAB SETUP COMPLETED SUCCESSFULLY"
+echo -e "============================================================"
+echo -e "\nNext step:\n\n  python3 run.py --help\n\nor run your Colab notebook.\n"
 echo "============================================================"
