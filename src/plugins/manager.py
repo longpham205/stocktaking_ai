@@ -74,7 +74,7 @@ class PluginManager:
             evidence: dict[str, dict] = {}
 
             if self._enabled and decision.needs_plugin:
-                only_forced = decision.trigger_reasons == frozenset({"force"})
+                only_forced = "force" in decision.trigger_reasons
 
                 for plugin in self._plugins:
                     if not plugin.is_enabled():

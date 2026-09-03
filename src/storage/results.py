@@ -2,8 +2,7 @@
 
 Responsibility: export InventoryResult objects to disk as JSON, CSV, and
 annotated visualization images. This module must NEVER contain AI logic
-or invoke pipeline components directly (see 02_MODULE_SPECIFICATION.md,
-Section 10).
+or invoke pipeline components directly.
 """
 
 from __future__ import annotations
@@ -104,34 +103,51 @@ class StorageManager:
         return str(output_path)
 
     def save_annotated_image(self, image: np.ndarray, result: InventoryResult) -> str:
-        """Renders bounding boxes/labels onto an image and saves it to disk.
-
-        Args:
-            image: The original source image (BGR) that was processed.
-            result: The pipeline result whose items should be drawn.
-
-        Returns:
-            The string path of the written annotated image file.
-        """
+        """Renders bounding boxes/labels onto an image and saves it to disk."""
         annotated = image.copy()
         color = tuple(self._config.box_color)
-        thickness = self._config.box_thickness
-        font_scale = self._config.font_scale
+
+        img_h, img_w = image.shape[:2]
+        diagonal = (img_h ** 2 + img_w ** 2) ** 0.5 
 
         for item in result.items:
             x1, y1, x2, y2 = (int(item.bbox.x1), int(item.bbox.y1), int(item.bbox.x2), int(item.bbox.y2))
+            
+            box_w = abs(x2 - x1)
+            box_h = abs(y2 - y1)
+            box_size = min(box_w, box_h)
+
+            font_scale = max(0.35, min(1.2, (diagonal / 1000.0) * 0.4 + (box_size / img_h) * 0.2))
+            thickness = max(1, int(font_scale * 1.8))
+            text_thickness = max(1, int(thickness // 1.5))
+
             cv2.rectangle(annotated, (x1, y1), (x2, y2), color, thickness)
+            
             label = f"{item.product_name} {item.final_confidence:.2f}"
-            (text_w, text_h), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, font_scale, 1)
-            cv2.rectangle(annotated, (x1, max(0, y1 - text_h - 6)), (x1 + text_w + 4, y1), color, -1)
+            (text_w, text_h), baseline = cv2.getTextSize(
+                label, cv2.FONT_HERSHEY_SIMPLEX, font_scale, text_thickness
+            )
+            
+            text_bg_y1 = max(0, y1 - text_h - baseline - 6)
+            text_bg_y2 = y1 if y1 - text_h - baseline - 6 >= 0 else y1 + text_h + baseline + 6
+            text_y = max(text_h, y1 - baseline - 2) if y1 - text_h - baseline - 6 >= 0 else y1 + text_h + 2
+
+            cv2.rectangle(
+                annotated, 
+                (x1, text_bg_y1), 
+                (min(img_w, x1 + text_w + 6), text_bg_y2), 
+                color, 
+                -1
+            )
+            
             cv2.putText(
                 annotated,
                 label,
-                (x1 + 2, max(text_h, y1 - 4)),
+                (x1 + 3, text_y),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 font_scale,
                 (255, 255, 255),
-                1,
+                text_thickness,
                 cv2.LINE_AA,
             )
 

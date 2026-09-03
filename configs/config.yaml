@@ -53,7 +53,6 @@ catalog:
     "9": "7000000000"
     "10": "7000000005"
     "11": "7000000009"
-    "12": "7000000001"
     "13": "7000000004"
     "14": "7000000011"
     "15": "7000000002"
@@ -331,7 +330,7 @@ storage:
   csv_filename: "result.csv"
   annotated_image_filename: "result.jpg"
   box_color: [0, 200, 0]
-  box_thickness: 6
+  box_thickness: 3
   font_scale: 1.5
 
 # --- Validation ---
