@@ -310,8 +310,8 @@ The multi-evidence reranking architecture resolved **59 visual retrieval misclas
 
 ## **13\. Current Runtime Status**
 
-* **Barcode Subsystem Status:** The upgraded adaptive barcode decoding engine is currently **disabled in runtime configuration (plugins.barcode.enabled: false)** pending comprehensive re-validation.  
-* **Catalog Metadata Integration:** The products.json metadata catalog requires population of canonical GTIN/Barcode values before decoded barcode evidence can actively contribute to fusion score computation.
+* **Barcode Subsystem Status:** The adaptive 9-stage barcode decoding engine is fully enabled (plugins.barcode.enabled: true) and integrated into the active evidence fusion pipeline.  
+* **Catalog Metadata Integration:** The product catalog (products.json) has been fully populated with canonical GTIN/Barcode values, enabling decoded barcode evidence to actively participate in candidate re-ranking and variant disambiguation.
 
 ## **14\. Technical Limitations**
 

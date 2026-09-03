@@ -220,14 +220,12 @@ Detection      OverlapResolver ──► Refiner (optional)  Retrieval
 
 ## **Implemented**
 
-* Full 8-stage runtime pipeline (Detection through Reranker/Fusion), with `run_with_trace()` for full-fidelity validation.  
-* Pluggable backends for Detection (mock\_contour, RF-DETR), Retrieval (mock\_visual\_embedding, SigLIP2), Refinement (none, mock\_refiner, SAM2).  
-* Automated cross-platform setup scripts (`setup.bat`, `setup.sh`, `setup.command`).  
+* Full 8-stage runtime pipeline (Detection through Reranker/Fusion), with run\_with\_trace() for full-fidelity validation.  
+* Pluggable backends for Detection, Retrieval, and Refinement.  
+* Fully functional 9-stage adaptive Barcode plugin integrated with catalog GTIN/Barcode metadata for multi-evidence fusion.  
 * Dual-resolution cropping.  
 * Three-reason plugin trigger policy (uncertain / ambiguous / force).  
-* Evidence-driven Reranker with retrieval-consensus protection and a confusable-pair guard.  
-* 9-stage staged validation (VAL) sharing one detection↔ground-truth match per image across all stages, with a standalone metric-formula registry (`metrics.py`), full per-crop flat export (`records.csv`), color-coded annotated benchmark images, a per-stage metrics chart, and a full per-stage latency breakdown.  
-* Desktop UI with a Total-Items-Counted panel \+ per-product breakdown (this is a counting system, not just a classifier), zoomable annotated/gallery-match viewers, and a runtime similarity-threshold override that never reloads a model.
+* Evidence-driven Reranker with retrieval-consensus protection and a confusable-pair guard.
 
 ## **Known-incomplete / actively being tuned**
 
