@@ -230,7 +230,7 @@ sudo apt-get install -y libzbar0
 
 Neural network weights must be placed in designated directories prior to execution.
 
-You can download all model weights from the project's Google Drive package (`weights.zip`).
+Neural network weights must be placed in designated directories prior to execution. You can download all model weights at [Google Drive Link]\(https\://drive.google.com/file/d/1c-vusZjXSafgXFLbeaFzU6MRuBQGS4-k/view?usp=drive\_link) (weights.zip).
 
 | Model / Subsystem | Required Checkpoint Path |
 | :--- | :--- |
@@ -256,7 +256,7 @@ You can download all model weights from the project's Google Drive package (`wei
 
 - **Benchmark Dataset (`data/benchmark/`):** Standardized COCO-format object detection annotations. The `category_id` attribute maps directly to the system's internal numeric `product_id`.
 
-> **Data Download:** You can download the complete dataset structure (`data.zip`) from the project's Google Drive package and extract it directly into the root directory.
+\> **\*\*Data Download:\*\*** You can download the complete dataset structure (\data.zip\) from [Google Drive Link]\(https\://drive.google.com/file/d/1QHuoY2Wmo49jKrEcf-wvSfA4mU7YL1o5/view?usp=drive\_link) and extract it directly into the root directory.
 
 ## 8. Configuration Schema
 
