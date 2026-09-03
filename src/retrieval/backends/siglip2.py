@@ -1,12 +1,6 @@
 """SigLIP2 real neural retrieval (embedding) backend.
 
-Uses SigLIP2 (https://huggingface.co/docs/transformers/model_doc/siglip2)
-via Hugging Face `transformers`. Selected via
-`configs/config.yaml -> retrieval.backend: "siglip2"`.
-
-Requires: `pip install torch transformers`, plus network access to
-Hugging Face Hub to download the checkpoint (`retrieval.siglip2.model_name`)
-on first use.
+Uses SigLIP2 via Hugging Face transformers.
 """
 
 from __future__ import annotations
@@ -27,35 +21,30 @@ class Siglip2Backend(EmbeddingBackend):
     """Real neural image embedding using SigLIP2."""
 
     def __init__(self, config: RetrievalSection) -> None:
-        """Loads the SigLIP2 model and processor exactly once.
-
-        Args:
-            config: The `retrieval` section of the application configuration.
-
-        Raises:
-            ImportError: If `torch`/`transformers` are not installed.
-        """
         self._config = config
-        self._torch, self._model, self._processor, self._device = self._load_model()
+        (
+            self._torch,
+            self._model,
+            self._processor,
+            self._device,
+            self._dtype,
+        ) = self._load_model()
+
         logger.info(
-            "Siglip2Backend initialized (model_name='%s' device='%s')",
+            "Siglip2Backend initialized "
+            "(model_name='%s' device='%s' dtype='%s')",
             config.siglip2.model_name,
             self._device,
+            self._dtype,
         )
 
-    def _load_model(self) -> tuple[Any, Any, Any, str]:
-        """Loads the SigLIP2 model, its processor, and resolves the device.
+    def _load_model(self) -> tuple[Any, Any, Any, str, Any]:
+        """Load SigLIP2 model and processor."""
 
-        Returns:
-            Tuple of (torch module, loaded model, loaded processor, device string).
-
-        Raises:
-            ImportError: If `torch`/`transformers` are not installed.
-        """
         try:
             import torch
             from transformers import AutoModel, AutoProcessor
-        except ImportError as exc:  # pragma: no cover - exercised only without optional deps
+        except ImportError as exc:
             raise ImportError(
                 "retrieval.backend='siglip2' requires the optional dependencies "
                 "'torch' and 'transformers'. Install them with: "
@@ -63,45 +52,129 @@ class Siglip2Backend(EmbeddingBackend):
             ) from exc
 
         model_name = self._config.siglip2.model_name
-        device = "cuda" if self._config.siglip2.device == "cuda" and torch.cuda.is_available() else "cpu"
 
-        logger.info("Loading SigLIP2 model '%s' on device='%s'", model_name, device)
+        device = (
+            "cuda"
+            if self._config.siglip2.device == "cuda"
+            and torch.cuda.is_available()
+            else "cpu"
+        )
+
+        # FP16 significantly reduces CUDA memory usage.
+        if device == "cuda":
+            dtype = torch.float16
+        else:
+            dtype = torch.float32
+
+        logger.info(
+            "Loading SigLIP2 model '%s' on device='%s' dtype='%s'",
+            model_name,
+            device,
+            dtype,
+        )
+
         processor = AutoProcessor.from_pretrained(model_name)
-        model = AutoModel.from_pretrained(model_name).to(device).eval()
 
-        return torch, model, processor, device
+        model = AutoModel.from_pretrained(
+            model_name,
+            torch_dtype=dtype if device == "cuda" else torch.float32,
+        )
+
+        model = model.to(device)
+        model.eval()
+
+        # Make sure gradients are disabled at model level as well.
+        for parameter in model.parameters():
+            parameter.requires_grad_(False)
+
+        if device == "cuda":
+            allocated = torch.cuda.memory_allocated() / 1024**3
+            reserved = torch.cuda.memory_reserved() / 1024**3
+
+            logger.info(
+                "SigLIP2 CUDA memory after load: "
+                "allocated=%.2f GB reserved=%.2f GB",
+                allocated,
+                reserved,
+            )
+
+        return torch, model, processor, device, dtype
 
     def embed(self, image_array: np.ndarray) -> np.ndarray:
+        """Generate a normalized image embedding on CPU."""
+
         from PIL import Image
+
+        if image_array is None or image_array.size == 0:
+            raise ValueError("SigLIP2 received an empty image array")
 
         rgb_array = cv2.cvtColor(image_array, cv2.COLOR_BGR2RGB)
         pil_image = Image.fromarray(rgb_array)
 
+        # Processor runs on CPU first.
         inputs = self._processor(
             images=[pil_image],
             return_tensors="pt",
-        ).to(self._device)
+        )
 
-        with self._torch.no_grad():
-            features = self._model.get_image_features(**inputs)
-        # BaseModelOutputWithPooling
-        if hasattr(features, "pooler_output"):
-            features = features.pooler_output
-        elif hasattr(features, "last_hidden_state"):
-            features = features.last_hidden_state.mean(dim=1)
-        if not isinstance(features, self._torch.Tensor):
-            raise TypeError(
-                f"Unexpected SigLIP2 output type: {type(features)}"
-            )
-        features = self._torch.nn.functional.normalize(
-            features,
-            p=2,
-            dim=-1,
-        )
-        return (
-            features[0]
-            .detach()
-            .cpu()
-            .numpy()
-            .astype(np.float32)
-        )
+        # Move only the processor tensors to the selected device.
+        inputs = {
+            key: value.to(self._device)
+            for key, value in inputs.items()
+        }
+
+        try:
+            with self._torch.inference_mode():
+
+                if self._device == "cuda":
+                    with self._torch.autocast(
+                        device_type="cuda",
+                        dtype=self._dtype,
+                    ):
+                        features = self._model.get_image_features(
+                            **inputs
+                        )
+                else:
+                    features = self._model.get_image_features(
+                        **inputs
+                    )
+
+                # Handle possible model output structures.
+                if hasattr(features, "pooler_output"):
+                    features = features.pooler_output
+
+                elif hasattr(features, "last_hidden_state"):
+                    features = features.last_hidden_state.mean(dim=1)
+
+                if not isinstance(features, self._torch.Tensor):
+                    raise TypeError(
+                        f"Unexpected SigLIP2 output type: {type(features)}"
+                    )
+
+                features = self._torch.nn.functional.normalize(
+                    features.float(),
+                    p=2,
+                    dim=-1,
+                )
+
+                # IMPORTANT:
+                # Move the final embedding to CPU immediately.
+                embedding = (
+                    features[0]
+                    .detach()
+                    .cpu()
+                    .numpy()
+                    .astype(np.float32)
+                )
+
+            return embedding
+
+        finally:
+            # Explicitly release GPU references after every crop.
+            del inputs
+
+            if "features" in locals():
+                del features
+
+            if self._device == "cuda":
+                self._torch.cuda.empty_cache()

@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Stocktaking AI - standalone execution entry point.
 
 Usage:
