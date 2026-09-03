@@ -319,21 +319,25 @@ result, trace = pipeline.run_with_trace(image_data)
 
 ## 11. Quantitative Performance Evaluation
 
-Performance benchmarks on the standard test dataset (**18 SKUs, 31 shelf scenes, 293 annotated instances**):
+Performance benchmarks on the standard test dataset (**8 core SKUs / up to 16 expanded SKUs, 31 shelf scenes, 293 annotated instances**):
 
 | Pipeline Stage | Primary Metric | Measured Value |
 | :--- | :--- | ---: |
-| Detection | F1-Score (Class-Agnostic, BBox IoU) | **0.950** |
-| Cropping | Crop Validity Rate | **1.000** |
-| Overlap Analysis | F1-Score | **0.920** |
-| Segmentation (SAM2) | Mean IoU Improvement | **+0.011** |
-| Visual Retrieval | Top-1 Accuracy | **0.739** |
-| Visual Retrieval | Top-5 Accuracy (K=5) | **0.990** |
-| Decision Engine | Precision (Pre-Evidence) | **0.739** |
-| Evidence Fusion | Accuracy Delta | **+0.224** |
-| **End-to-End Pipeline** | **Overall F1-Score** | **0.901** |
+| Detection (RF-DETR FT) | Precision / Recall / mAP@50 | **0.970 / 0.940 / 0.990** |
+| Detection (RF-DETR FT) | F1-Score (Class-Agnostic, IoU ≥ 0.3) | **0.950** |
+| Visual Retrieval (SigLIP2) | Top-1 Accuracy (287 valid crops) | **0.735** |
+| Visual Retrieval (SigLIP2) | Top-5 Accuracy (K=5) | **1.000** |
+| Decision Engine | Pre-Fusion Accuracy (264 evaluated cases) | **0.712** |
+| Evidence Fusion | Accuracy Delta (Reranking Gain) | **+0.224** |
+| Post-Fusion Decision | Post-Fusion Accuracy (Reranking) | **0.936** |
+| Product Counting | Product Count Accuracy (31 scenes) | **0.871** |
+| **End-to-End Pipeline** | **Precision / Recall / F1-Score** | **0.913 / 0.966 / 0.939** |
 
-The multi-evidence reranking architecture resolved **59 visual retrieval misclassifications** without introducing **any false corrections (0 regressions)**, driving post-fusion accuracy to **93.9%** and the End-to-End F1-Score to **0.901**.
+---
+
+### Key Summary
+
+The multi-evidence reranking architecture resolved **60 visual retrieval misclassifications** with only **1 false correction (1 regression)** across 264 evaluated cases, driving post-fusion identification accuracy to **93.6%** and bringing the final **End-to-End F1-Score to 0.939** (with an overall Product Count Accuracy of **87.1%**).
 
 ## 12. Engineering Insights & Experimental Log
 
