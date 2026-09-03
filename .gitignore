@@ -7,6 +7,8 @@ __pycache__/
 *.so
 .Python
 env/
+venv/
+.venv/
 build/
 develop-eggs/
 dist/
@@ -23,8 +25,6 @@ share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
-venv/
-.venv/
 
 # ==========================================
 # 2. TESTING & DEBUGGING
@@ -38,6 +38,9 @@ coverage.xml
 *.cover
 *.log
 .hypothesis/
+debug/
+tests/
+test.py
 
 # ==========================================
 # 3. IDE & OS FILES
@@ -57,9 +60,20 @@ desktop.ini
 .env.*
 
 # ==========================================
-# 5. PROJECT SPECIFIC: MODEL WEIGHTS
+# 5. ARCHIVES & COMPRESSED FILES
 # ==========================================
-# Bỏ qua tất cả file weights (.pth, .pt, safetensors, v.v.) nhưng giữ lại thư mục rỗng qua .gitkeep
+*.zip
+*.rar
+*.7z
+*.tar
+*.gz
+*.bz2
+*.xz
+*.tgz
+
+# ==========================================
+# 6. MODEL WEIGHTS
+# ==========================================
 weights/**/*.pth
 weights/**/*.pt
 weights/**/*.safetensors
@@ -67,44 +81,27 @@ weights/**/*.bin
 weights/**/*.msgpack
 weights/**/*.h5
 weights/**/*.onnx
-# Bỏ qua cả các file config của HuggingFace download về (siglip2)
 weights/retriever/siglip2/*.json
 weights/retriever/siglip2/*.jinja
-
-# Ngoại lệ: Giữ lại các file .gitkeep trong thư mục weights
 !weights/**/.gitkeep
 
 # ==========================================
-# 6. PROJECT SPECIFIC: CACHE, OUTPUTS & BUILD METADATA
+# 7. CACHE, OUTPUTS & BUILD METADATA
 # ==========================================
-# Bỏ qua output kết quả inference / benchmark
 data/outputs/*
 !data/outputs/.gitkeep
 
-# Bỏ qua FAISS index và logs
 data/cache/*
 !data/cache/.gitkeep
 
-# Bỏ qua các file metadata ĐƯỢC GENERATE (Build outputs)
+# Generated build outputs (giữ lại product_colors.json do được viết thủ công)
 data/metadata/products.json
 data/metadata/product_ids.json
-# (Lưu ý: KHÔNG bỏ qua data/metadata/product_colors.json vì đây là file code tay - "HAND-AUTHORED")
 
 # ==========================================
-# 7. PROJECT SPECIFIC: DATASETS (OPTIONAL)
+# 8. DATASETS & TEMPORARY FILES
 # ==========================================
-# Bỏ comment các dòng dưới đây nếu bạn KHÔNG muốn đẩy ảnh gallery/query thực tế lên Git
-# (Thường áp dụng khi dataset quá nặng)
-
-# data/gallery/*
 data/gallery/.gitkeep
-# data/query/*
 data/query/.gitkeep
-
-#temp
 data/
 notebooks/
-weights/
-scripts/
-tests/  
-test.py

@@ -122,8 +122,11 @@ class Sam2Section(BaseModel):
     prompt_type: str = "box"
     use_source_image: bool = True
     per_detection: bool = True
-    mask_threshold: float = 0.50
-    min_mask_area_ratio: float = 0.001
+    mask_threshold: float = Field(default=0.50, ge=0.0, le=1.0)
+    min_mask_area_ratio: float = Field(default=0.30, ge=0.0)
+    # ge=0.0 only (no upper bound of 1.0): this is now a coverage ratio
+    # against the detection bbox area (see sam2.py backend), and a
+    # refined mask can in principle exceed the original bbox area.
 
 
 class RefinementOutputSection(BaseModel):
@@ -131,8 +134,9 @@ class RefinementOutputSection(BaseModel):
 
     use_mask_bbox: bool = True
     fallback_to_detection_bbox: bool = True
-    min_mask_coverage_ratio: float = 0.20
-    max_bbox_expansion_ratio: float = 1.50
+    min_mask_coverage_ratio: float = Field(default=0.55, ge=0.0, le=1.0)
+    max_bbox_expansion_ratio: float = Field(default=1.50, ge=1.0)
+    min_refinement_iou: float = Field(default=0.50, ge=0.0, le=1.0)
 
 
 class RefinementSection(BaseModel):
@@ -143,6 +147,22 @@ class RefinementSection(BaseModel):
     trigger: RefinementTriggerSection = Field(default_factory=RefinementTriggerSection)
     sam2: Sam2Section = Field(default_factory=Sam2Section)
     output: RefinementOutputSection = Field(default_factory=RefinementOutputSection)
+
+    @model_validator(mode="after")
+    def validate_coverage_thresholds(self) -> "RefinementSection":
+        # Both ratios are now measured against the same denominator (the
+        # original detection bbox area, see sam2.py backend). Keeping the
+        # backend-level filter looser than the output-level filter avoids
+        # one of them being silently redundant.
+        if self.sam2.min_mask_area_ratio > self.output.min_mask_coverage_ratio:
+            raise ValueError(
+                "refinement.sam2.min_mask_area_ratio "
+                f"({self.sam2.min_mask_area_ratio}) must not exceed "
+                "refinement.output.min_mask_coverage_ratio "
+                f"({self.output.min_mask_coverage_ratio}); the stricter "
+                "check should live in refinement.output, not the backend."
+            )
+        return self
 
 
 class CroppingSection(BaseModel):
@@ -517,7 +537,12 @@ class ValidationMetricsSection(BaseModel):
     decision: list[str] = Field(
         default_factory=lambda: ["accuracy", "precision", "recall", "f1", "confusion_matrix"]
     )
-    plugins: list[str] = Field(default_factory=lambda: ["trigger_rate", "success_rate", "correction_rate"])
+    plugins: list[str] = Field(
+            default_factory=lambda: [
+                "trigger_rate", "success_rate", "coverage_rate", "accuracy",
+                "correction_rate", "degradation_rate", "influence_rate", "latency",
+            ]
+        )
     fusion: list[str] = Field(
         default_factory=lambda: ["accuracy_before", "accuracy_after", "improvement", "correction_rate"]
     )

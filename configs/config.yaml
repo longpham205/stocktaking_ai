@@ -104,12 +104,13 @@ refinement:
     use_source_image: true
     per_detection: true
     mask_threshold: 0.50
-    min_mask_area_ratio: 0.001
+    min_mask_area_ratio: 0.03
   output:
     use_mask_bbox: true
     fallback_to_detection_bbox: true
-    min_mask_coverage_ratio: 0.20
+    min_mask_coverage_ratio: 0.55
     max_bbox_expansion_ratio: 1.50
+    min_refinement_iou: 0.50
 
 # --- Cropping Module ---
 cropping:
@@ -268,10 +269,6 @@ plugins:
       - 270
 
   force_rules:
-    "1": ["barcode"]
-    "2": ["barcode"]
-    "3": ["barcode"]
-    "4": ["barcode"]
     "5": ["barcode", "color"]
     "6": ["barcode", "color"]
     "7": ["ocr"]
@@ -319,7 +316,7 @@ rerank:
     enabled: true
     weight: 0.20
     references_path: "data/metadata/product_colors.json"
-    delta_e_strong: 5.0
+    delta_e_strong: 6.0
     delta_e_weak: 20.0
     min_margin: 1.0
     margin_scale: 5.0
@@ -367,6 +364,6 @@ validation:
     segmentation: [iou_improvement, improved_rate]
     retrieval: [top1_accuracy, topk_accuracy, mrr, mean_rank, recall_at_k]
     decision: [accuracy, precision, recall, f1, confusion_matrix]
-    plugins: [trigger_rate, success_rate, correction_rate]
+    plugins: [trigger_rate, success_rate, coverage_rate, accuracy, correction_rate, degradation_rate, influence_rate, latency]
     fusion: [accuracy_before, accuracy_after, improvement, correction_rate]
     end_to_end: [precision, recall, f1, confusion_matrix]

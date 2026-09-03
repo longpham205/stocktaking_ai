@@ -268,6 +268,7 @@ class ColorPlugin:
             "percentages": percentages,
             "roi": roi_info,
             "debug": debug_info,
+            "latency_ms": elapsed["elapsed_ms"],
         }
 
     # =========================================================================

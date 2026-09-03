@@ -166,20 +166,21 @@ stocktaking\_ai/
 
 Bash  
 \# Clone repository and install core dependencies  
-git clone \<repository-url\>  
+git clone \<https://github.com/longpham205/stocktaking_ai\>  
 cd stocktaking\_ai  
 pip install \-r requirements.txt \--break-system-packages
 
 \# Install system-level dependency for barcode decoding  
 sudo apt-get install \-y libzbar0
 
-**Model Checkpoint Placement:** Neural network weights must be placed in designated directories prior to execution:
+Model Checkpoint Placement: Neural network weights must be placed in designated directories prior to execution. You can download all model weights at [Google Drive Link](https://drive.google.com/file/d/1c-vusZjXSafgXFLbeaFzU6MRuBQGS4-k/view?usp=drive_link) (`weights.zip`).
 
 | Model / Subsystem | Required Checkpoint Path |
-| :---- | :---- |
-| RF-DETR Detector | weights/detector/checkpoint\_best\_ema.pth |
-| SAM2 Refinement Model | weights/refinement/sam2/sam2.1\_hiera\_small.pt |
-| SigLIP2 Vision Encoder | Pulled automatically from Hugging Face (google/siglip2-base-patch16-224) |
+| :--- | :--- |
+| **RF-DETR Detector** | `weights/detector/checkpoint_best_ema.pth` |
+| **SAM2 Refinement Model** | `weights/refinement/sam2/sam2.1_hiera_small.pt` |
+| **SigLIP2 Vision Encoder** | Pulled automatically from Hugging Face (`google/siglip2-base-patch16-224`) |
+
 
 ## **7\. Dataset & Metadata Specification**
 
@@ -196,6 +197,8 @@ JSON
 }
 
 * **Benchmark Dataset (data/benchmark/):** Standardized COCO format object detection annotations. The category\_id attribute maps directly to the system's internal numeric product\_id.
+
+> **Data Download:** You can download the complete dataset structure (`data.zip`) from [Google Drive Link](https://drive.google.com/file/d/1QHuoY2Wmo49jKrEcf-wvSfA4mU7YL1o5/view?usp=drive_link) and extract it directly into the root directory.
 
 ## **8\. Configuration Schema**
 

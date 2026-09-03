@@ -76,8 +76,7 @@ class Sam2Backend:
             config.model_type,
             config.device,
         )
-        
-        
+
     def _ensure_checkpoint(self) -> Path:
         """Ensure the configured SAM2 checkpoint exists locally.
 
@@ -260,21 +259,52 @@ class Sam2Backend:
             equal to `bbox`) if SAM2 produced an empty/invalid mask.
         """
         rgb_array = cv2.cvtColor(image_array, cv2.COLOR_BGR2RGB)
-        box_prompt = np.array([bbox.x1, bbox.y1, bbox.x2, bbox.y2], dtype=np.float32)
+        height, width = rgb_array.shape[:2]
+
+        # Clip the prompt box to image bounds. Detections near an edge
+        # (or from an overlap group) can carry coordinates that slightly
+        # exceed the frame, which is an invalid prompt for SAM2.
+        box_prompt = np.array(
+            [
+                max(0.0, bbox.x1),
+                max(0.0, bbox.y1),
+                min(float(width), bbox.x2),
+                min(float(height), bbox.y2),
+            ],
+            dtype=np.float32,
+        )
 
         with self._torch.inference_mode():
             self._predictor.set_image(rgb_array)
-            masks, scores, _ = self._predictor.predict(box=box_prompt, multimask_output=False)
+            # multimask_output=True: a box prompt inside an overlap region
+            # (the only scenario Refiner ever calls this backend for) is an
+            # inherently ambiguous prompt -- the box may cover parts of two
+            # neighboring products. Requesting a single mask forces SAM2 to
+            # commit to one interpretation with no way to compare
+            # alternatives, which is precisely how refinement ends up
+            # latching onto the wrong neighboring object. Requesting all
+            # three candidates lets us pick the one that best matches the
+            # original detector box instead of blindly trusting whichever
+            # single mask SAM2 happened to return.
+            masks, scores, _ = self._predictor.predict(box=box_prompt, multimask_output=True)
 
         if masks is None or len(masks) == 0:
             return self._fallback(bbox, detection_index)
 
-        mask = masks[0] >= self._config.mask_threshold
+        best_index = self._select_best_mask(masks, scores, bbox)
+        mask = masks[best_index] >= self._config.mask_threshold
         mask_area = float(mask.sum())
         detection_area = max(bbox.area, 1.0)
 
-        min_area_pixels = self._config.min_mask_area_ratio * image_array.shape[0] * image_array.shape[1]
-        if mask_area < min_area_pixels:
+        # Coverage ratio is measured against the ORIGINAL DETECTION BBOX
+        # area, not the full source image. This must stay consistent with
+        # RefinedBox.mask_area_ratio's own definition and with
+        # refinement.output.min_mask_coverage_ratio, which both compare
+        # against the detection box. (Previously this filter compared
+        # mask_area against a fraction of the whole image, an unrelated
+        # and effectively uncontrolled threshold.)
+        mask_coverage_ratio = mask_area / detection_area
+        if mask_coverage_ratio < self._config.min_mask_area_ratio:
             return self._fallback(bbox, detection_index)
 
         refined_bbox = self._mask_to_bbox(mask)
@@ -284,11 +314,52 @@ class Sam2Backend:
         return RefinedBox(
             detection_index=detection_index,
             refined_bbox=refined_bbox,
-            mask_area_ratio=mask_area / detection_area,
-            refinement_confidence=float(scores[0]) if scores is not None and len(scores) else 0.0,
+            mask_area_ratio=mask_coverage_ratio,
+            refinement_confidence=float(scores[best_index]) if scores is not None and len(scores) else 0.0,
             backend="sam2",
             used_fallback=False,
         )
+
+    @staticmethod
+    def _select_best_mask(
+        masks: np.ndarray, scores: np.ndarray, bbox: BoundingBox
+    ) -> int:
+        """Selects the best candidate among SAM2's multi-mask output.
+
+        Prefers the candidate whose derived bbox best overlaps the
+        original detector box, rather than trusting SAM2's own
+        confidence score alone. This directly guards against SAM2
+        latching onto a neighboring object when the box prompt sits in
+        an overlap region (ambiguous prompt), since a neighboring
+        object's mask can still score highly on its own merits while
+        being positionally wrong.
+
+        Args:
+            masks: Array of candidate boolean masks, shape (N, H, W).
+            scores: Array of SAM2's own per-mask confidence scores.
+            bbox: The original detector bounding box being refined.
+
+        Returns:
+            Index of the selected candidate in `masks`/`scores`.
+        """
+        best_index = 0
+        best_iou = -1.0
+        for index in range(len(masks)):
+            candidate_bbox = Sam2Backend._mask_to_bbox(masks[index] >= 0.5)
+            if candidate_bbox is None:
+                continue
+            candidate_iou = candidate_bbox.iou(bbox)
+            if candidate_iou > best_iou:
+                best_index, best_iou = index, candidate_iou
+
+        if best_iou < 0.0:
+            # No candidate produced a valid bbox at all; fall back to
+            # SAM2's own ranking.
+            if scores is not None and len(scores):
+                return int(np.argmax(scores))
+            return 0
+
+        return best_index
 
     @staticmethod
     def _mask_to_bbox(mask: np.ndarray) -> BoundingBox | None:

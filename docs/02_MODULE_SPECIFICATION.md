@@ -276,13 +276,30 @@ identify color codes, or compare against reference colors — that is
 
 ## 8.4 barcode.py
 
-pyzbar-based. Reads `crop.raw_image_array` only. Currently disabled in
-`configs/config.yaml` (`plugins.barcode.enabled: false`) pending root-
-cause investigation of its near-zero decode success rate.
+pyzbar-based, reads `crop.raw_image_array` only. 9-stage cumulative adaptive decode pipeline
+(each stage attempted only if the previous one failed to decode anything):
 
-**Forbidden (all plugins)**: never alter core pipeline execution order,
-never call Detector/Retriever directly.
+```text
+-1. Presence pre-check (edge density gate — cheap reject for barcode-free crops)
+ 0. Raw decode
+ 1. Barcode-region detection (gradient anisotropy, rotation-invariant)
+    -> if no region found after step 0 fails, stop (very likely no barcode)
+ 2. Deskew (seeded from detected region angle, else a dedicated Hough pass)
+ 3. Upscale (cropped to detected region first, so resolution isn't spent on background)
+ 4. CLAHE contrast enhancement
+ 5. Adaptive threshold binarization
+ 6. Denoise
+ 7. Sharpen
+ 8. Fixed-angle rotation fallback (90/180/270) — last resort
+```
 
+Returns a `confidence` score (not `confidence_boost`) combining decode quality, symbology
+trust, and a penalty when multiple decoded barcodes in the same crop disagree. Decoded values
+and catalog values are normalized before matching (digits only; UPC-A aligned to EAN-13/JAN by
+leading-zero prepend) — see `Reranker._barcode_match_strength`.
+
+Currently disabled via `plugins.barcode.enabled: false` pending a validation run against this
+rewritten pipeline.
 ---
 
 # 9. pipeline/pipeline.py (InventoryPipeline)

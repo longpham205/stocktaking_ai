@@ -195,6 +195,17 @@ def improvement(stats: dict) -> float:
     """accuracy_after - accuracy_before."""
     return round(accuracy_after(stats) - accuracy_before(stats), 4)
 
+def coverage_rate(stats: dict) -> float:
+    """Fraction of ALL eligible cases where the plugin produced usable
+    evidence at all (success / eligible) — broader than success_rate,
+    which only looks at cases the plugin actually executed."""
+    return round(_safe_divide(stats.get("success", 0), stats.get("eligible", 0)), 4)
+
+
+def influence_rate(stats: dict) -> float:
+    """Fraction of executed cases where the plugin's evidence changed
+    the final decision, in either direction (corrected + degraded)."""
+    return round(_safe_divide(stats.get("influenced", 0), stats.get("executed", 0)), 4)
 
 # =============================================================================
 # Registry
@@ -223,6 +234,9 @@ METRIC_REGISTRY: dict[str, Callable[[dict], Any]] = {
     "accuracy_before": accuracy_before,
     "accuracy_after": accuracy_after,
     "improvement": improvement,
+    "coverage_rate": coverage_rate,
+    "influence_rate": influence_rate,
+    "latency": mean_latency_ms,
 }
 
 

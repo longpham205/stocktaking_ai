@@ -137,6 +137,7 @@ class BarcodePlugin:
             "barcodes": barcodes,
             "confidence": confidence,
             "preprocessing_stage": stage_used,
+            "latency_ms": elapsed["elapsed_ms"],
         }
 
     # ------------------------------------------------------------------

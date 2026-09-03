@@ -11,8 +11,8 @@ config.yaml, "refinement" section header comment).
 (`refinement.output.*`): it selects and loads exactly one concrete
 `SegmentationBackend` implementation (see `src/segmentation/backends/`)
 based on `configs/config.yaml -> refinement.backend`, then applies
-coverage/expansion sanity checks to every backend result before handing
-it to `Cropper`. New models can be added at any time:
+coverage/expansion/positional sanity checks to every backend result
+before handing it to `Cropper`. New models can be added at any time:
 
     1. Create `src/segmentation/backends/<name>.py` implementing
        `SegmentationBackend.refine(image_array, bbox, detection_index)`.
@@ -173,7 +173,16 @@ class Refiner:
             - the backend already reported `used_fallback=True`, or
             - the mask coverage is below `min_mask_coverage_ratio`, or
             - the refined box expanded beyond `max_bbox_expansion_ratio`
-              relative to the original detection box.
+              relative to the original detection box, or
+            - the refined box's IoU against the original detection box is
+              below `min_refinement_iou`.
+
+        The first three checks only constrain the refined box's SIZE
+        relative to the original. None of them catch a refined box that
+        is a plausible size but sits in the wrong place -- e.g. SAM2
+        latching onto a neighboring product inside an overlap region,
+        which is the exact scenario Refiner is invoked for. The IoU
+        check catches that positional failure mode specifically.
 
         Args:
             detection: The original Detection this refinement belongs to.
@@ -203,6 +212,16 @@ class Refiner:
                 raw_result.detection_index,
                 expansion_ratio,
                 self._output_config.max_bbox_expansion_ratio,
+            )
+            return self._fallback_box(detection, raw_result)
+
+        positional_iou = raw_result.refined_bbox.iou(detection.bbox)
+        if positional_iou < self._output_config.min_refinement_iou:
+            logger.debug(
+                "Rejecting refinement for detection_index=%d: positional IoU %.3f < min %.3f",
+                raw_result.detection_index,
+                positional_iou,
+                self._output_config.min_refinement_iou,
             )
             return self._fallback_box(detection, raw_result)
 

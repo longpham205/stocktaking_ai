@@ -510,7 +510,13 @@ class Evaluator:
 
         plugin_names = ("ocr", "color", "barcode")
         per_plugin: dict[str, dict] = {
-            name: {"eligible": 0, "triggered": 0, "executed": 0, "success": 0, "influenced": 0} for name in plugin_names
+            name: {
+                "eligible": 0, "triggered": 0, "executed": 0,
+                "success": 0, "correct": 0, "total": 0,
+                "corrected": 0, "degraded": 0, "influenced": 0,
+                "latencies": [],
+            }
+            for name in plugin_names
         }
 
         for context in contexts:
@@ -527,20 +533,49 @@ class Evaluator:
                 if plugin_result is None:
                     continue
 
+                rerank_debug = getattr(crop_trace.final_decision, "rerank_debug", None) or {}
+                candidates = rerank_debug.get("candidates", [])
+                final_winner_id = crop_trace.final_decision.product_id
                 decision_before_correct = crop_trace.decision_result.product_id == gt_product_id
                 decision_after_correct = crop_trace.final_decision.product_id == gt_product_id
-                influenced = decision_before_correct != decision_after_correct
 
                 for name in plugin_names:
                     if name not in plugin_result.executed_plugins:
                         continue
-                    per_plugin[name]["triggered"] += 1
-                    per_plugin[name]["executed"] += 1
+                    stats = per_plugin[name]
+                    stats["triggered"] += 1
+                    stats["executed"] += 1
+
                     evidence = plugin_result.evidence.get(name, {})
+                    latency = evidence.get("latency_ms")
+                    if latency is not None:
+                        stats["latencies"].append(float(latency))
+
                     if _plugin_success(name, evidence):
-                        per_plugin[name]["success"] += 1
-                    if influenced:
-                        per_plugin[name]["influenced"] += 1
+                        stats["success"] += 1
+
+                    # Which candidate did THIS plugin's evidence point to?
+                    identified_product_id, identified_strength = _plugin_identified_candidate(
+                        name, candidates
+                    )
+
+                    if identified_product_id is not None and identified_strength > 0.0:
+                        stats["total"] += 1
+                        if str(identified_product_id) == str(gt_product_id):
+                            stats["correct"] += 1
+
+                    # Did this plugin's evidence agree with the FINAL winner,
+                    # and did the decision flip correctness as a result?
+                    plugin_supported_winner = (
+                        identified_product_id is not None
+                        and str(identified_product_id) == str(final_winner_id)
+                    )
+                    if decision_before_correct != decision_after_correct and plugin_supported_winner:
+                        stats["influenced"] += 1
+                        if decision_after_correct:
+                            stats["corrected"] += 1
+                        else:
+                            stats["degraded"] += 1
 
         result = {}
         for name, stats in per_plugin.items():
@@ -553,7 +588,11 @@ class Evaluator:
                     "skipped": stats["eligible"] - stats["executed"],
                     "success": stats["success"],
                     "failure": stats["executed"] - stats["success"],
-                    "cases_changed_final_decision": stats["influenced"],
+                    "identified_total": stats["total"],
+                    "identified_correct": stats["correct"],
+                    "corrected": stats["corrected"],
+                    "degraded": stats["degraded"],
+                    "influenced": stats["influenced"],
                 }
             )
             result[name] = metrics_out
@@ -912,6 +951,28 @@ def _plugin_success(name: str, evidence: dict) -> bool:
         return len(evidence.get("palette", [])) > 0
     return False
 
+def _plugin_identified_candidate(name: str, candidates: list[dict]) -> tuple[str | None, float]:
+    """Finds which retrieval candidate a single plugin's evidence pointed to most strongly.
+
+    Args:
+        name: Plugin name ("ocr", "color", "barcode").
+        candidates: `rerank_debug["candidates"]` list produced by Reranker,
+            each carrying `<name>_match_strength` per candidate.
+
+    Returns:
+        Tuple of (product_id with the highest match_strength, that
+        strength), or (None, 0.0) if no candidate has any positive
+        match_strength for this plugin.
+    """
+    match_key = f"{name}_match_strength"
+    best_product_id: str | None = None
+    best_strength = 0.0
+    for entry in candidates:
+        strength = float(entry.get(match_key, 0.0))
+        if strength > best_strength:
+            best_strength = strength
+            best_product_id = entry.get("product_id")
+    return best_product_id, best_strength
 
 def greedy_iou_match(
     pred_boxes: list[BoundingBox],

@@ -207,3 +207,10 @@ New VAL metric: one new function in `metrics.py`, registered in
    Reranker corrected roughly as many cases as it broke. Any new
    evidence source must integrate through the retrieval-consensus
    protection mechanism, not bypass it with a flat additive boost.
+5. **Barcode plugin single-attempt bug**: the original plugin called `pyzbar.decode()` exactly
+   once on a raw crop and gave up, which fails on almost any real-world rotation/contrast
+   condition. Any adaptive-decode-style plugin (barcode, and potentially future OCR
+   refinements) should follow the same pattern established here: a cheap presence/region
+   pre-check before committing to expensive preprocessing, cumulative fallback stages that
+   each retry the actual decode, and an early exit on first success — not a single
+   best-effort attempt.

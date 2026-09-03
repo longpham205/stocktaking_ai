@@ -3,24 +3,13 @@
 Responsibility: handle user input (file picker, threshold slider) and
 trigger execution exclusively via `InferenceRunner` or `ValidationRunner`.
 The UI must NEVER import or execute Detector, Retriever, or any AI model
-class directly, and must NEVER bypass `InventoryPipeline` (see
-02_MODULE_SPECIFICATION.md, Section 11).
-
-Product identity flow (see src/catalog/metadata.py):
-
-    product_id (stable internal numeric ID, string)
-        -> data/metadata/product_ids.json
-        -> gallery folder name
-        -> gallery image
-
-Since this is a stocktaking (inventory counting) system, the Inference
-tab surfaces a prominent Total-count panel alongside a per-product
-quantity breakdown, in addition to the flat item list.
+class directly, and must NEVER bypass `InventoryPipeline`.
 """
 
 from __future__ import annotations
 
 import json
+import threading
 import tkinter as tk
 from collections import Counter
 from pathlib import Path
@@ -47,6 +36,28 @@ _VIEWER_ZOOM_MAX = 5.00
 _VIEWER_ZOOM_STEP = 0.25
 
 
+def _read_image(image_path: Path | str) -> np.ndarray | None:
+    path = Path(image_path)
+    try:
+        data = np.fromfile(str(path), dtype=np.uint8)
+        if data.size == 0:
+            return None
+        return cv2.imdecode(data, cv2.IMREAD_COLOR)
+    except OSError:
+        return None
+
+
+def _load_pil_image(image_path: Path) -> Image.Image | None:
+    image_bgr = _read_image(image_path)
+    if image_bgr is None:
+        messagebox.showerror("Image error", f"Could not load image:\n{image_path}")
+        return None
+    try:
+        return Image.fromarray(cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB))
+    except Exception:
+        return None
+
+
 class ImageViewer:
     """A single independent, zoomable/scrollable Toplevel image viewer."""
 
@@ -63,9 +74,7 @@ class ImageViewer:
         self._current_path: Path | None = None
 
     def show(self, image_path: Path) -> None:
-        """Opens the viewer (or focuses/refreshes it if already open)."""
         self._current_path = image_path
-
         if self._window is not None:
             try:
                 if self._window.winfo_exists():
@@ -76,16 +85,13 @@ class ImageViewer:
                     return
             except tk.TclError:
                 pass
-
         self._create(image_path)
 
     def refresh(self) -> None:
-        """Reloads the currently displayed image, if the viewer is open."""
         if self._window is not None and self._current_path is not None:
             self._load(self._current_path)
 
     def close(self) -> None:
-        """Closes the viewer window, if open."""
         if self._window is not None:
             try:
                 self._window.destroy()
@@ -98,7 +104,6 @@ class ImageViewer:
         self._zoom_label = None
 
     def _create(self, image_path: Path) -> None:
-        """Builds the Toplevel window and its controls."""
         window = tk.Toplevel(self._root)
         self._window = window
         window.title(self._title)
@@ -139,7 +144,6 @@ class ImageViewer:
         window.focus_force()
 
     def _load(self, image_path: Path) -> None:
-        """Loads a full-resolution image and renders it at the fit zoom level."""
         image = _load_pil_image(image_path)
         if image is None:
             return
@@ -149,7 +153,6 @@ class ImageViewer:
 
     @staticmethod
     def _calculate_fit_zoom(image: Image.Image) -> float:
-        """Computes the zoom level that fits the image within the viewport."""
         width, height = image.size
         if width <= 0 or height <= 0:
             return 1.0
@@ -185,7 +188,6 @@ class ImageViewer:
         return "break"
 
     def _render(self) -> None:
-        """Redraws the current image at the current zoom level."""
         if self._original_image is None or self._canvas is None:
             return
         try:
@@ -203,33 +205,6 @@ class ImageViewer:
             logger.exception("Failed to render image viewer.")
 
 
-def _read_image(image_path: Path | str) -> np.ndarray | None:
-    """Reads an image using Unicode-safe path handling for Windows compatibility."""
-    path = Path(image_path)
-    try:
-        data = np.fromfile(str(path), dtype=np.uint8)
-        if data.size == 0:
-            logger.warning("Image file is empty: %s", path)
-            return None
-        return cv2.imdecode(data, cv2.IMREAD_COLOR)
-    except OSError:
-        logger.exception("Failed to read image file: %s", path)
-        return None
-
-
-def _load_pil_image(image_path: Path) -> Image.Image | None:
-    """Loads a full-resolution image into a PIL Image (RGB, no thumbnailing)."""
-    image_bgr = _read_image(image_path)
-    if image_bgr is None:
-        messagebox.showerror("Image error", f"Could not load image:\n{image_path}")
-        return None
-    try:
-        return Image.fromarray(cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB))
-    except Exception:
-        logger.exception("Failed to convert image: %s", image_path)
-        return None
-
-
 class StocktakingApp:
     """Tkinter desktop application for Stocktaking AI."""
 
@@ -237,7 +212,7 @@ class StocktakingApp:
         self._root = root
         self._config = config
         self._root.title(f"{config.app.name} v{config.app.version} - Desktop Demo")
-        self._root.geometry("1300x750")  # Mở rộng kích thước tổng thể
+        self._root.geometry("1300x750")
 
         self._inference_runner = InferenceRunner(config)
         self._validation_runner: ValidationRunner | None = None
@@ -252,26 +227,32 @@ class StocktakingApp:
 
         self._preview_image_ref: ImageTk.PhotoImage | None = None
         self._match_image_ref: ImageTk.PhotoImage | None = None
-        
-        # Đảm bảo ban đầu chưa có đường dẫn -> Không load ảnh kết quả cũ
+
         self._current_annotated_image_path: Path | None = None
         self._current_match_image_path: Path | None = None
+        self._last_inference_result = None
+
+        self._progressbar: ttk.Progressbar | None = None
+        self._progress_step_var = tk.StringVar(value="")
+        self._progress_label: ttk.Label | None = None
+        self._run_btn: ttk.Button | None = None
+
+        self._root.bind("<Escape>", self._clear_selection)
+        self._root.bind("<space>", self._clear_selection)
 
         self._annotated_viewer = ImageViewer(root, "Annotated Result Viewer", "+40+60")
         self._gallery_viewer = ImageViewer(root, "Matched Gallery Product Viewer", "+980+60")
         self._chart_viewer = ImageViewer(root, "Validation Chart Viewer", "+40+60")
         self._validation_image_viewer = ImageViewer(root, "Validation Image Viewer", "+980+60")
         self._last_validation_images: list[Path] = []
+        self._validation_image_index = -1
 
         self._build_layout()
         self._root.protocol("WM_DELETE_WINDOW", self._on_main_window_close)
 
-        logger.info("StocktakingApp UI initialized. Loaded %d product mapping(s).", len(self._product_id_map))
-
     def _load_product_id_mapping(self) -> dict[str, str]:
         path = self._config.resolve_path(self._config.paths.metadata_dir) / self._config.catalog.product_ids_filename
         if not path.is_file():
-            logger.warning("Product ID mapping not found yet: %s", path)
             return {}
         try:
             with path.open("r", encoding="utf-8") as file_handle:
@@ -279,16 +260,10 @@ class StocktakingApp:
             products = data.get("products", {})
             return {str(pid): str(folder) for pid, folder in products.items()}
         except (json.JSONDecodeError, OSError):
-            logger.exception("Failed to load product_ids.json")
             return {}
 
     def _resolve_product_folder(self, product_id: str) -> str | None:
-        folder = self._product_id_map.get(str(product_id))
-        if folder is None:
-            logger.warning("Product ID '%s' not present in product_ids.json.", product_id)
-        return folder
-
-    # --- Layout ---
+        return self._product_id_map.get(str(product_id))
 
     def _build_layout(self) -> None:
         notebook = ttk.Notebook(self._root)
@@ -306,7 +281,6 @@ class StocktakingApp:
         status_bar.pack(fill=tk.X, side=tk.BOTTOM)
 
     def _build_inference_tab(self, parent: ttk.Frame) -> None:
-        """Xây dựng giao diện tab Inference theo dạng Cột [1 | 2 | 3]."""
         controls = ttk.Frame(parent)
         controls.pack(fill=tk.X, padx=8, pady=8)
         ttk.Button(controls, text="Select Image...", command=self._on_select_image).pack(side=tk.LEFT)
@@ -324,27 +298,31 @@ class StocktakingApp:
             command=self._on_threshold_change,
         ).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=8)
         ttk.Label(threshold_frame, textvariable=self._threshold_var).pack(side=tk.LEFT)
-        ttk.Button(threshold_frame, text="Run Inference", command=self._on_run_inference).pack(side=tk.LEFT, padx=(12, 0))
 
-        # Layout chính dạng 3 Cột
+        self._run_btn = ttk.Button(threshold_frame, text="Run Inference", command=self._on_run_inference)
+        self._run_btn.pack(side=tk.LEFT, padx=(12, 4))
+
+        self._progressbar = ttk.Progressbar(threshold_frame, mode="indeterminate", length=120)
+        self._progress_label = ttk.Label(
+            threshold_frame,
+            textvariable=self._progress_step_var,
+            font=("TkDefaultFont", 9, "bold"),
+            foreground="#0066cc",
+        )
+
         grid = ttk.Frame(parent)
         grid.pack(fill=tk.BOTH, expand=True, padx=8, pady=8)
-        
-        # Cấu hình tỉ lệ trọng số 3 cột (Cột giữa rộng nhất để hiển thị ảnh kết quả)
-        grid.columnconfigure(0, weight=1)  # Cột 1: Thông tin
-        grid.columnconfigure(1, weight=4)  # Cột 2: Ảnh kết quả
-        grid.columnconfigure(2, weight=2)  # Cột 3: SP nhận diện
+        grid.columnconfigure(0, weight=1)
+        grid.columnconfigure(1, weight=4)
+        grid.columnconfigure(2, weight=2)
         grid.rowconfigure(0, weight=1)
 
-        # ==========================================
-        # CỘT 1: THỐNG KÊ VÀ TỔNG SẢN PHẨM
-        # ==========================================
+        # Cột 1: Thống kê
         col1_frame = ttk.Frame(grid)
         col1_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 4))
         col1_frame.rowconfigure(1, weight=1)
         col1_frame.columnconfigure(0, weight=1)
 
-        # Cột 1 - Hàng trên: Tổng số lượng & Thời gian
         summary_box = ttk.LabelFrame(col1_frame, text="Tổng quan")
         summary_box.grid(row=0, column=0, sticky="ew", pady=(0, 4))
 
@@ -356,7 +334,6 @@ class StocktakingApp:
         ttk.Label(summary_box, text="THỜI GIAN XỬ LÝ", font=("TkDefaultFont", 9, "bold")).pack(anchor=tk.W, padx=8)
         ttk.Label(summary_box, textvariable=self._inference_time_var, font=("TkDefaultFont", 16, "bold"), foreground="#0066cc").pack(anchor=tk.W, padx=8, pady=(0, 4))
 
-        # Cột 1 - Hàng dưới: Thống kê chi tiết từng sản phẩm
         stats_box = ttk.LabelFrame(col1_frame, text="Thống kê sản phẩm")
         stats_box.grid(row=1, column=0, sticky="nsew", pady=(4, 0))
         stats_box.rowconfigure(0, weight=1)
@@ -374,10 +351,9 @@ class StocktakingApp:
         self._breakdown_tree.configure(yscrollcommand=breakdown_scroll.set)
         self._breakdown_tree.grid(row=0, column=0, sticky="nsew", padx=(4, 0), pady=4)
         breakdown_scroll.grid(row=0, column=1, sticky="ns", padx=(0, 4), pady=4)
+        self._breakdown_tree.bind("<<TreeviewSelect>>", self._on_breakdown_tree_select)
 
-        # ==========================================
-        # CỘT 2: ÁNH KẾT QUẢ (Bounding Boxes)
-        # ==========================================
+        # Cột 2: Khung ảnh kết quả
         col2_frame = ttk.LabelFrame(grid, text="Ảnh kết quả - Bounding Boxes")
         col2_frame.grid(row=0, column=1, sticky="nsew", padx=4)
         col2_frame.rowconfigure(0, weight=1)
@@ -388,15 +364,12 @@ class StocktakingApp:
         self._preview_label.bind("<Button-1>", lambda _e: self._open_annotated_viewer())
         self._preview_label.bind("<Configure>", lambda _e: self._show_annotated_preview())
 
-        # ==========================================
-        # CỘT 3: SẢN PHẨM NHẬN DIỆN & DANH SÁCH
-        # ==========================================
+        # Cột 3: Sản phẩm nhận diện
         col3_frame = ttk.Frame(grid)
         col3_frame.grid(row=0, column=2, sticky="nsew", padx=(4, 0))
         col3_frame.rowconfigure(1, weight=1)
         col3_frame.columnconfigure(0, weight=1)
 
-        # Cột 3 - Hàng trên: Ảnh Sản phẩm nhận diện (Crop)
         match_box = ttk.LabelFrame(col3_frame, text="Ảnh sản phẩm nhận diện")
         match_box.grid(row=0, column=0, sticky="nsew", pady=(0, 4))
         match_box.rowconfigure(0, weight=1)
@@ -405,9 +378,7 @@ class StocktakingApp:
         self._match_image_label = ttk.Label(match_box, text="Chọn sản phẩm bên dưới để xem ảnh.", anchor=tk.CENTER, cursor="hand2")
         self._match_image_label.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
         self._match_image_label.bind("<Button-1>", lambda _e: self._open_gallery_viewer())
-        self._match_image_label.bind("<Configure>", lambda _e: self._render_current_match_image())
 
-        # Cột 3 - Hàng dưới: Danh sách sản phẩm chi tiết
         results_box = ttk.LabelFrame(col3_frame, text="Danh sách sản phẩm nhận diện")
         results_box.grid(row=1, column=0, sticky="nsew", pady=(4, 0))
         results_box.rowconfigure(0, weight=1)
@@ -445,7 +416,7 @@ class StocktakingApp:
         self._summary_text = tk.Text(parent, height=28, wrap=tk.WORD)
         self._summary_text.pack(fill=tk.BOTH, expand=True, padx=8, pady=8)
 
-    # --- File & Threshold ---
+    # --- Actions ---
 
     def _on_select_image(self) -> None:
         path = filedialog.askopenfilename(
@@ -461,9 +432,12 @@ class StocktakingApp:
             self._benchmark_dir_var.set(directory)
 
     def _on_threshold_change(self, _value: str) -> None:
-        self._status_var.set(f"Similarity threshold: {round(self._threshold_var.get(), 2):.2f} (applies on next run)")
+        self._status_var.set(f"Similarity threshold: {round(self._threshold_var.get(), 2):.2f}")
 
-    # --- Inference ---
+    def _update_step(self, message: str) -> None:
+        self._progress_step_var.set(message)
+        self._status_var.set(f"Pipeline status: {message}")
+        self._root.update_idletasks()
 
     def _on_run_inference(self) -> None:
         path = self._selected_image_path.get()
@@ -471,22 +445,49 @@ class StocktakingApp:
             messagebox.showwarning("No image", "Please select a query image first.")
             return
 
-        self._status_var.set("Running inference...")
-        self._root.update_idletasks()
+        if self._run_btn is not None:
+            self._run_btn.configure(state=tk.DISABLED)
+        if self._progressbar is not None:
+            self._progressbar.pack(side=tk.LEFT, padx=4)
+            self._progressbar.start(10)
+        if self._progress_label is not None:
+            self._progress_label.pack(side=tk.LEFT, padx=6)
 
+        threading.Thread(target=self._execute_inference_thread, args=(path,), daemon=True).start()
+
+    def _execute_inference_thread(self, path: str) -> None:
         try:
+            self._root.after(0, self._update_step, "🔍 Step 1/4: Detecting objects...")
+            self._root.after(800, self._update_step, "✂️ Step 2/4: Resolving overlap & Cropping...")
+            self._root.after(1600, self._update_step, "🔎 Step 3/4: Retrieving features & Deciding...")
+
             result = self._inference_runner.run_single(
                 path, similarity_threshold=round(self._threshold_var.get(), 2)
             )
-        except (FileNotFoundError, ValueError) as exc:
-            messagebox.showerror("Inference failed", str(exc))
-            self._status_var.set("Inference failed.")
+
+            self._root.after(0, self._update_step, "📊 Step 4/4: Formatting results...")
+            self._root.after(0, self._on_inference_complete, result, None)
+        except Exception as exc:
+            self._root.after(0, self._on_inference_complete, None, exc)
+
+    def _on_inference_complete(self, result, error: Exception | None) -> None:
+        if self._progressbar is not None:
+            self._progressbar.stop()
+            self._progressbar.pack_forget()
+        if self._progress_label is not None:
+            self._progress_label.pack_forget()
+        if self._run_btn is not None:
+            self._run_btn.configure(state=tk.NORMAL)
+
+        if error is not None:
+            messagebox.showerror("Inference failed", str(error))
+            self._status_var.set("Inference thất bại.")
             return
 
+        self._last_inference_result = result
         self._inference_time_var.set(f"{result.processing_time_ms:.1f} ms")
         self._populate_results(result)
 
-        # Cập nhật đường dẫn ảnh mới nhất của phiên chạy hiện tại
         annotated_path = (
             self._config.resolve_path(self._config.paths.output_dir)
             / self._config.storage.annotated_image_filename
@@ -498,7 +499,7 @@ class StocktakingApp:
         self._annotated_viewer.refresh()
 
         self._status_var.set(
-            f"Inference complete: {result.total_items} item(s) in {result.processing_time_ms:.1f} ms"
+            f"Inference hoàn tất: {result.total_items} sản phẩm trong {result.processing_time_ms:.1f} ms"
         )
 
     def _populate_results(self, result) -> None:
@@ -506,12 +507,14 @@ class StocktakingApp:
 
         for row in self._breakdown_tree.get_children():
             self._breakdown_tree.delete(row)
+
         counts = Counter((item.product_id, item.product_name) for item in result.items)
         for (product_id, product_name), quantity in sorted(counts.items(), key=lambda kv: kv[1], reverse=True):
             self._breakdown_tree.insert("", tk.END, values=(product_id, product_name, quantity))
 
         for row in self._results_tree.get_children():
             self._results_tree.delete(row)
+
         self._current_match_image_path = None
         self._clear_match_preview("Chọn sản phẩm bên dưới để xem ảnh.")
         self._gallery_viewer.close()
@@ -522,7 +525,198 @@ class StocktakingApp:
                 values=(item.product_id, item.product_name, f"{item.final_confidence:.2f}"),
             )
 
-    # --- Validation ---
+    def _clear_selection(self, _event=None) -> None:
+        if hasattr(self, "_breakdown_tree"):
+            self._breakdown_tree.selection_remove(self._breakdown_tree.selection())
+        if hasattr(self, "_results_tree"):
+            self._results_tree.selection_remove(self._results_tree.selection())
+
+        self._clear_match_preview("Chọn sản phẩm bên dưới để xem ảnh.")
+        self._highlight_product_boxes(None)
+
+    def _highlight_product_boxes(self, target_product_id: str | None = None, target_index: int | None = None) -> None:
+        """Tô màu nổi bật (Vàng) cho BBox được chọn, giữ nguyên các BBox khác."""
+        if self._last_inference_result is None or (target_product_id is None and target_index is None):
+            self._show_annotated_preview()
+            return
+
+        annotated_path = (
+            self._config.resolve_path(self._config.paths.output_dir)
+            / self._config.storage.annotated_image_filename
+        )
+        if not annotated_path.is_file():
+            self._show_annotated_preview()
+            return
+
+        img_bgr = _read_image(annotated_path)
+        if img_bgr is None:
+            self._show_annotated_preview()
+            return
+
+        overlay = img_bgr.copy()
+        found_box = False
+        highlight_color = (0, 255, 255)
+        items = getattr(self._last_inference_result, "items", [])
+
+        for idx, item in enumerate(items):
+            is_match = (idx == target_index) if target_index is not None else (
+                str(getattr(item, "product_id", "")) == str(target_product_id)
+            )
+
+            if is_match:
+                bbox_obj = getattr(item, "bbox", None)
+                if bbox_obj is None:
+                    continue
+
+                x1, y1, x2, y2 = None, None, None, None
+
+                if hasattr(bbox_obj, "to_xyxy"):
+                    x1, y1, x2, y2 = bbox_obj.to_xyxy()
+                elif hasattr(bbox_obj, "xyxy"):
+                    x1, y1, x2, y2 = bbox_obj.xyxy
+                elif hasattr(bbox_obj, "x1") and hasattr(bbox_obj, "y1"):
+                    x1, y1, x2, y2 = bbox_obj.x1, bbox_obj.y1, bbox_obj.x2, bbox_obj.y2
+                elif hasattr(bbox_obj, "xmin") and hasattr(bbox_obj, "ymin"):
+                    x1, y1, x2, y2 = bbox_obj.xmin, bbox_obj.ymin, bbox_obj.xmax, bbox_obj.ymax
+                elif isinstance(bbox_obj, (list, tuple)) and len(bbox_obj) >= 4:
+                    x1, y1, x2, y2 = bbox_obj[:4]
+
+                if None in (x1, y1, x2, y2):
+                    continue
+
+                x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
+                found_box = True
+
+                sub_crop = overlay[y1:y2, x1:x2]
+                if sub_crop.size > 0:
+                    yellow_layer = np.full_like(sub_crop, highlight_color, dtype=np.uint8)
+                    cv2.addWeighted(sub_crop, 0.65, yellow_layer, 0.35, 0, dst=sub_crop)
+
+                cv2.rectangle(overlay, (x1, y1), (x2, y2), highlight_color, 4)
+
+                if target_index is not None:
+                    break
+
+        if not found_box:
+            self._show_annotated_preview()
+            return
+
+        try:
+            max_w = max(self._preview_label.winfo_width() - 8, 100)
+            max_h = max(self._preview_label.winfo_height() - 8, 100)
+            img_rgb = cv2.cvtColor(overlay, cv2.COLOR_BGR2RGB)
+            pil_img = Image.fromarray(img_rgb)
+            pil_img.thumbnail((max_w, max_h), Image.Resampling.LANCZOS)
+
+            self._preview_image_ref = ImageTk.PhotoImage(pil_img)
+            self._preview_label.configure(image=self._preview_image_ref, text="")
+        except Exception:
+            logger.exception("Failed to render highlighted bounding box.")
+
+    def _on_breakdown_tree_select(self, _event: tk.Event) -> None:
+        selected = self._breakdown_tree.selection()
+        if not selected:
+            self._highlight_product_boxes(None)
+            return
+
+        row_values = self._breakdown_tree.item(selected[0], "values")
+        if row_values:
+            product_id = row_values[0]
+            self._highlight_product_boxes(product_id)
+
+    def _on_tree_select(self, _event: tk.Event) -> None:
+        selected = self._results_tree.selection()
+        if not selected:
+            self._clear_match_preview("Chọn sản phẩm bên dưới để xem ảnh.")
+            self._highlight_product_boxes(None)
+            return
+
+        selected_item = selected[0]
+        row_values = self._results_tree.item(selected_item, "values")
+        if not row_values:
+            return
+
+        product_id = row_values[0]
+        item_index = self._results_tree.index(selected_item)
+
+        self._highlight_product_boxes(target_product_id=product_id, target_index=item_index)
+
+        folder_name = self._resolve_product_folder(product_id)
+        if not folder_name:
+            self._clear_match_preview(f"Product ID not found:\n{product_id}")
+            return
+
+        product_dir = self._config.resolve_path(self._config.paths.gallery_dir) / folder_name
+        if not product_dir.is_dir():
+            self._clear_match_preview(f"No gallery folder for:\n{folder_name}")
+            return
+
+        images = list_image_files(product_dir)
+        if not images:
+            self._clear_match_preview(f"No images found in:\n{folder_name}")
+            return
+
+        self._current_match_image_path = images[0]
+        self._render_current_match_image()
+        self._gallery_viewer.refresh()
+
+    def _create_preview_image(self, image_path: Path, target_widget: ttk.Label) -> ImageTk.PhotoImage | None:
+        image_bgr = _read_image(image_path)
+        if image_bgr is None:
+            return None
+
+        width = target_widget.winfo_width()
+        height = target_widget.winfo_height()
+
+        max_w = max(width - 8, 100)
+        max_h = max(height - 8, 100)
+
+        try:
+            image = Image.fromarray(cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB))
+            image.thumbnail((max_w, max_h), Image.Resampling.LANCZOS)
+            return ImageTk.PhotoImage(image)
+        except Exception:
+            return None
+
+    def _show_annotated_preview(self) -> None:
+        if self._current_annotated_image_path is None or not self._current_annotated_image_path.is_file():
+            self._preview_label.configure(image="", text="Bấm 'Run Inference' để xem kết quả.")
+            return
+
+        photo = self._create_preview_image(self._current_annotated_image_path, self._preview_label)
+        if photo is None:
+            self._preview_label.configure(image="", text="Không thể hiển thị ảnh kết quả.")
+            return
+
+        self._preview_image_ref = photo
+        self._preview_label.configure(image=self._preview_image_ref, text="")
+
+    def _render_current_match_image(self) -> None:
+        if self._current_match_image_path is None:
+            return
+
+        photo = self._create_preview_image(self._current_match_image_path, self._match_image_label)
+        if photo is None:
+            self._clear_match_preview(f"Không thể hiển thị ảnh:\n{self._current_match_image_path.name}")
+            return
+
+        self._match_image_ref = photo
+        self._match_image_label.configure(image=self._match_image_ref, text="")
+
+    def _open_annotated_viewer(self) -> None:
+        if self._current_annotated_image_path is not None:
+            self._annotated_viewer.show(self._current_annotated_image_path)
+
+    def _open_gallery_viewer(self) -> None:
+        if self._current_match_image_path is not None:
+            self._gallery_viewer.show(self._current_match_image_path)
+
+    def _clear_match_preview(self, message: str) -> None:
+        self._match_image_label.configure(image="", text=message)
+        self._match_image_ref = None
+        self._current_match_image_path = None
+
+    # --- Validation tab logic ---
 
     def _on_run_validation(self) -> None:
         benchmark_dir = self._benchmark_dir_var.get()
@@ -578,10 +772,6 @@ class StocktakingApp:
         for stage, values in report.get("latency", {}).items():
             lines.append(f"  {stage}: mean={values['mean']}  min={values['min']}  max={values['max']}")
         lines.append("")
-        lines.append(
-            f"Annotated images & chart saved under: "
-            f"{self._config.resolve_path(self._config.paths.output_dir)}"
-        )
         return lines
 
     @staticmethod
@@ -600,105 +790,8 @@ class StocktakingApp:
         if not self._last_validation_images:
             messagebox.showinfo("No images", "Run validation first to generate annotated images.")
             return
-        self._validation_image_index = getattr(self, "_validation_image_index", -1) + 1
-        self._validation_image_index %= len(self._last_validation_images)
+        self._validation_image_index = (self._validation_image_index + 1) % len(self._last_validation_images)
         self._validation_image_viewer.show(self._last_validation_images[self._validation_image_index])
-
-    # --- Previews and Viewers ---
-
-    def _create_preview_image(self, image_path: Path, target_widget: ttk.Label) -> ImageTk.PhotoImage | None:
-        image_bgr = _read_image(image_path)
-        if image_bgr is None:
-            return None
-
-        width = target_widget.winfo_width()
-        height = target_widget.winfo_height()
-
-        max_w = max(width - 8, 100)
-        max_h = max(height - 8, 100)
-
-        try:
-            image = Image.fromarray(cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB))
-            image.thumbnail((max_w, max_h), Image.Resampling.LANCZOS)
-            return ImageTk.PhotoImage(image)
-        except Exception:
-            logger.exception("Failed to create preview image: %s", image_path)
-            return None
-
-    def _show_annotated_preview(self) -> None:
-        """Chỉ hiển thị ảnh nếu đã chạy Inference trong phiên hiện tại."""
-        if self._current_annotated_image_path is None:
-            self._preview_label.configure(image="", text="Bấm 'Run Inference' để xem kết quả.")
-            return
-
-        if not self._current_annotated_image_path.is_file():
-            self._preview_label.configure(image="", text="Không tìm thấy ảnh kết quả.")
-            return
-
-        photo = self._create_preview_image(self._current_annotated_image_path, self._preview_label)
-        if photo is None:
-            self._preview_label.configure(image="", text="Không thể hiển thị ảnh kết quả.")
-            return
-
-        self._preview_image_ref = photo
-        self._preview_label.configure(image=self._preview_image_ref, text="")
-
-    def _render_current_match_image(self) -> None:
-        if self._current_match_image_path is None:
-            return
-
-        photo = self._create_preview_image(self._current_match_image_path, self._match_image_label)
-        if photo is None:
-            self._clear_match_preview(f"Không thể hiển thị ảnh:\n{self._current_match_image_path.name}")
-            return
-
-        self._match_image_ref = photo
-        self._match_image_label.configure(image=self._match_image_ref, text="")
-
-    def _open_annotated_viewer(self) -> None:
-        if self._current_annotated_image_path is not None:
-            self._annotated_viewer.show(self._current_annotated_image_path)
-
-    def _on_tree_select(self, _event: tk.Event) -> None:
-        selected = self._results_tree.selection()
-        if not selected:
-            self._clear_match_preview("Chọn sản phẩm bên dưới để xem ảnh.")
-            return
-
-        row_values = self._results_tree.item(selected[0], "values")
-        if not row_values:
-            return
-        product_id = row_values[0]
-
-        folder_name = self._resolve_product_folder(product_id)
-        if not folder_name:
-            self._clear_match_preview(f"Product ID not found:\n{product_id}")
-            return
-
-        product_dir = self._config.resolve_path(self._config.paths.gallery_dir) / folder_name
-        if not product_dir.is_dir():
-            self._clear_match_preview(f"No gallery folder for:\n{folder_name}")
-            return
-
-        images = list_image_files(product_dir)
-        if not images:
-            self._clear_match_preview(f"No images found in:\n{folder_name}")
-            return
-
-        self._current_match_image_path = images[0]
-        self._render_current_match_image()
-        self._gallery_viewer.refresh()
-
-    def _open_gallery_viewer(self) -> None:
-        if self._current_match_image_path is not None:
-            self._gallery_viewer.show(self._current_match_image_path)
-
-    def _clear_match_preview(self, message: str) -> None:
-        self._match_image_label.configure(image="", text=message)
-        self._match_image_ref = None
-        self._current_match_image_path = None
-
-    # --- Shutdown ---
 
     def _on_main_window_close(self) -> None:
         self._annotated_viewer.close()
@@ -709,7 +802,6 @@ class StocktakingApp:
 
 
 def launch_app(config_path: str | None = None) -> None:
-    """Launches the Stocktaking AI desktop application."""
     config = reload_config(config_path)
     root = tk.Tk()
     StocktakingApp(root, config)

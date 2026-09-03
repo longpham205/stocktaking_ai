@@ -183,13 +183,12 @@ class OcrPlugin:
             elapsed["elapsed_ms"],
         )
 
-        return self._build_output(
-            text=text,
-            text_length=text_length,
-            best_result=best_result,
-            orientation_results=orientation_results,
-            orientation_candidates=orientation_candidates,
+        output = self._build_output(
+            text=text, text_length=text_length, best_result=best_result,
+            orientation_results=orientation_results, orientation_candidates=orientation_candidates,
         )
+        output["latency_ms"] = elapsed["elapsed_ms"]
+        return output
 
     # ------------------------------------------------------------------
     # OUTPUT BUILDERS
