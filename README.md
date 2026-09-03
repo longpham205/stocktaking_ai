@@ -1,124 +1,131 @@
 # Stocktaking AI
 
-> AI-powered retail product inventory counting system — detects, segments, retrieves, and identifies individual products from shelf photos, fusing visual retrieval with OCR, Color, and Barcode evidence to resolve visually near-identical product variants.
+> Hệ thống kiểm kê sản phẩm bán lẻ ứng dụng AI — phát hiện, phân đoạn, truy xuất và nhận diện từng sản phẩm từ ảnh kệ hàng, kết hợp truy xuất hình ảnh với bằng chứng từ OCR, màu sắc và mã vạch để phân biệt các biến thể sản phẩm có hình thức gần như giống hệt nhau.
 
-## Table of Contents
+## Mục lục
 
-- [1. Executive Summary](#1-executive-summary)
-- [2. System Architecture & Pipeline](#2-system-architecture--pipeline)
-- [3. Key Modules & Features](#3-key-modules--features)
-- [4. Project Structure](#4-project-structure)
-- [5. System Requirements](#5-system-requirements)
-- [6. Installation & Environment Setup](#6-installation--environment-setup)
-- [7. Dataset & Metadata Specification](#7-dataset--metadata-specification)
-- [8. Configuration Schema](#8-configuration-schema)
-- [9. System Execution Guide](#9-system-execution-guide)
-- [10. Input & Output Specifications](#10-input--output-specifications)
-- [11. Quantitative Performance Evaluation](#11-quantitative-performance-evaluation)
-- [12. Engineering Insights & Experimental Log](#12-engineering-insights--experimental-log)
-- [13. Current Runtime Status](#13-current-runtime-status)
-- [14. Technical Limitations](#14-technical-limitations)
-- [15. System Roadmap](#15-system-roadmap)
-- [16. Citation](#16-citation)
-- [17. License](#17-license)
+* [1. Tổng quan](#1-tổng-quan)
+* [2. Kiến trúc hệ thống & Pipeline](#2-kiến-trúc-hệ-thống--pipeline)
+* [3. Các module & tính năng chính](#3-các-module--tính-năng-chính)
+* [4. Cấu trúc dự án](#4-cấu-trúc-dự-án)
+* [5. Yêu cầu hệ thống](#5-yêu-cầu-hệ-thống)
+* [6. Cài đặt & thiết lập môi trường](#6-cài-đặt--thiết-lập-môi-trường)
+* [7. Đặc tả Dataset & Metadata](#7-đặc-tả-dataset--metadata)
+* [8. Schema cấu hình](#8-schema-cấu-hình)
+* [9. Hướng dẫn thực thi hệ thống](#9-hướng-dẫn-thực-thi-hệ-thống)
+* [10. Đặc tả Input & Output](#10-đặc-tả-input--output)
+* [11. Đánh giá hiệu năng định lượng](#11-đánh-giá-hiệu-năng-định-lượng)
+* [12. Phân tích kỹ thuật & Nhật ký thực nghiệm](#12-phân-tích-kỹ-thuật--nhật-ký-thực-nghiệm)
+* [13. Trạng thái Runtime hiện tại](#13-trạng-thái-runtime-hiện-tại)
+* [14. Hạn chế kỹ thuật](#14-hạn-chế-kỹ-thuật)
+* [15. Lộ trình phát triển](#15-lộ-trình-phát-triển)
+* [16. Trích dẫn](#16-trích-dẫn)
+* [17. Giấy phép](#17-giấy-phép)
 
-## 1. Executive Summary
+## 1. Tổng quan
 
-**Stocktaking AI** is an enterprise-grade Computer Vision system designed to automate retail shelf inventory auditing from a single photograph. Given a high-density shelf image, the system executes a multi-stage inference pipeline:
+**Stocktaking AI** là hệ thống Computer Vision cấp doanh nghiệp được thiết kế để tự động hóa quá trình kiểm kê sản phẩm trên kệ bán lẻ từ một bức ảnh duy nhất. Với một ảnh kệ hàng có mật độ sản phẩm cao, hệ thống thực hiện một pipeline suy luận gồm nhiều giai đoạn:
 
-1. **Class-Agnostic Localization (Object Detection):** Identifies bounding coordinates for all product instances regardless of class.
-2. **Boundary Refinement & Overlap Analysis:** Detects spatial occlusions and refines instance boundaries using Segment Anything Model 2 (SAM2).
-3. **Visual Representation & Retrieval:** Maps image crops into a high-dimensional vector space via SigLIP2 and retrieves top-K candidate identities using FAISS vector indexing.
-4. **Multimodal Evidence Fusion & Reranking:** Fuses auxiliary attributes — OCR text tokens, color profiles in Lab color space (CIEDE2000), and barcode data — to disambiguate fine-grained variants (e.g., identical packaging differing only by shade, net weight, or minor text).
-5. **Audit Trail & Inventory Synthesis:** Generates item counts, per-SKU breakdowns, and a complete decision audit trail for compliance and reporting.
+1. **Định vị không phụ thuộc lớp (Object Detection):** Xác định tọa độ bounding box của tất cả các đối tượng sản phẩm mà không phụ thuộc vào class.
 
-The system enforces a decoupled architecture between **Localization** (detection/segmentation) and **Identification** (retrieval/evidence fusion). This modular design allows independent optimization, component swapping, and granular error isolation.
+2. **Tinh chỉnh biên & Phân tích chồng lấp:** Phát hiện các vùng sản phẩm bị che khuất và tinh chỉnh ranh giới của từng instance bằng Segment Anything Model 2 (SAM2).
 
-## 2. System Architecture & Pipeline
+3. **Biểu diễn hình ảnh & Truy xuất:** Ánh xạ các crop của ảnh vào không gian vector nhiều chiều thông qua SigLIP2 và truy xuất Top-K ứng viên nhận diện bằng chỉ mục vector FAISS.
+
+4. **Hợp nhất bằng chứng đa phương thức & Reranking:** Kết hợp các thuộc tính bổ sung — token OCR, đặc trưng màu trong không gian màu Lab (CIEDE2000) và dữ liệu mã vạch — để phân biệt các biến thể chi tiết của sản phẩm, ví dụ các sản phẩm có bao bì giống nhau nhưng khác màu, khối lượng tịnh hoặc một phần nội dung chữ.
+
+5. **Audit Trail & Tổng hợp kiểm kê:** Tạo số lượng sản phẩm, thống kê theo từng SKU và toàn bộ nhật ký quyết định phục vụ kiểm toán và báo cáo.
+
+Hệ thống duy trì kiến trúc tách biệt giữa **Localization** (phát hiện/phân đoạn) và **Identification** (truy xuất/hợp nhất bằng chứng). Thiết kế module hóa này cho phép tối ưu độc lập từng thành phần, thay thế backend linh hoạt và cô lập lỗi ở từng giai đoạn.
+
+## 2. Kiến trúc hệ thống & Pipeline
 
 ```text
 Input Image
     │
     ▼
-① DETECTION STAGE
+① GIAI ĐOẠN DETECTION
     Detector (RF-DETR / Mock Contour)
-    — Class-agnostic bounding box extraction
+    — Trích xuất bounding box không phụ thuộc class
     │
     ▼
-② OVERLAP ANALYSIS STAGE
+② GIAI ĐOẠN PHÂN TÍCH CHỒNG LẤP
     OverlapResolver
-    — Flags high-density occlusion groups
+    — Xác định các nhóm đối tượng bị che khuất với mật độ cao
     │
     ▼
-③ SEGMENTATION STAGE
+③ GIAI ĐOẠN SEGMENTATION
     Refinement Engine (SAM2 / Mock / None)
-    — Boundary mask refinement on flagged regions
+    — Tinh chỉnh mask biên tại các vùng được đánh dấu
     │
     ▼
-④ CROPPING STAGE
+④ GIAI ĐOẠN CROPPING
     Cropper
-    — Generates dual outputs:
+    — Tạo hai đầu ra:
       Resized Crop (Retrieval)
       & Raw High-Res Crop (Secondary Plugins)
     │
     ▼
-⑤ VISUAL RETRIEVAL STAGE
+⑤ GIAI ĐOẠN VISUAL RETRIEVAL
     Retriever (SigLIP2 Vector Extraction + FAISS)
-    — Top-K nearest gallery item retrieval
+    — Truy xuất Top-K sản phẩm gần nhất trong gallery
     │
     ▼
-⑥ DECISION STAGE
+⑥ GIAI ĐOẠN DECISION
     Decision Engine
-    — Evaluates similarity score against thresholds
-    — Emits plugin trigger flags (uncertain/ambiguous/force)
+    — Đánh giá similarity score dựa trên các threshold
+    — Phát sinh cờ kích hoạt plugin (uncertain/ambiguous/force)
     │
     ▼
-⑦ SECONDARY EVIDENCE STAGE
+⑦ GIAI ĐOẠN SECONDARY EVIDENCE
     Plugin Manager (OCR / Color / Barcode)
-    — Extracts localized domain evidence on demand
+    — Trích xuất bằng chứng chuyên biệt theo miền khi cần
     │
     ▼
-⑧ RERANKING & FUSION STAGE
+⑧ GIAI ĐOẠN RERANKING & FUSION
     Reranker Engine
-    — Multi-evidence fusion across Top-K candidates
-    — Enforces Consensus Protection & Confusable-Pair Guards
+    — Hợp nhất nhiều loại bằng chứng trên Top-K ứng viên
+    — Áp dụng Consensus Protection & Confusable-Pair Guards
     │
     ▼
 OUTPUT SYNTHESIS
     Storage Manager
-    — Exports JSON / CSV / Annotated Visuals
+    — Xuất JSON / CSV / Annotated Visuals
 ```
 
-The pipeline supports two execution modalities:
+Pipeline hỗ trợ hai phương thức thực thi:
 
-- `InventoryPipeline.run()`: Production-grade inference optimizing latency and memory overhead.
-- `InventoryPipeline.run_with_trace()`: Extended execution path capturing full state traces across all 9 pipeline stages for benchmarking and diagnostic evaluation.
+* `InventoryPipeline.run()`: Luồng suy luận dành cho môi trường production, tối ưu độ trễ và mức sử dụng bộ nhớ.
+* `InventoryPipeline.run_with_trace()`: Luồng thực thi mở rộng, ghi lại đầy đủ trạng thái qua cả 9 giai đoạn của pipeline để benchmark và chẩn đoán.
 
-## 3. Key Modules & Features
+## 3. Các module & tính năng chính
 
-- **Pluggable Backend Framework:** Decoupled interfaces allow seamless backend substitution via configuration:
-  - **Detection Backends:** `rf_detr` (deep learning inference) / `mock_contour` (classical CV fallback).
-  - **Retrieval Backends:** `siglip2` (vision-language embeddings) / `mock_visual_embedding` (HSV histograms).
-  - **Segmentation Backends:** `sam2` (instance segmentation) / `none`.
+* **Framework Backend dạng Plugin:** Các interface được tách biệt cho phép dễ dàng thay thế backend thông qua cấu hình:
 
-- **Dual-Resolution Cropping Engine:** Generates a standardized resized tensor for feature vector extraction alongside an uncompressed high-resolution crop for fine-grained OCR and barcode extraction.
+  * **Detection Backends:** `rf_detr` (deep learning inference) / `mock_contour` (classical CV fallback).
+  * **Retrieval Backends:** `siglip2` (vision-language embeddings) / `mock_visual_embedding` (HSV histograms).
+  * **Segmentation Backends:** `sam2` (instance segmentation) / `none`.
 
-- **Dynamic Plugin Trigger Policies:** Supports three deterministic trigger criteria:
-  - `uncertain`: Similarity score falls within border thresholds.
-  - `ambiguous`: Top-N retrieval candidates exhibit tight cosine margin deltas.
-  - `force`: Enforces domain rules for specific product classes requiring multimodal verification.
+* **Dual-Resolution Cropping Engine:** Tạo tensor resized được chuẩn hóa để trích xuất feature vector đồng thời tạo crop độ phân giải cao, không nén để thực hiện OCR và trích xuất mã vạch ở các plugin phụ trợ.
 
-- **Multi-Modal Evidence Reranking:**
-  - **Barcode Processing:** Adaptive 9-stage decoding pipeline optimized for low-resolution, warped, or rotated crops.
-  - **OCR Processing:** Multi-orientation text parsing (0°, 90°, 180°, 270°) with CLAHE contrast transformation and token matching.
-  - **Color Analysis:** Color extraction in CIELAB space evaluated against reference standards via the CIEDE2000 metric.
-  - **Consensus & Guard Mechanisms:** Protects high-confidence visual retrieval results from noisy plugin overrides while applying strict validation rules to known confusable product pairs.
+* **Dynamic Plugin Trigger Policies:** Hỗ trợ ba tiêu chí kích hoạt xác định:
 
-- **9-Stage Validation Suite:** Integrated framework measuring performance across individual stages — from raw object detection to End-to-End SKU classification — with automated diagnostic reporting.
+  * `uncertain`: Similarity score nằm trong vùng threshold biên.
+  * `ambiguous`: Các ứng viên Top-N có độ chênh cosine margin rất nhỏ.
+  * `force`: Áp dụng các quy tắc miền cho những nhóm sản phẩm yêu cầu xác minh đa phương thức.
 
-- **Desktop Graphical Interface (Tkinter UI):** Real-time monitoring dashboard supporting SKU counting visualization, dynamic threshold tuning, visual inspection, and validation trace analysis.
+* **Multi-Modal Evidence Reranking:**
 
-## 4. Project Structure
+  * **Barcode Processing:** Pipeline giải mã thích ứng gồm 9 giai đoạn, được tối ưu cho crop có độ phân giải thấp, bị biến dạng hoặc xoay.
+  * **OCR Processing:** Phân tích văn bản theo nhiều hướng (0°, 90°, 180°, 270°), kết hợp biến đổi tương phản CLAHE và đối chiếu token.
+  * **Color Analysis:** Trích xuất màu trong không gian CIELAB và so sánh với chuẩn tham chiếu bằng metric CIEDE2000.
+  * **Consensus & Guard Mechanisms:** Bảo vệ kết quả visual retrieval có độ tin cậy cao khỏi việc bị ghi đè bởi nhiễu từ plugin, đồng thời áp dụng các quy tắc kiểm tra nghiêm ngặt cho những cặp sản phẩm dễ nhầm lẫn.
+
+* **9-Stage Validation Suite:** Framework đánh giá tích hợp, đo lường hiệu năng trên từng giai đoạn — từ object detection ban đầu đến phân loại SKU End-to-End — cùng hệ thống báo cáo chẩn đoán tự động.
+
+* **Desktop Graphical Interface (Tkinter UI):** Dashboard giám sát thời gian thực, hỗ trợ trực quan hóa số lượng SKU, điều chỉnh threshold động, kiểm tra hình ảnh và phân tích validation trace.
+
+## 4. Cấu trúc dự án
 
 ```text
 stocktaking_ai/
@@ -126,69 +133,69 @@ stocktaking_ai/
 ├── .gitignore
 ├── README.md
 ├── requirements.txt
-├── setup.bat                    # One-click E2E setup script for Windows
-├── setup.sh                     # Automated setup script for Linux
-├── setup.command                # One-click setup script for macOS
+├── setup.bat                    # Script thiết lập E2E một lần chạy trên Windows
+├── setup.sh                     # Script thiết lập tự động trên Linux
+├── setup.command                # Script thiết lập một lần chạy trên macOS
 ├── run.py                       # CLI entry point (Build -> Infer / Validate / UI)
-├── test.py                      # Rapid manual testing entry script
-├── assets_manifest.json         # Checksum and structure integrity manifest
+├── test.py                      # Entry script kiểm thử thủ công nhanh
+├── assets_manifest.json         # Manifest kiểm tra checksum và tính toàn vẹn cấu trúc
 ├── configs/
-│   └── config.yaml              # Master runtime configuration
+│   └── config.yaml              # Cấu hình runtime chính
 ├── data/
-│   ├── gallery/                 # Reference product images for vector indexing
-│   ├── metadata/                # SKU catalogs, color maps, and ID mappings
-│   ├── benchmark/               # COCO-formatted evaluation datasets
-│   ├── query/                   # Input shelf images for inference
-│   ├── outputs/                 # Exported results (JSON, CSV, annotated visuals)
-│   └── cache/                   # Serialized FAISS vector index & metadata cache
-├── debug/                       # Standalone diagnostic and verification scripts
-├── docs/                        # Architecture specs, context, and developer guidelines
-├── notebooks/                   # Analytical and pipeline evaluation Jupyter notebooks
+│   ├── gallery/                 # Ảnh sản phẩm tham chiếu dùng để lập chỉ mục vector
+│   ├── metadata/                # Catalog SKU, bản đồ màu và ánh xạ ID
+│   ├── benchmark/               # Dataset đánh giá theo định dạng COCO
+│   ├── query/                   # Ảnh kệ hàng đầu vào cho inference
+│   ├── outputs/                 # Kết quả xuất ra (JSON, CSV, ảnh đã annotation)
+│   └── cache/                   # FAISS vector index & metadata cache được serialize
+├── debug/                       # Các script chẩn đoán và xác minh độc lập
+├── docs/                        # Đặc tả kiến trúc, context và hướng dẫn phát triển
+├── notebooks/                   # Jupyter notebook phân tích và đánh giá pipeline
 ├── scripts/
-│   ├── setup.py                 # Core environment and asset initialization logic
-│   ├── generate_manifest.py     # Asset manifest generation script
-│   └── verify_manifest.py       # Integrity verification script
+│   ├── setup.py                 # Logic khởi tạo environment và assets
+│   ├── generate_manifest.py     # Script tạo asset manifest
+│   └── verify_manifest.py       # Script kiểm tra tính toàn vẹn manifest
 ├── weights/                     # Model checkpoints (RF-DETR, SAM2, SigLIP2)
-│   ├── detector/                # Detection model weights
-│   ├── refinement/              # Segmentation model weights
-│   └── retriever/               # Vision encoder offline weights
+│   ├── detector/                # Trọng số model detection
+│   ├── refinement/              # Trọng số model segmentation
+│   └── retriever/               # Trọng số vision encoder offline
 ├── src/
-│   ├── catalog/                 # Metadata compilation and catalog indexing
-│   ├── core/                    # System configuration, logging, and common utilities
+│   ├── catalog/                 # Biên dịch metadata và lập chỉ mục catalog
+│   ├── core/                    # Cấu hình hệ thống, logging và tiện ích chung
 │   ├── decision/                # Similarity thresholding & multi-evidence reranking
-│   ├── detection/               # Object detection backends and dual-crop generation
-│   ├── inference/               # Production batch/single-image inference engine
+│   ├── detection/               # Backend object detection và tạo dual-crop
+│   ├── inference/               # Engine inference production dạng batch/single-image
 │   ├── models/                  # Domain Data Transfer Objects (Pydantic / Dataclasses)
-│   ├── pipeline/                # Master orchestrator, overlap resolution, and offline build
-│   ├── plugins/                 # Secondary evidence plugins (OCR, Color, Barcode)
-│   ├── retrieval/               # SigLIP2 embedding extraction and FAISS indexer
-│   ├── segmentation/            # SAM2 instance mask boundary refinement
-│   ├── storage/                 # CSV/JSON output persistence and visualization overlay
+│   ├── pipeline/                # Master orchestrator, xử lý overlap và offline build
+│   ├── plugins/                 # Plugin bằng chứng phụ trợ (OCR, Color, Barcode)
+│   ├── retrieval/               # Trích xuất SigLIP2 embedding và FAISS indexer
+│   ├── segmentation/            # Tinh chỉnh boundary mask bằng SAM2
+│   ├── storage/                 # Lưu output CSV/JSON và visualization overlay
 │   ├── ui/                      # Desktop Graphical Interface (Tkinter dashboard)
-│   └── validation/              # 9-stage evaluation suite and metric calculators
-└── tests/                       # Unit and integration pytest test suite
+│   └── validation/              # Bộ đánh giá 9 giai đoạn và tính toán metric
+└── tests/                       # Bộ test unit và integration bằng pytest
 ```
 
-## 5. System Requirements
+## 5. Yêu cầu hệ thống
 
-- **Operating System:** Linux (Ubuntu 20.04/22.04 LTS recommended) / macOS / Windows 11
-- **Runtime Environment:** Python `>= 3.11`
-- **Core Dependencies:** `numpy`, `opencv-python-headless`, `PyYAML`, `pydantic`, `Pillow`, `matplotlib`, `faiss-cpu`
-- **Deep Learning Frameworks:** `torch`, `torchvision`, `transformers`, `rfdetr`, `supervision`, `sam2`
-- **Domain Tools:** `easyocr`, `pyzbar` (requires system-level `libzbar0`), `tkinter`
-- **Hardware Acceleration:** NVIDIA GPU with `>= 8GB` VRAM (CUDA execution recommended for RF-DETR, SAM2, and SigLIP2).
+* **Hệ điều hành:** Linux (khuyến nghị Ubuntu 20.04/22.04 LTS) / macOS / Windows 11
+* **Môi trường Runtime:** Python `>= 3.11`
+* **Dependencies chính:** `numpy`, `opencv-python-headless`, `PyYAML`, `pydantic`, `Pillow`, `matplotlib`, `faiss-cpu`
+* **Framework Deep Learning:** `torch`, `torchvision`, `transformers`, `rfdetr`, `supervision`, `sam2`
+* **Công cụ chuyên biệt:** `easyocr`, `pyzbar` (yêu cầu system-level `libzbar0`), `tkinter`
+* **Tăng tốc phần cứng:** NVIDIA GPU với **>= 8GB VRAM** (khuyến nghị CUDA cho RF-DETR, SAM2 và SigLIP2).
 
-## 6. Installation & Environment Setup
+## 6. Cài đặt & thiết lập môi trường
 
-### Quick Automated Setup (Recommended)
+### Thiết lập tự động nhanh (Khuyến nghị)
 
-The project provides cross-platform automated setup scripts (`setup.bat`, `setup.sh`, `setup.command`) located at the project root. These scripts verify Python, validate dependencies, and execute `scripts/setup.py`.
+Project cung cấp các script thiết lập đa nền tảng (`setup.bat`, `setup.sh`, `setup.command`) tại thư mục gốc. Các script này kiểm tra Python, xác thực dependencies và thực thi `scripts/setup.py`.
 
-> **Note:** Make sure to execute the setup scripts directly from the **project root directory**.
+> **Lưu ý:** Hãy đảm bảo chạy các script setup trực tiếp từ **thư mục gốc của project**.
 
 #### Windows
 
-Double-click `setup.bat` or execute in CMD / PowerShell:
+Nhấp đúp vào `setup.bat` hoặc thực thi trong CMD / PowerShell:
 
 ```bat
 setup.bat
@@ -196,7 +203,7 @@ setup.bat
 
 #### Linux
 
-Grant execution permissions and run:
+Cấp quyền thực thi và chạy:
 
 ```bash
 chmod +x setup.sh
@@ -205,44 +212,44 @@ chmod +x setup.sh
 
 #### macOS
 
-Double-click `setup.command` in Finder or run via Terminal:
+Nhấp đúp vào `setup.command` trong Finder hoặc chạy bằng Terminal:
 
 ```bash
 chmod +x setup.command
 ./setup.command
 ```
 
-### System Dependencies & Manual Installation
+### Dependencies hệ thống & Cài đặt thủ công
 
-If you prefer to set up the environment manually:
+Nếu muốn thiết lập môi trường thủ công:
 
 ```bash
-# Clone repository and install core dependencies
+# Clone repository và cài đặt các dependencies chính
 git clone <https://github.com/longpham205/stocktaking_ai>
 cd stocktaking_ai
 pip install -r requirements.txt --break-system-packages
 
-# Install system-level dependency for barcode decoding (Linux)
+# Cài đặt dependency cấp hệ thống cho giải mã mã vạch (Linux)
 sudo apt-get install -y libzbar0
 ```
 
-#### Model Checkpoint Placement
+#### Đặt Model Checkpoint
 
-Neural network weights must be placed in designated directories prior to execution.
+Các trọng số neural network phải được đặt vào đúng thư mục trước khi chạy hệ thống.
 
-Neural network weights must be placed in designated directories prior to execution. You can download all model weights at [Google Drive Link](https://drive.google.com/file/d/1c-vusZjXSafgXFLbeaFzU6MRuBQGS4-k/view?usp=drive_link) (`weight.zip`).
+Bạn có thể tải toàn bộ model weights tại [Google Drive Link](https://drive.google.com/file/d/1c-vusZjXSafgXFLbeaFzU6MRuBQGS4-k/view?usp=drive_link) (`weight.zip`).
 
-| Model / Subsystem | Required Checkpoint Path |
-| :--- | :--- |
-| **RF-DETR Detector** | `weights/detector/checkpoint_best_ema.pth` |
-| **SAM2 Refinement Model** | `weights/refinement/sam2/sam2.1_hiera_small.pt` |
-| **SigLIP2 Vision Encoder** | Pulled automatically from Hugging Face (`google/siglip2-base-patch16-224`) |
+| Model / Subsystem          | Đường dẫn Checkpoint yêu cầu                                    |
+| :------------------------- | :-------------------------------------------------------------- |
+| **RF-DETR Detector**       | `weights/detector/checkpoint_best_ema.pth`                      |
+| **SAM2 Refinement Model**  | `weights/refinement/sam2/sam2.1_hiera_small.pt`                 |
+| **SigLIP2 Vision Encoder** | Tự động tải từ Hugging Face (`google/siglip2-base-patch16-224`) |
 
-## 7. Dataset & Metadata Specification
+## 7. Đặc tả Dataset & Metadata
 
-- **Gallery Store (`data/gallery/`):** Organised directory structure containing reference images per SKU. Directory names map directly to product descriptors defined in `configs/config.yaml`.
+* **Gallery Store (`data/gallery/`):** Cấu trúc thư mục chứa các ảnh sản phẩm tham chiếu theo từng SKU. Tên thư mục ánh xạ trực tiếp đến descriptor của sản phẩm được định nghĩa trong `configs/config.yaml`.
 
-- **Color Standards (`data/metadata/product_colors.json`):** Defines canonical color standards in RGB/CIELAB space for variant disambiguation:
+* **Color Standards (`data/metadata/product_colors.json`):** Định nghĩa các chuẩn màu canonical trong không gian RGB/CIELAB để phân biệt các biến thể:
 
 ```json
 {
@@ -254,46 +261,46 @@ Neural network weights must be placed in designated directories prior to executi
 }
 ```
 
-- **Benchmark Dataset (`data/benchmark/`):** Standardized COCO-format object detection annotations. The `category_id` attribute maps directly to the system's internal numeric `product_id`.
+* **Benchmark Dataset (`data/benchmark/`):** Annotation object detection chuẩn hóa theo định dạng COCO. Thuộc tính `category_id` ánh xạ trực tiếp đến `product_id` dạng số nội bộ của hệ thống.
 
-**\*\*Data Download:\*\*** You can download the complete dataset structure (`data.zip`) from [Google Drive Link](https://drive.google.com/file/d/1QHuoY2Wmo49jKrEcf-wvSfA4mU7YL1o5/view?usp=drive_link).
+**Tải dữ liệu:** Có thể tải toàn bộ cấu trúc dataset (`data.zip`) từ [Google Drive Link](https://drive.google.com/file/d/1QHuoY2Wmo49jKrEcf-wvSfA4mU7YL1o5/view?usp=drive_link).
 
-## 8. Configuration Schema
+## 8. Schema cấu hình
 
-All runtime parameters are centralized within `configs/config.yaml`.
+Tất cả tham số runtime được tập trung trong `configs/config.yaml`.
 
-| Parameter Block | Functional Scope |
-| :--- | :--- |
-| `catalog` | SKU ID mapping rules and catalog compilation toggles |
-| `detection` | Backend choice, confidence thresholds, IoU limits, and detector parameters |
-| `refinement` | SAM2 invocation triggers and geometric boundary limits |
-| `cropping` | Bounding box expansion padding and target tensor resolution |
-| `retrieval` | Feature vector dimensionality, FAISS parameters, and Top-K limits |
-| `decision` | Acceptance, uncertainty, and rejection similarity thresholds |
-| `plugins` | Configuration parameters for OCR, Color, Barcode, and rule overrides |
-| `rerank` | Multi-evidence weighting factors, ΔE color thresholds, and protection rules |
-| `storage` | Output format specifications and visual annotation styling |
-| `validation` | IoU evaluation thresholds, stage toggles, and report exports |
+| Parameter Block | Phạm vi chức năng                                                     |
+| :-------------- | :-------------------------------------------------------------------- |
+| `catalog`       | Quy tắc ánh xạ SKU ID và các tùy chọn biên dịch catalog               |
+| `detection`     | Lựa chọn backend, confidence threshold, IoU limit và tham số detector |
+| `refinement`    | Trigger gọi SAM2 và các giới hạn boundary hình học                    |
+| `cropping`      | Padding mở rộng bounding box và độ phân giải tensor mục tiêu          |
+| `retrieval`     | Kích thước feature vector, tham số FAISS và giới hạn Top-K            |
+| `decision`      | Similarity threshold cho acceptance, uncertainty và rejection         |
+| `plugins`       | Tham số cấu hình cho OCR, Color, Barcode và các rule override         |
+| `rerank`        | Trọng số hợp nhất bằng chứng, ngưỡng ΔE màu và các rule bảo vệ        |
+| `storage`       | Định dạng output và kiểu annotation trực quan                         |
+| `validation`    | IoU threshold đánh giá, bật/tắt stage và xuất báo cáo                 |
 
-## 9. System Execution Guide
+## 9. Hướng dẫn thực thi hệ thống
 
-The primary entry point `run.py` automatically builds necessary indexes and metadata prior to command execution (bypassable via `--skip-build`).
+Entry point chính `run.py` tự động xây dựng các index và metadata cần thiết trước khi thực thi command (`--skip-build` có thể bỏ qua bước này).
 
 ```bash
-# 1. Execute single-image inference
+# 1. Thực hiện inference trên một ảnh
 python run.py --mode infer --image data/query/test_shelf.jpg
 
-# 2. Execute batch inference across a directory
+# 2. Thực hiện inference batch trên một thư mục
 python run.py --mode infer --image-dir data/query/
 
-# 3. Run validation suite against a COCO benchmark dataset
+# 3. Chạy validation suite trên COCO benchmark dataset
 python run.py --mode validate --benchmark-dir data/benchmark/
 
-# 4. Launch Desktop Graphical Interface
+# 4. Khởi chạy Desktop Graphical Interface
 python run.py --mode ui
 ```
 
-### Programmatic Python API Usage
+### Sử dụng Python API
 
 ```python
 from src.core.config import load_config
@@ -302,79 +309,85 @@ from src.pipeline.pipeline import InventoryPipeline
 config = load_config()
 pipeline = InventoryPipeline(config)
 
-# Standard inference execution
+# Thực thi inference tiêu chuẩn
 result = pipeline.run(image_data)
 
-# Diagnostic execution with complete stage tracing
+# Thực thi chẩn đoán với trace đầy đủ các stage
 result, trace = pipeline.run_with_trace(image_data)
 ```
 
-## 10. Input & Output Specifications
+## 10. Đặc tả Input & Output
 
-| Operational Mode | Input Format | Generated Artifacts (`data/outputs/`) |
-| :--- | :--- | :--- |
-| Inference | Image file / Directory | `result.json` (full audit log), `result.csv` (item counts), `result.jpg` (visual annotations) |
-| Validation | COCO Benchmark Dir | `report.json/csv` (9-stage metrics), `records.csv` (instance-level logs), diagnostic visuals & charts |
-| GUI Application | Interactive User Input | Real-time counting tables, annotated overlay, dynamic threshold sliders |
+| Chế độ vận hành | Định dạng Input        | Artifacts được tạo (`data/outputs/`)                                                              |
+| :-------------- | :--------------------- | :------------------------------------------------------------------------------------------------ |
+| Inference       | Image file / Directory | `result.json` (audit log đầy đủ), `result.csv` (số lượng sản phẩm), `result.jpg` (ảnh annotation) |
+| Validation      | COCO Benchmark Dir     | `report.json/csv` (metric 9 giai đoạn), `records.csv` (log cấp instance), ảnh & biểu đồ chẩn đoán |
+| GUI Application | User Input tương tác   | Bảng đếm thời gian thực, annotated overlay, thanh điều chỉnh threshold động                       |
 
-## 11. Quantitative Performance Evaluation
+## 11. Đánh giá hiệu năng định lượng
 
-Performance benchmarks on the standard test dataset (**8 core SKUs / up to 16 expanded SKUs, 31 shelf scenes, 293 annotated instances**):
+Benchmark hiệu năng trên test dataset tiêu chuẩn (**8 SKU cốt lõi / tối đa 16 SKU mở rộng, 31 cảnh kệ hàng, 293 instance được annotation**):
 
-| Pipeline Stage | Primary Metric | Measured Value |
-| :--- | :--- | ---: |
-| Detection (RF-DETR FT) | Precision / Recall / mAP@50 | **0.970 / 0.940 / 0.990** |
-| Detection (RF-DETR FT) | F1-Score (Class-Agnostic, IoU ≥ 0.3) | **0.950** |
-| Visual Retrieval (SigLIP2) | Top-1 Accuracy (287 valid crops) | **0.735** |
-| Visual Retrieval (SigLIP2) | Top-5 Accuracy (K=5) | **1.000** |
-| Decision Engine | Pre-Fusion Accuracy (264 evaluated cases) | **0.712** |
-| Evidence Fusion | Accuracy Delta (Reranking Gain) | **+0.224** |
-| Post-Fusion Decision | Post-Fusion Accuracy (Reranking) | **0.936** |
-| Product Counting | Product Count Accuracy (31 scenes) | **0.871** |
-| **End-to-End Pipeline** | **Precision / Recall / F1-Score** | **0.913 / 0.966 / 0.939** |
+| Pipeline Stage             | Metric chính                                       |           Giá trị đo được |
+| :------------------------- | :------------------------------------------------- | ------------------------: |
+| Detection (RF-DETR FT)     | Precision / Recall / mAP@50                        | **0.970 / 0.940 / 0.990** |
+| Detection (RF-DETR FT)     | F1-Score (Class-Agnostic, IoU ≥ 0.3)               |                 **0.950** |
+| Visual Retrieval (SigLIP2) | Top-1 Accuracy (287 crop hợp lệ)                   |                 **0.735** |
+| Visual Retrieval (SigLIP2) | Top-5 Accuracy (K=5)                               |                 **1.000** |
+| Decision Engine            | Pre-Fusion Accuracy (264 trường hợp được đánh giá) |                 **0.712** |
+| Evidence Fusion            | Accuracy Delta (Reranking Gain)                    |                **+0.224** |
+| Post-Fusion Decision       | Post-Fusion Accuracy (Reranking)                   |                 **0.936** |
+| Product Counting           | Product Count Accuracy (31 cảnh)                   |                 **0.871** |
+| **End-to-End Pipeline**    | **Precision / Recall / F1-Score**                  | **0.913 / 0.966 / 0.939** |
 
----
+### Tóm tắt kết quả chính
 
-### Key Summary
+Kiến trúc multi-evidence reranking đã xử lý đúng **60 trường hợp nhận diện sai từ visual retrieval**, với chỉ **1 trường hợp sửa sai (1 regression)** trên tổng số 264 trường hợp được đánh giá.
 
-The multi-evidence reranking architecture resolved **60 visual retrieval misclassifications** with only **1 false correction (1 regression)** across 264 evaluated cases, driving post-fusion identification accuracy to **93.6%** and bringing the final **End-to-End F1-Score to 0.939** (with an overall Product Count Accuracy of **87.1%**).
+Điều này giúp độ chính xác nhận diện sau fusion đạt **93.6%**, đồng thời đưa **F1-Score End-to-End lên 0.939**, với **Product Count Accuracy đạt 87.1%**.
 
-## 12. Engineering Insights & Experimental Log
+## 12. Phân tích kỹ thuật & Nhật ký thực nghiệm
 
-1. **SigLIP2 Pooling Optimization:** Resolved an issue where unpooled patch embeddings `(1, 196, 768)` were returned instead of a global feature vector `(1, 768)`. Implementing mean-pooling across the spatial patch dimension increased **Top-1 Retrieval Accuracy from 3% to 55%**.
+1. **Tối ưu Pooling của SigLIP2:** Khắc phục vấn đề khi embedding chưa pooling có kích thước `(1, 196, 768)` thay vì global feature vector `(1, 768)`. Việc thực hiện mean-pooling trên chiều spatial patch đã tăng **Top-1 Retrieval Accuracy từ 3% lên 55%**.
 
-2. **Dual-Resolution Crop Architecture:** Addressed text degradation caused by uniform downsampling during visual feature extraction. Introducing dedicated uncompressed crops (`raw_image_array`) for plugin execution improved **OCR recognition rates from 54% to 98%**.
+2. **Kiến trúc Dual-Resolution Crop:** Giải quyết vấn đề suy giảm chất lượng chữ do downsampling đồng nhất trong quá trình trích xuất visual feature. Việc tạo crop riêng không nén (`raw_image_array`) cho plugin đã cải thiện **tỷ lệ nhận diện OCR từ 54% lên 98%**.
 
-3. **Multi-Orientation OCR Processing:** Implemented multi-angle rotation sweeps (0°, 90°, 180°, 270°) with Contrast Limited Adaptive Histogram Equalization (CLAHE) to handle arbitrarily oriented products on shelf displays.
+3. **OCR đa hướng:** Triển khai quét xoay nhiều góc (0°, 90°, 180°, 270°) kết hợp Contrast Limited Adaptive Histogram Equalization (CLAHE) để xử lý các sản phẩm có hướng đặt tùy ý trên kệ.
 
-4. **Guarded Reranking Architecture:** Designed **Retrieval Consensus Protection** and **Confusable-Pair Guard** logic to prevent secondary plugin noise from overriding high-confidence visual vector matches, achieving a net accuracy gain of **+22.4%**.
+4. **Kiến trúc Reranking có cơ chế bảo vệ:** Thiết kế **Retrieval Consensus Protection** và **Confusable-Pair Guard** nhằm ngăn nhiễu từ các plugin phụ trợ ghi đè lên kết quả vector matching có độ tin cậy cao, đạt mức tăng accuracy ròng **+22.4%**.
 
-5. **Adaptive Barcode Decoding Pipeline:** Engineered a 9-stage adaptive decoding pipeline utilizing gradient anisotropy for barcode localization, region-seeded deskewing, and adaptive thresholding to process blurred or off-angle codes.
+5. **Pipeline giải mã mã vạch thích ứng:** Xây dựng pipeline giải mã thích ứng gồm 9 giai đoạn, sử dụng gradient anisotropy để định vị mã vạch, deskew dựa trên vùng và adaptive thresholding nhằm xử lý các mã bị mờ hoặc lệch góc.
 
-## 13. Current Runtime Status
+## 13. Trạng thái Runtime hiện tại
 
-- **Barcode Subsystem Status:** The adaptive 9-stage barcode decoding engine is fully enabled (`plugins.barcode.enabled: true`) and integrated into the active evidence fusion pipeline.
+* **Trạng thái Barcode Subsystem:** Engine giải mã mã vạch thích ứng gồm 9 giai đoạn đã được bật hoàn toàn (`plugins.barcode.enabled: true`) và tích hợp vào pipeline evidence fusion đang hoạt động.
 
-- **Catalog Metadata Integration:** The product catalog (`products.json`) has been fully populated with canonical GTIN/Barcode values, enabling decoded barcode evidence to actively participate in candidate re-ranking and variant disambiguation.
+* **Tích hợp Catalog Metadata:** Product catalog (`products.json`) đã được điền đầy đủ các giá trị GTIN/Barcode canonical, cho phép bằng chứng từ mã vạch tham gia trực tiếp vào quá trình re-ranking ứng viên và phân biệt biến thể.
 
-## 14. Technical Limitations
+## 14. Hạn chế kỹ thuật
 
-- Fine-grained identification errors (~6%) are concentrated among near-identical packaging variants differing solely by minor text descriptors (e.g., net weight variants). These cases trigger ambiguous flags for manual review.
-- The reference color database (`product_colors.json`) relies on manual configuration rather than automated extraction from gallery datasets.
-- The OCR text recognition module is optimized for Latin alphanumeric characters (language: `[en]`) and does not process non-Latin packaging scripts.
-- CPU execution is fully supported but exhibits higher processing latency compared to CUDA GPU acceleration.
+* Các lỗi nhận diện fine-grained (~6%) tập trung ở các biến thể bao bì gần như giống hệt nhau và chỉ khác một số mô tả nhỏ trên chữ, ví dụ các biến thể khác khối lượng tịnh. Những trường hợp này sẽ kích hoạt cờ ambiguous để kiểm tra thủ công.
 
-## 15. System Roadmap
+* Database màu tham chiếu (`product_colors.json`) hiện phụ thuộc vào cấu hình thủ công thay vì tự động trích xuất từ gallery dataset.
 
-- Automate reference color extraction directly from gallery photos using localized K-Means clustering in CIELAB space.
-- Re-validate and enable the adaptive barcode plugin within the evidence fusion pipeline following complete metadata integration.
-- Refine SAM2 segmentation trigger heuristics to optimize boundary quality for tightly packed shelf displays.
-- Expand OCR language coverage to support multilingual retail packaging.
+* Module nhận diện OCR được tối ưu cho các ký tự Latin và chữ số (ngôn ngữ: `[en]`) và chưa xử lý các hệ chữ không phải Latin trên bao bì.
 
-## 16. Citation
+* Chạy trên CPU được hỗ trợ đầy đủ nhưng có độ trễ xử lý cao hơn so với tăng tốc bằng CUDA GPU.
 
-Internal research and development codebase. Not currently tied to an external academic publication.
+## 15. Lộ trình phát triển
 
-## 17. License
+* Tự động hóa việc trích xuất màu tham chiếu trực tiếp từ ảnh gallery bằng phương pháp K-Means clustering cục bộ trong không gian CIELAB.
 
-Proprietary internal software. Consult organizational licensing terms prior to external distribution.
+* Re-validate và kích hoạt adaptive barcode plugin trong pipeline evidence fusion sau khi hoàn tất tích hợp metadata.
+
+* Tinh chỉnh heuristic kích hoạt segmentation của SAM2 để tối ưu chất lượng boundary đối với các kệ hàng có sản phẩm được xếp sát nhau.
+
+* Mở rộng phạm vi ngôn ngữ OCR để hỗ trợ bao bì bán lẻ đa ngôn ngữ.
+
+## 16. Trích dẫn
+
+Codebase nghiên cứu và phát triển nội bộ. Hiện tại chưa gắn với một công bố học thuật bên ngoài.
+
+## 17. Giấy phép
+
+Phần mềm nội bộ độc quyền. Cần tham khảo các điều khoản cấp phép của tổ chức trước khi phân phối ra bên ngoài.
