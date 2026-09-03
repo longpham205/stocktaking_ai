@@ -94,7 +94,7 @@ The pipeline supports two execution modalities:
 * **Desktop Graphical Interface (Tkinter UI):** Real-time monitoring dashboard supporting SKU counting visualization, dynamic threshold tuning, visual inspection, and validation trace analysis.
 
 ## **4\. Project Structure**
-
+```text
 stocktaking_ai/
 ├── .env
 ├── .gitignore
@@ -141,7 +141,7 @@ stocktaking_ai/
 │   ├── ui/                      # Desktop Graphical Interface (Tkinter dashboard)
 │   └── validation/              # 9-stage evaluation suite and metric calculators
 └── tests/                       # Unit and integration pytest test suite
-
+```
 ## **5\. System Requirements**
 
 * **Operating System:** Linux (Ubuntu 20.04/22.04 LTS recommended) / macOS / Windows 11  
