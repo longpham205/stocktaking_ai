@@ -179,6 +179,7 @@ stocktaking_ai/
 │   ├── ui/                      # Desktop Graphical Interface (Tkinter dashboard)
 │   └── validation/              # 9-stage evaluation suite and metric calculators
 └── tests/                       # Unit and integration pytest test suite
+```
 
 # 5. High-Level Architecture
 
