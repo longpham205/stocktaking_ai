@@ -88,20 +88,27 @@ weights/retriever/siglip2/*.jinja
 # ==========================================
 # 7. CACHE, OUTPUTS & BUILD METADATA
 # ==========================================
-data/outputs/*
-!data/outputs/.gitkeep
+data/
 
-data/cache/*
+# Keep manually maintained metadata
+!data/metadata/
+!data/metadata/product_colors.json
+
+# Keep required empty directories
+!data/gallery/
+!data/gallery/.gitkeep
+!data/query/
+!data/query/.gitkeep
+!data/outputs/
+!data/outputs/.gitkeep
+!data/cache/
 !data/cache/.gitkeep
 
-# Generated build outputs (giữ lại product_colors.json do được viết thủ công)
+# Ignore generated metadata
 data/metadata/products.json
 data/metadata/product_ids.json
 
 # ==========================================
-# 8. DATASETS & TEMPORARY FILES
+# 8. TEMPORARY FILES
 # ==========================================
-data/gallery/.gitkeep
-data/query/.gitkeep
-data/
 notebooks/
