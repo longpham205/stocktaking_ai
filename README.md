@@ -230,7 +230,7 @@ sudo apt-get install -y libzbar0
 
 Neural network weights must be placed in designated directories prior to execution.
 
-Neural network weights must be placed in designated directories prior to execution. You can download all model weights at [Google Drive Link](https://drive.google.com/file/d/1c-vusZjXSafgXFLbeaFzU6MRuBQGS4-k/view?usp=drive_link).
+Neural network weights must be placed in designated directories prior to execution. You can download all model weights at [Google Drive Link](https://drive.google.com/file/d/1c-vusZjXSafgXFLbeaFzU6MRuBQGS4-k/view?usp=drive_link) (`weight.zip`).
 
 | Model / Subsystem | Required Checkpoint Path |
 | :--- | :--- |
@@ -256,7 +256,7 @@ Neural network weights must be placed in designated directories prior to executi
 
 - **Benchmark Dataset (`data/benchmark/`):** Standardized COCO-format object detection annotations. The `category_id` attribute maps directly to the system's internal numeric `product_id`.
 
-\> **\*\*Data Download:\*\*** You can download the complete dataset structure (\data.zip\) from [Google Drive Link](https://drive.google.com/file/d/1QHuoY2Wmo49jKrEcf-wvSfA4mU7YL1o5/view?usp=drive_link).
+\> **\*\*Data Download:\*\*** You can download the complete dataset structure (`data.zip`) from [Google Drive Link](https://drive.google.com/file/d/1QHuoY2Wmo49jKrEcf-wvSfA4mU7YL1o5/view?usp=drive_link).
 
 ## 8. Configuration Schema
 
