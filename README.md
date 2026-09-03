@@ -197,7 +197,7 @@ sudo apt-get install \-y libzbar0
 
 #### **Model Checkpoint Placement**
 
-Neural network weights must be placed in designated directories prior to execution. You can download all model weights at [Google Drive Link](https://www.google.com/search?q=https://drive.google.com/file/d/1c-vusZjXSafgXFLbeaFzU6MRuBQGS4-k/view%3Fusp%3Ddrive_link) (weights.zip).
+Neural network weights must be placed in designated directories prior to execution. You can download all model weights at [Google Drive Link](https://drive.google.com/file/d/1c-vusZjXSafgXFLbeaFzU6MRuBQGS4-k/view?usp=drive_link) (weights.zip).
 
 | Model / Subsystem | Required Checkpoint Path |
 | :---- | :---- |
