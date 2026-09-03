@@ -95,63 +95,52 @@ The pipeline supports two execution modalities:
 
 ## **4\. Project Structure**
 
-Plaintext  
-stocktaking\_ai/  
-├── README.md  
-├── requirements.txt  
-├── run.py                       \# CLI entry point (Build \-\> Infer / Validate / UI)  
-├── configs/  
-│   └── config.yaml              \# Single source of truth for runtime config  
-├── data/  
-│   ├── gallery/                 \# Product gallery reference photos  
-│   ├── metadata/  
-│   │   ├── products.json        \# Compiled product catalog  
-│   │   ├── product\_ids.json     \# SKU string to integer ID mappings  
-│   │   └── product\_colors.json  \# Reference color metadata (CIELAB/RGB)  
-│   ├── benchmark/  
-│   │   ├── images/              \# Benchmark dataset images  
-│   │   └── \_annotations.coco.json  
-│   ├── query/                   \# Input query images  
-│   ├── outputs/                 \# Exported artifacts (JSON, CSV, Visuals, Charts)  
-│   └── cache/                   \# Serialized FAISS index files and cache  
-├── weights/                     \# Pre-trained deep learning checkpoints  
-├── scripts/  
-│   └── generate\_sample\_data.py  
-├── src/  
-│   ├── core/                    \# Core utilities, logging, configuration loading  
-│   ├── models/                  \# Domain Data Transfer Objects (DataClasses / Pydantic)  
-│   ├── catalog/                 \# Metadata build pipeline and ID assignment  
-│   ├── detection/  
-│   │   ├── detector.py          \# Detection abstraction layer  
-│   │   ├── backends/            \# RF-DETR and contour implementations  
-│   │   └── cropper.py           \# Dual-resolution crop generation  
-│   ├── pipeline/  
-│   │   ├── pipeline.py          \# Master pipeline orchestrator  
-│   │   ├── overlap.py           \# Occlusion and overlap resolution  
-│   │   └── build.py             \# Offline metadata/indexing build tasks  
-│   ├── segmentation/  
-│   │   ├── refiner.py           \# Boundary refinement dispatcher  
-│   │   └── backends/            \# SAM2 and mock implementations  
-│   ├── retrieval/  
-│   │   ├── retriever.py         \# Retrieval dispatcher (Runtime inference)  
-│   │   ├── backends/            \# SigLIP2 and mock visual embedding  
-│   │   └── gallery\_builder.py   \# FAISS index construction pipeline  
-│   ├── decision/  
-│   │   ├── decision.py          \# Decision engine and trigger policies  
-│   │   └── reranker.py          \# Evidence fusion and reranking logic  
-│   ├── plugins/  
-│   │   ├── manager.py           \# Plugin lifecycle management  
-│   │   ├── ocr.py               \# OCR text extraction and normalization  
-│   │   ├── color.py             \# CIELAB color extraction and matching  
-│   │   └── barcode.py           \# Barcode detection and adaptive decoding  
-│   ├── storage/                 \# Data persistence and visual reporting  
-│   ├── inference/               \# Production inference execution engine  
-│   ├── validation/  
-│   │   ├── validate.py          \# Benchmark evaluation orchestrator  
-│   │   ├── evaluator.py         \# Stage-by-stage metric computation  
-│   │   └── metrics.py           \# Mathematical metric formulations  
-│   └── ui/                      \# Desktop GUI application  
-└── tests/                       \# Unit and integration test suites
+stocktaking_ai/
+├── .env
+├── .gitignore
+├── README.md
+├── requirements.txt
+├── setup.bat                    # One-click E2E setup script for Windows
+├── setup.sh                     # Automated setup script for Linux
+├── setup.command                # One-click setup script for macOS
+├── run.py                       # CLI entry point (Build -> Infer / Validate / UI)
+├── test.py                      # Rapid manual testing entry script
+├── assets_manifest.json         # Checksum and structure integrity manifest
+├── configs/
+│   └── config.yaml              # Master runtime configuration
+├── data/
+│   ├── gallery/                 # Reference product images for vector indexing
+│   ├── metadata/                # SKU catalogs, color maps, and ID mappings
+│   ├── benchmark/               # COCO-formatted evaluation datasets
+│   ├── query/                   # Input shelf images for inference
+│   ├── outputs/                 # Exported results (JSON, CSV, annotated visuals)
+│   └── cache/                   # Serialized FAISS vector index & metadata cache
+├── debug/                       # Standalone diagnostic and verification scripts
+├── docs/                        # Architecture specs, context, and developer guidelines
+├── notebooks/                   # Analytical and pipeline evaluation Jupyter notebooks
+├── scripts/
+│   ├── setup.py                 # Core environment and asset initialization logic
+│   ├── generate_manifest.json   # Asset manifest generation script
+│   └── verify_manifest.py       # Integrity verification script
+├── weights/                     # Model checkpoints (RF-DETR, SAM2, SigLIP2)
+│   ├── detector/                # Detection model weights
+│   ├── refinement/              # Segmentation model weights
+│   └── retriever/               # Vision encoder offline weights
+├── src/
+│   ├── catalog/                 # Metadata compilation and catalog indexing
+│   ├── core/                    # System configuration, logging, and common utilities
+│   ├── decision/                # Similarity thresholding & multi-evidence reranking
+│   ├── detection/               # Object detection backends and dual-crop generation
+│   ├── inference/               # Production batch/single-image inference engine
+│   ├── models/                  # Domain Data Transfer Objects (Pydantic / Dataclasses)
+│   ├── pipeline/                # Master orchestrator, overlap resolution, and offline build
+│   ├── plugins/                 # Secondary evidence plugins (OCR, Color, Barcode)
+│   ├── retrieval/               # SigLIP2 embedding extraction and FAISS indexer
+│   ├── segmentation/            # SAM2 instance mask boundary refinement
+│   ├── storage/                 # CSV/JSON output persistence and visualization overlay
+│   ├── ui/                      # Desktop Graphical Interface (Tkinter dashboard)
+│   └── validation/              # 9-stage evaluation suite and metric calculators
+└── tests/                       # Unit and integration pytest test suite
 
 ## **5\. System Requirements**
 
@@ -164,22 +153,58 @@ stocktaking\_ai/
 
 ## **6\. Installation & Environment Setup**
 
+### **Quick Automated Setup (Recommended)**
+
+The project provides cross-platform automated setup scripts (setup.bat, setup.sh, setup.command) located at the project root. These scripts verify Python, validate dependencies, and execute scripts/setup.py.
+
+> **Note:** Make sure to execute the setup scripts directly from the **project root directory**.
+
+#### **Windows**
+
+Double-click setup.bat or execute in CMD / PowerShell:
+
+DOS  
+setup.bat
+
+#### **Linux**
+
+Grant execution permissions and run:
+
+Bash  
+chmod \+x setup.sh  
+./setup.sh
+
+#### **macOS**
+
+Double-click setup.command in Finder or run via Terminal:
+
+Bash  
+chmod \+x setup.command  
+./setup.command
+
+### **System Dependencies & Manual Installation**
+
+If you prefer to set up the environment manually:
+
 Bash  
 \# Clone repository and install core dependencies  
-git clone \<https://github.com/longpham205/stocktaking_ai\>  
+git clone \<https://github.com/longpham205/stocktaking\_ai\>  
 cd stocktaking\_ai  
 pip install \-r requirements.txt \--break-system-packages
 
-\# Install system-level dependency for barcode decoding  
+\# Install system-level dependency for barcode decoding (Linux)  
 sudo apt-get install \-y libzbar0
 
-Model Checkpoint Placement: Neural network weights must be placed in designated directories prior to execution. You can download all model weights at [Google Drive Link](https://drive.google.com/file/d/1c-vusZjXSafgXFLbeaFzU6MRuBQGS4-k/view?usp=drive_link) (`weights.zip`).
+#### **Model Checkpoint Placement**
+
+Neural network weights must be placed in designated directories prior to execution. You can download all model weights at [Google Drive Link](https://www.google.com/search?q=https://drive.google.com/file/d/1c-vusZjXSafgXFLbeaFzU6MRuBQGS4-k/view%3Fusp%3Ddrive_link) (weights.zip).
 
 | Model / Subsystem | Required Checkpoint Path |
-| :--- | :--- |
-| **RF-DETR Detector** | `weights/detector/checkpoint_best_ema.pth` |
-| **SAM2 Refinement Model** | `weights/refinement/sam2/sam2.1_hiera_small.pt` |
-| **SigLIP2 Vision Encoder** | Pulled automatically from Hugging Face (`google/siglip2-base-patch16-224`) |
+| :---- | :---- |
+| **RF-DETR Detector** | weights/detector/checkpoint\_best\_ema.pth |
+| **SAM2 Refinement Model** | weights/refinement/sam2/sam2.1\_hiera\_small.pt |
+| **SigLIP2 Vision Encoder** | Pulled automatically from Hugging Face (google/siglip2-base-patch16-224) |
+
 
 
 ## **7\. Dataset & Metadata Specification**
