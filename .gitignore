@@ -86,23 +86,28 @@ weights/retriever/siglip2/*.jinja
 !weights/**/.gitkeep
 
 # ==========================================
-# 7. CACHE, OUTPUTS & BUILD METADATA
+# 7. DATA, CACHE, OUTPUTS & METADATA
 # ==========================================
-data/
 
-# Keep manually maintained metadata
+# Ignore everything inside data
+data/*
+
+# Allow only required directory placeholders
+data/gallery/
+!data/gallery/.gitkeep
+
+data/query/
+!data/query/.gitkeep
+
+data/outputs/
+!data/outputs/.gitkeep
+
+data/cache/
+!data/cache/.gitkeep
+
+# Allow metadata directory and ONLY product_colors.json
 !data/metadata/
 !data/metadata/product_colors.json
-
-# Keep required empty directories
-!data/gallery/
-!data/gallery/.gitkeep
-!data/query/
-!data/query/.gitkeep
-!data/outputs/
-!data/outputs/.gitkeep
-!data/cache/
-!data/cache/.gitkeep
 
 # Ignore generated metadata
 data/metadata/products.json
