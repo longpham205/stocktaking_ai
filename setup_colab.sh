@@ -82,7 +82,58 @@ extract_zip() {
     [[ -f "${zip_file}" ]] || fail "ZIP file not found: ${zip_file}"
 
     log "Extracting $(basename "${zip_file}")"
-    unzip -oq "${zip_file}" -d "${PROJECT_ROOT}"
+
+    "${PYTHON_BIN}" - "${zip_file}" "${PROJECT_ROOT}" <<'PY'
+import sys
+import zipfile
+from pathlib import Path
+
+zip_file = Path(sys.argv[1])
+project_root = Path(sys.argv[2])
+
+print(f"[INFO] ZIP file: {zip_file}")
+print(f"[INFO] Destination: {project_root}")
+
+try:
+    with zipfile.ZipFile(zip_file, "r") as z:
+        print(f"[INFO] Files in archive: {len(z.infolist())}")
+
+        for info in z.infolist():
+            name = info.filename
+
+            # Bỏ file rác do Windows tạo
+            if Path(name).name.lower() in {"thumbs.db", "desktop.ini"}:
+                continue
+
+            target = project_root / name
+
+            # Directory
+            if info.is_dir():
+                target.mkdir(parents=True, exist_ok=True)
+                continue
+
+            # Tạo thư mục cha
+            target.parent.mkdir(parents=True, exist_ok=True)
+
+            # Giải nén theo từng chunk, không chiếm nhiều RAM
+            with z.open(info) as src, open(target, "wb") as dst:
+                while True:
+                    chunk = src.read(1024 * 1024)
+                    if not chunk:
+                        break
+                    dst.write(chunk)
+
+    print("[INFO] Extraction completed successfully.")
+
+except zipfile.BadZipFile as e:
+    print(f"[ERROR] Invalid ZIP file: {e}")
+    sys.exit(1)
+
+except Exception as e:
+    print(f"[ERROR] Extraction failed: {type(e).__name__}: {e}")
+    sys.exit(1)
+PY
+
     echo "Extraction completed."
 }
 

@@ -1,6 +1,5 @@
 """Stocktaking AI - Windows E2E setup helper.
 
-Called by setup_e2e.bat from the project root.
 """
 
 from __future__ import annotations
@@ -277,13 +276,69 @@ def download_with_gdown(
 
 
 def extract_zip(zip_path: Path) -> None:
+    """Extract ZIP while preserving Unicode filenames.
+
+    Windows-generated metadata files such as Thumbs.db and desktop.ini
+    are skipped because they are not required by the application.
+    """
     log(f"Extracting {zip_path.name} ...")
+
+    if not zip_path.is_file():
+        fail(f"ZIP file not found: {zip_path}")
 
     try:
         with zipfile.ZipFile(zip_path, "r") as archive:
-            archive.extractall(PROJECT_ROOT)
+            members = archive.infolist()
+
+            log(f"Archive contains {len(members)} entries.")
+
+            extracted = 0
+            skipped = 0
+
+            for member in members:
+                name = member.filename
+
+                # Skip Windows metadata files
+                filename = Path(name).name.lower()
+                if filename in {"thumbs.db", "desktop.ini"}:
+                    skipped += 1
+                    continue
+
+                target = PROJECT_ROOT / name
+
+                # Directory
+                if member.is_dir():
+                    target.mkdir(parents=True, exist_ok=True)
+                    continue
+
+                # Ensure parent directory exists
+                target.parent.mkdir(parents=True, exist_ok=True)
+
+                # Extract in chunks to avoid loading large files into RAM
+                with archive.open(member, "r") as src:
+                    with target.open("wb") as dst:
+                        while True:
+                            chunk = src.read(1024 * 1024)
+                            if not chunk:
+                                break
+                            dst.write(chunk)
+
+                extracted += 1
+
+            print(
+                f"[setup] Extraction completed: "
+                f"{extracted} files extracted, "
+                f"{skipped} metadata files skipped."
+            )
+
     except zipfile.BadZipFile:
         fail(f"{zip_path.name} is not a valid ZIP archive.")
+
+    except Exception as exc:
+        fail(
+            f"Failed to extract {zip_path.name}: "
+            f"{type(exc).__name__}: {exc}"
+        )
 
 
 def download_and_extract(
