@@ -39,7 +39,6 @@ coverage.xml
 *.log
 .hypothesis/
 debug/
-tests/
 test.py
 
 # ==========================================
