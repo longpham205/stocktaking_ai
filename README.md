@@ -1,6 +1,6 @@
 # Stocktaking AI
 
-> Hệ thống kiểm kê sản phẩm bán lẻ ứng dụng AI — phát hiện, phân đoạn, truy xuất và nhận diện từng sản phẩm từ ảnh kệ hàng, kết hợp truy xuất hình ảnh với bằng chứng từ OCR, màu sắc và mã vạch để phân biệt các biến thể sản phẩm có hình thức gần như giống hệt nhau.
+> Hệ thống kiểm kê sản phẩm bán lẻ ứng dụng AI — phát hiện, phân đoạn, truy xuất và nhận diện từng sản phẩm từ bàn thanh toán, kết hợp truy xuất hình ảnh với bằng chứng từ OCR, màu sắc và mã vạch để phân biệt các biến thể sản phẩm có hình thức gần như giống hệt nhau.
 
 ## Mục lục
 
