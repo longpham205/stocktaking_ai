@@ -24,7 +24,7 @@
 
 ## 1. Tổng quan
 
-**Stocktaking AI** là hệ thống Computer Vision cấp doanh nghiệp được thiết kế để tự động hóa quá trình kiểm kê sản phẩm trên kệ bán lẻ từ một bức ảnh duy nhất. Với một ảnh kệ hàng có mật độ sản phẩm cao, hệ thống thực hiện một pipeline suy luận gồm nhiều giai đoạn:
+**Stocktaking AI** là hệ thống Computer Vision cấp doanh nghiệp được thiết kế để tự động hóa quá trình kiểm kê sản phẩm trên bàn thanh toán từ một bức ảnh duy nhất. Với một ảnh kệ hàng có mật độ sản phẩm cao, hệ thống thực hiện một pipeline suy luận gồm nhiều giai đoạn:
 
 1. **Định vị không phụ thuộc lớp (Object Detection):** Xác định tọa độ bounding box của tất cả các đối tượng sản phẩm mà không phụ thuộc vào class.
 
