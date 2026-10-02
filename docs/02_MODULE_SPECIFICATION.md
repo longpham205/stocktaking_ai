@@ -190,7 +190,7 @@ Reads `crop.raw_image_array` only. Runs a pyzbar-based 9-stage cumulative adapti
 
 ```Python
 
-InventoryPipeline.run(image\_data: ImageData) \-\> InventoryResult
+InventoryPipeline.run(image\_data: ImageData, similarity\_threshold: float | None \= None, min\_confidence\_accept: float | None \= None) \-\> InventoryResult
 
 InventoryPipeline.run\_with\_trace(image\_data: ImageData) \-\> tuple\[InventoryResult, PipelineTrace\]
 ```
@@ -201,6 +201,13 @@ Plaintext
 Detect \-\> Overlap \-\> Refine (if flagged) \-\> Crop \-\> \[per crop: Retrieve \-\> Decide \-\> Plugins (if needed) \-\> Rerank (if plugins ran)\] \-\> InventoryResult
 
 `run()` skips trace bookkeeping for hot-path performance; VAL exclusively uses `run_with_trace()` so validation always measures the real production pipeline.
+
+**Per-call threshold overrides.** `similarity_threshold` and `min_confidence_accept` (both optional, `None` = configured default) override the matching `decision.*` values for one call only. Because `DecisionEngine`/`Reranker` hold no model weights, a temporary pair is built from an overridden config copy; pairs are cached in a small LRU (8 entries) keyed by the two override values, so a caller that passes the same thresholds on every request does not rebuild them. The cache is not thread-safe: call `run()` from one thread (the web backend does).
+
+**`InventoryResult.has_overlap`** is `OverlapResult.needs_refinement` for the processed image. It is true only when the number of overlapping pairs reaches `overlap.min_overlapping_pairs`, so light overlap does not set it. Consumers (e.g. the POS UI) use it to suggest re-capturing; it does not change the result items. Both `run()` and `run_with_trace()` set it.
+
+**`InventoryResult.detected_count`** is the number of regions the detector found, before the decision step. Items whose decision is `rejected` are dropped from `items`, so `detected_count - len(items)` is how many detected objects could not be recognised; the POS UI shows this so the cashier knows something was seen but not identified (e.g. a product missing from the gallery, or a blurry crop).
+
 
 **Forbidden**: no concrete model implementations, no file I/O, no UI.
 
@@ -218,11 +225,13 @@ Orchestrates `MetadataBuilder` (→ `products.json`, `product_ids.json`) and `Ga
 
 ```Python
 
-InferenceRunner.run\_single(image\_path: str, similarity\_threshold: float | None \= None) \-\> InventoryResult
+InferenceRunner.run\_single(image\_path: str, similarity\_threshold: float | None \= None, min\_confidence\_accept: float | None \= None, persist: bool \= True) \-\> InventoryResult
 
-InferenceRunner.run\_batch(image\_dir: str, similarity\_threshold: float | None \= None) \-\> list\[InventoryResult\]
+InferenceRunner.run\_batch(image\_dir: str, similarity\_threshold: float | None \= None, min\_confidence\_accept: float | None \= None) \-\> list\[InventoryResult\]
 ```
-The optional `similarity_threshold` override is cheap: `DecisionEngine`/ `Reranker` hold no model weights, so building a temporary overridden pair per call does not violate "never reload model weights per query."
+The optional threshold overrides are cheap: `DecisionEngine`/ `Reranker` hold no model weights, so building (and caching, see §9) a temporary overridden pair does not violate "never reload model weights per query."
+
+`persist=False` skips `StorageManager.save_all`, so nothing is written. Callers that keep their own records (the web backend) use it; otherwise every call would overwrite the shared output files. The default (`True`) keeps the original behaviour. `run_batch` always persists.
 
 # **13\. validation/**
 

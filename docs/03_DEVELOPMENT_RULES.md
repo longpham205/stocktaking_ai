@@ -254,7 +254,9 @@ Reranker.rerank(
 ) -> DecisionResult
 
 InventoryPipeline.run(
-    image_data: ImageData
+    image_data: ImageData,
+    similarity_threshold: float | None = None,
+    min_confidence_accept: float | None = None,
 ) -> InventoryResult
 
 InventoryPipeline.run_with_trace(
@@ -328,6 +330,20 @@ The following rules are absolute:
 - ❌ Never let `ColorPlugin`, `OcrPlugin`, or `BarcodePlugin` read the product catalog or compare against reference values. That is `Reranker`'s responsibility only.
 - ❌ Never let `OverlapResolver` remove or mutate a `Detection`. It is **not NMS**.
 - ❌ Never let `Refiner` overwrite `DetectionResult`.
+
+---
+
+# 19. Web Backend Rules
+
+The web POS (`backend/`, `frontend/`) is a thin layer **around** the pipeline and must never change how it works.
+
+1. **Single entry point.** `backend/` runs the pipeline only through `InferenceRunner` / `ValidationRunner`. It never calls `InventoryPipeline.run()`, never imports a concrete backend model (`Detector`, `Retriever`, RF-DETR/SAM2/SigLIP2) or plugin. Importing pure modules that touch no GPU (`AppConfig`) is allowed. When in doubt whether an import touches the GPU, treat it as forbidden.
+2. **`src/` never imports `backend/`.** `src/` must keep running standalone (`run.py --mode infer/validate/ui`, notebooks, Colab).
+3. **Pass thresholds per call, do not mutate config.** Per-request behaviour (`similarity_threshold`, `min_confidence_accept`) goes through the `run_single` arguments, not by editing `AppConfig` at runtime.
+4. **Safe by default.** The backend is exposed through a public tunnel in demos: every endpoint except the health check and login needs a token; there are no default secrets (they are generated randomly and kept out of git); no auto-generated API docs endpoint; uploaded images are verified by decoding them (never trust `Content-Type`); request bodies and uploads have size limits; media URLs are signed and expire; one open shift per account.
+5. **Business data changes are logged.** Any admin edit of prices, barcodes or settings writes a `change_log` row with old/new value and the user.
+6. **Identifiers are stable.** `product_id` equals the benchmark `category_id` and is never renumbered, reused or edited through the UI.
+7. **`[Planned, Phase 1B]` Evidence is explicit.** The Reranker and every plugin use only evidence declared in the catalog (OCR keywords, colour code, barcode, confusable pairs). They must not infer evidence from a product name. *The current `Reranker` still derives some tokens from names; this rule takes effect when Phase 1B moves the catalog into the database.*
 
 ---
 

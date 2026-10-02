@@ -8,8 +8,8 @@ Version: 0.1.0 (extended)
 # 1. Project Overview
 
 Stocktaking AI is a research-oriented AI Product Inventory System. It
-automatically counts and identifies retail products from a single shelf
-photograph.
+automatically counts and identifies retail products from a single
+checkout-counter photograph.
 
 Unlike a traditional single-stage object detector, this project strictly
 separates **product localization** (where is a product?) from **product
@@ -150,7 +150,7 @@ stocktaking_ai/
 │   ├── gallery/                 # Reference product images for vector indexing
 │   ├── metadata/                # SKU catalogs, color maps, and ID mappings
 │   ├── benchmark/               # COCO-formatted evaluation datasets
-│   ├── query/                   # Input shelf images for inference
+│   ├── query/                   # Input checkout-counter images for inference
 │   ├── outputs/                 # Exported results (JSON, CSV, annotated visuals)
 │   └── cache/                   # Serialized FAISS vector index & metadata cache
 ├── debug/                       # Standalone diagnostic and verification scripts

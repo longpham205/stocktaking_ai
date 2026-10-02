@@ -592,7 +592,7 @@ class StocktakingApp:
                     yellow_layer = np.full_like(sub_crop, highlight_color, dtype=np.uint8)
                     cv2.addWeighted(sub_crop, 0.65, yellow_layer, 0.35, 0, dst=sub_crop)
 
-                cv2.rectangle(overlay, (x1, y1), (x2, y2), highlight_color, 4)
+                cv2.rectangle(overlay, (x1, y1), (x2, y2), highlight_color, 8)
 
                 if target_index is not None:
                     break

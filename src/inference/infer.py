@@ -33,14 +33,26 @@ class InferenceRunner:
         self._storage = StorageManager(config)
         logger.info("InferenceRunner initialized.")
 
-    def run_single(self, image_path: str, similarity_threshold: float | None = None) -> InventoryResult:
-        """Runs the full pipeline on a single query image and persists results.
+    def run_single(
+        self,
+        image_path: str,
+        similarity_threshold: float | None = None,
+        min_confidence_accept: float | None = None,
+        persist: bool = True,
+    ) -> InventoryResult:
+        """Runs the full pipeline on a single query image and (optionally) persists results.
 
         Args:
             image_path: Filesystem path to the query image.
             similarity_threshold: Optional per-call override of
                 `decision.similarity_threshold` (see
                 `InventoryPipeline.run`).
+            min_confidence_accept: Optional per-call override of
+                `decision.min_confidence_accept` (see `InventoryPipeline.run`).
+            persist: When False, skip `StorageManager.save_all` (no files are
+                written). Used by callers such as the web backend that keep
+                their own records and would otherwise overwrite the shared
+                output files on every call. Defaults to True (unchanged).
 
         Returns:
             The InventoryResult produced by the pipeline.
@@ -65,11 +77,21 @@ class InferenceRunner:
         )
 
         logger.info("Running inference on '%s'", path)
-        result = self._pipeline.run(image_data, similarity_threshold=similarity_threshold)
-        self._storage.save_all(image_array, result)
+        result = self._pipeline.run(
+            image_data,
+            similarity_threshold=similarity_threshold,
+            min_confidence_accept=min_confidence_accept,
+        )
+        if persist:
+            self._storage.save_all(image_array, result)
         return result
 
-    def run_batch(self, image_dir: str, similarity_threshold: float | None = None) -> list[InventoryResult]:
+    def run_batch(
+        self,
+        image_dir: str,
+        similarity_threshold: float | None = None,
+        min_confidence_accept: float | None = None,
+    ) -> list[InventoryResult]:
         """Runs the full pipeline over every image in a directory.
 
         Args:
@@ -77,6 +99,8 @@ class InferenceRunner:
             similarity_threshold: Optional per-call override of
                 `decision.similarity_threshold` (see
                 `InventoryPipeline.run`).
+            min_confidence_accept: Optional per-call override of
+                `decision.min_confidence_accept` (see `InventoryPipeline.run`).
 
         Returns:
             List of InventoryResult objects, one per successfully processed
@@ -94,7 +118,13 @@ class InferenceRunner:
         results: list[InventoryResult] = []
         for image_path in image_paths:
             try:
-                results.append(self.run_single(str(image_path), similarity_threshold=similarity_threshold))
+                results.append(
+                    self.run_single(
+                        str(image_path),
+                        similarity_threshold=similarity_threshold,
+                        min_confidence_accept=min_confidence_accept,
+                    )
+                )
             except (FileNotFoundError, ValueError):
                 logger.exception("Failed to process '%s'; skipping.", image_path)
                 continue

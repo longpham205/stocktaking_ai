@@ -1,3 +1,6 @@
+# CONFIG DEMO - sinh bởi scripts/make_demo_dataset.py (đừng sửa tay, chạy lại script).
+# Backend mock, CPU, dữ liệu trong data_demo/. Chạy:
+#   python run.py --mode validate --config configs/config.demo.yaml --benchmark-dir data_demo/benchmark
 # =============================================================================
 # STOCKTAKING AI - CENTRAL CONFIGURATION
 # Version: 0.1.0
@@ -9,12 +12,12 @@ app:
   name: "Stocktaking AI"
   version: "0.1.0"
   environment: "development" # development | production
-  device: "cuda" # cpu | cuda
+  device: "cpu" # cpu | cuda
 
 # --- Logging ---
 logging:
   level: "INFO" # DEBUG | INFO | WARNING | ERROR
-  log_dir: "data/cache/logs"
+  log_dir: "data_demo/cache/logs"
   log_to_file: true
   log_to_console: true
   max_bytes: 5242880
@@ -22,14 +25,14 @@ logging:
 
 # --- Paths ---
 paths:
-  gallery_dir: "data/gallery"
-  benchmark_dir: "data/benchmark"
-  benchmark_images_dir: "data/benchmark/images"
-  benchmark_labels_dir: "data/benchmark/_annotations.coco.json"
-  query_dir: "data/query"
-  output_dir: "data/outputs"
-  cache_dir: "data/cache"
-  metadata_dir: "data/metadata"
+  gallery_dir: "data_demo/gallery"
+  benchmark_dir: "data_demo/benchmark"
+  benchmark_images_dir: "data_demo/benchmark/images"
+  benchmark_labels_dir: "data_demo/benchmark/_annotations.coco.json"
+  query_dir: "data_demo/query"
+  output_dir: "data_demo/outputs"
+  cache_dir: "data_demo/cache"
+  metadata_dir: "data_demo/metadata"
   detector_weights_dir: "weights/detector"
   retriever_weights_dir: "weights/retriever"
   plugin_weights_dir: "weights/plugins"
@@ -42,29 +45,24 @@ catalog:
   product_ids_filename: "product_ids.json"
   # External product ID -> product name mapping (IDs stored as strings)
   id_mapping:
-    "1": "アネッサ パーフェクトUV スキンケアスプレー"
-    "2": "インテグレート アイブローペンシル（BR641）"
-    "3": "インテグレート フォルミングチークス（OR210）"
-    "4": "マキアージュ スポンジパフ"
-    "5": "マジョリカマジョルカ シャドーカスタマイズ（BE203）"
-    "6": "マジョリカマジョルカ シャドーカスタマイズ（PK300）"
-    "7": "外箱ABA"
-    "8": "外箱ABC"
-    "9": "7000000000"
-    "10": "7000000005"
-    "11": "7000000009"
-    "13": "7000000004"
-    "14": "7000000011"
-    "15": "7000000002"
-    "17": "7000000006"
-    "18": "8000000016"
-    "19": "7000000014"
+    "1": "01_Xit_Chong_Nang_UV_Sunny"
+    "2": "02_But_Chi_Chan_May_BR641"
+    "3": "03_Phan_Ma_Hong_OR210"
+    "4": "04_Bong_Phan_Puff"
+    "5": "05_Phan_Mat_Palette_BE203"
+    "6": "06_Phan_Mat_Palette_PK300"
+    "7": "07_Hop_Ngoai_ABA"
+    "8": "08_Hop_Ngoai_ABC"
+    "13": "13_Sua_Rua_Mat_Tra_Xanh"
+    "15": "15_Dau_Goi_Hoa_Hong"
+    "17": "17_Xit_Khoang_Bac_Ha"
+    "18": "18_Tay_Trang_Dao"
 
 # --- Detection Module ---
 detection:
-  backend: "rf_detr" # mock_contour | rf_detr
+  backend: "mock_contour" # mock_contour | rf_detr
   weights_path: "weights/detector/model.pt"
-  confidence_threshold: 0.50
+  confidence_threshold: 0.70
   min_box_area_ratio: 0.001
   max_box_area_ratio: 0.60
   min_aspect_ratio: 0.15
@@ -76,7 +74,7 @@ detection:
   rf_detr:
     variant: "base" # nano | small | medium | base | large
     weights_path: "weights/detector/checkpoint_best_ema.pth"
-    device: "cuda"
+    device: "cpu"
     inference:
       optimize: true
       compile: false
@@ -87,7 +85,7 @@ detection:
 # --- Detection Refinement / Segmentation ---
 refinement:
   enabled: true
-  backend: "sam2" # none | sam2
+  backend: "none" # none | sam2
   trigger:
     enabled: true
     iou_threshold: 0.05
@@ -98,7 +96,7 @@ refinement:
     model_type: "sam2.1_hiera_small"
     checkpoint_path: "weights/refinement/sam2/sam2.1_hiera_small.pt"
     model_config: ""
-    device: "cuda"
+    device: "cpu"
     prompt_type: "box"
     use_source_image: true
     per_detection: true
@@ -119,17 +117,17 @@ cropping:
 
 # --- Retrieval Module ---
 retrieval:
-  backend: "siglip2" # mock_visual_embedding | siglip2
+  backend: "mock_visual_embedding" # mock_visual_embedding | siglip2
   embedding_dim: 768
-  gallery_index_path: "data/cache/gallery_index.faiss"
-  gallery_metadata_path: "data/cache/gallery_metadata.json"
+  gallery_index_path: "data_demo/cache/gallery_index.faiss"
+  gallery_metadata_path: "data_demo/cache/gallery_metadata.json"
   top_k: 5
   color_hist_bins: 8
-  build_gallery_index: false
+  build_gallery_index: true  # demo: build index từ data_demo/gallery ở lần chạy đầu
   siglip2:
     model_name: "google/siglip2-base-patch16-224"
     weights_path: "weights/retriever/siglip2"
-    device: "cuda"
+    device: "cpu"
 
 # --- Decision Engine ---
 decision:
@@ -145,10 +143,10 @@ decision:
 plugins:
   enabled: true
   ocr:
-    enabled: true
+    enabled: false  # demo: bật lại (true) để thử EasyOCR
     language:
       - en
-    device: "cuda"
+    device: "cpu"
     min_text_length: 3
     confidence_threshold: 0.10
     upscale_enabled: true
@@ -272,6 +270,8 @@ plugins:
     "6": ["barcode", "color"]
     "7": ["ocr"]
     "8": ["ocr"]
+    "30": ["ocr"]
+    "31": ["ocr"]
 
 # --- Reranking / Evidence Fusion ---
 rerank:
@@ -301,6 +301,7 @@ rerank:
 
   confusable_pairs:
     - ["7", "8"]
+    - ["30", "31"]
   confusable_min_agreeing_plugins: 1
 
   barcode:
@@ -314,7 +315,7 @@ rerank:
   color:
     enabled: true
     weight: 0.20
-    references_path: "data/metadata/product_colors.json"
+    references_path: "data_demo/metadata/product_colors.json"
     delta_e_strong: 6.0
     delta_e_weak: 20.0
     min_margin: 1.0

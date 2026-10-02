@@ -90,6 +90,7 @@ weights/retriever/siglip2/*.jinja
 
 # Ignore everything inside data
 data/*
+data_demo/*
 
 # Allow only required directory placeholders
 data/gallery/

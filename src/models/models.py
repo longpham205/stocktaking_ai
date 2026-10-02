@@ -577,6 +577,15 @@ class InventoryResult:
         total_items: Total count of accepted inventory items.
         processing_time_ms: Total end-to-end pipeline latency, in ms.
         timestamp: ISO-8601 timestamp of when processing completed.
+        has_overlap: True when the overlap stage flagged the image as needing
+            refinement (`OverlapResult.needs_refinement`). That is only true
+            when the number of overlapping pairs reaches
+            `overlap.min_overlapping_pairs`, so light overlap does not set it.
+            Consumers (e.g. the POS UI) can use it to suggest a re-capture.
+        detected_count: Number of regions the detector found, before the
+            decision step. Regions that were rejected are not in `items`, so
+            `detected_count - len(items)` is how many detected objects could
+            not be recognised (consumers use it to tell the user).
     """
 
     image_id: str
@@ -585,6 +594,8 @@ class InventoryResult:
     total_items: int = 0
     processing_time_ms: float = 0.0
     timestamp: str = ""
+    has_overlap: bool = False
+    detected_count: int = 0
 
 
 # =============================================================================

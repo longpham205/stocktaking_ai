@@ -34,6 +34,7 @@ module abstractions.
 from __future__ import annotations
 
 import datetime as _datetime
+from collections import OrderedDict
 
 from src.core.config import AppConfig
 from src.core.logger import get_logger
@@ -77,10 +78,19 @@ class InventoryPipeline:
         self._decision_engine = DecisionEngine(config)
         self._plugin_manager = PluginManager(config)
         self._reranker = Reranker(config, self._decision_engine, self._retriever.get_product)
+        # Small LRU of override (DecisionEngine, Reranker) pairs keyed by (similarity_threshold,
+        # min_confidence_accept), so a caller passing the same thresholds on every request does not
+        # rebuild them each time. Not thread-safe: run() is expected to be called from one thread.
+        self._override_cache: OrderedDict[tuple[float | None, float | None], tuple[DecisionEngine, Reranker]] = OrderedDict()
 
         logger.info("InventoryPipeline fully initialized; all components loaded once.")
 
-    def run(self, image_data: ImageData, similarity_threshold: float | None = None) -> InventoryResult:
+    def run(
+        self,
+        image_data: ImageData,
+        similarity_threshold: float | None = None,
+        min_confidence_accept: float | None = None,
+    ) -> InventoryResult:
         """Executes the complete inventory pipeline for one image.
 
         Args:
@@ -93,13 +103,17 @@ class InventoryPipeline:
                 this does not violate the "never reload model weights per
                 query" rule (03_DEVELOPMENT_RULES.md, Rule 23). None uses
                 the configured default.
+            min_confidence_accept: Optional per-call override of
+                `decision.min_confidence_accept`, same semantics as
+                `similarity_threshold`. Override pairs are cached (small LRU)
+                by the two threshold values.
 
         Returns:
             The consolidated InventoryResult for the processed image.
         """
         with timer() as elapsed:
-            decision_engine, reranker = self._resolve_decision_components(similarity_threshold)
-            detection_result, _overlap_result, _refinement_result, items = self._run_stages(
+            decision_engine, reranker = self._resolve_decision_components(similarity_threshold, min_confidence_accept)
+            detection_result, overlap_result, _refinement_result, items = self._run_stages(
                 image_data, decision_engine=decision_engine, reranker=reranker
             )
 
@@ -110,6 +124,8 @@ class InventoryPipeline:
             total_items=len(items),
             processing_time_ms=elapsed["elapsed_ms"],
             timestamp=_datetime.datetime.now(_datetime.timezone.utc).isoformat(),
+            has_overlap=bool(overlap_result.needs_refinement),
+            detected_count=len(detection_result.detections),
         )
 
         logger.info(
@@ -147,6 +163,8 @@ class InventoryPipeline:
             total_items=len(items),
             processing_time_ms=elapsed["elapsed_ms"],
             timestamp=_datetime.datetime.now(_datetime.timezone.utc).isoformat(),
+            has_overlap=bool(overlap_result.needs_refinement),
+            detected_count=len(detection_result.detections),
         )
         trace = PipelineTrace(
             image_id=image_data.image_id,
@@ -158,27 +176,41 @@ class InventoryPipeline:
         return result, trace
 
     def _resolve_decision_components(
-        self, similarity_threshold: float | None
+        self, similarity_threshold: float | None, min_confidence_accept: float | None = None
     ) -> tuple[DecisionEngine, Reranker]:
         """Resolves which DecisionEngine/Reranker pair to use for a run.
 
         Args:
             similarity_threshold: Optional per-call threshold override.
+            min_confidence_accept: Optional per-call override of the minimum
+                final confidence needed to accept an item.
 
         Returns:
             The pipeline's shared (DecisionEngine, Reranker) when no
-            override is requested, otherwise a freshly built lightweight
-            pair using an overridden config copy.
+            override is requested, otherwise a lightweight pair built from an
+            overridden config copy (cached by the two override values).
         """
-        if similarity_threshold is None:
+        if similarity_threshold is None and min_confidence_accept is None:
             return self._decision_engine, self._reranker
 
-        overridden_decision = self._config.decision.model_copy(
-            update={"similarity_threshold": similarity_threshold}
-        )
+        key = (similarity_threshold, min_confidence_accept)
+        cached = self._override_cache.get(key)
+        if cached is not None:
+            self._override_cache.move_to_end(key)
+            return cached
+
+        update: dict[str, float] = {}
+        if similarity_threshold is not None:
+            update["similarity_threshold"] = similarity_threshold
+        if min_confidence_accept is not None:
+            update["min_confidence_accept"] = min_confidence_accept
+        overridden_decision = self._config.decision.model_copy(update=update)
         overridden_config = self._config.model_copy(update={"decision": overridden_decision})
         decision_engine = DecisionEngine(overridden_config)
         reranker = Reranker(overridden_config, decision_engine, self._retriever.get_product)
+        self._override_cache[key] = (decision_engine, reranker)
+        while len(self._override_cache) > 8:
+            self._override_cache.popitem(last=False)
         return decision_engine, reranker
 
     def _run_stages(
