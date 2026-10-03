@@ -4,7 +4,7 @@
 
 > **Ghi chú phiên bản:** Tài liệu này mô tả hệ thống ở trạng thái v0.1.0 (extended). Các mục đánh dấu **[Kế hoạch]** là hạng mục chưa triển khai, dự kiến bổ sung ở các phiên bản sau.
 
-> **Hướng dẫn nhanh:** chạy web POS — [`docs/WEB.md`](docs/WEB.md) · chuẩn bị và xử lý sự cố ngày demo — [`docs/DEMO.md`](docs/DEMO.md) · dữ liệu và catalog — [`docs/04_DATA_AND_CATALOG.md`](docs/04_DATA_AND_CATALOG.md).
+> **Hướng dẫn nhanh:** chạy web POS — [`docs/WEB.md`](docs/WEB.md) · chuẩn bị và xử lý sự cố ngày demo — [`docs/DEMO.md`](docs/DEMO.md) · dữ liệu và catalog — [`docs/04_DATA_AND_CATALOG.md`](docs/04_DATA_AND_CATALOG.md) · sơ đồ (mở bằng [excalidraw.com](https://excalidraw.com) hoặc tiện ích Excalidraw của VS Code): kiến trúc [`docs/HLD.excalidraw`](docs/HLD.excalidraw), luồng chụp → thanh toán [`docs/sequence.excalidraw`](docs/sequence.excalidraw).
 
 ## Mục lục
 
