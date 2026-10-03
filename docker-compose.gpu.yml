@@ -1,0 +1,26 @@
+# Override: the real pipeline on an NVIDIA GPU (needs the NVIDIA Container Toolkit; on Windows,
+# Docker Desktop with the WSL2 backend).
+#
+#   make docker-up-gpu     = docker compose -f docker-compose.yml -f docker-compose.gpu.yml up
+#
+# Builds the image with the ML stack and CUDA 12.8 torch wheels (several GB), loads the engine
+# in the API process (RECOGNIZER=local) and hands it every GPU.
+services:
+  migrate:
+    build:
+      args:
+        TORCH_VARIANT: cu128
+
+  api:
+    build:
+      args:
+        TORCH_VARIANT: cu128
+    environment:
+      RECOGNIZER: local
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

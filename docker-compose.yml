@@ -1,0 +1,86 @@
+# The API (FastAPI + the recognition engine) and its Postgres. `migrate` applies the Alembic
+# revisions once and exits; the API starts only after it succeeded. The web console joins in
+# phase 5 (frontend/ does not exist yet).
+#
+#   make setup && make docker-up        -> http://localhost:8000/healthz
+#
+# Default: the light image and RECOGNIZER=fake (no torch, runs anywhere).
+# Real pipeline on an NVIDIA GPU: `make docker-up-gpu` (docker-compose.gpu.yml).
+name: stocktaking-ai
+
+x-api-env: &api-env
+  DATABASE_URL: postgresql+asyncpg://stocktaking:stocktaking@postgres:5432/stocktaking
+  RECOGNIZER: ${RECOGNIZER:-fake}
+  PIPELINE_CONFIG: ${PIPELINE_CONFIG:-configs/config.yaml}
+
+x-api-build: &api-build
+  context: ./backend
+  args:
+    TORCH_VARIANT: ${TORCH_VARIANT:-none}
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: stocktaking
+      POSTGRES_PASSWORD: stocktaking
+      POSTGRES_DB: stocktaking
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    ports:
+      # published for `uv run uvicorn`, `make migrate` and the test suite on the host
+      - "5437:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U stocktaking -d stocktaking"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+
+  migrate:
+    build: *api-build
+    command: ["alembic", "upgrade", "head"]
+    env_file:
+      - path: .env
+        required: false
+    environment: *api-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    build: *api-build
+    # dev: reload on source changes (the three source trees are bind-mounted below)
+    command: ["uvicorn", "entrypoints.api:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1", "--reload",
+              "--reload-dir", "app", "--reload-dir", "engine", "--reload-dir", "entrypoints"]
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      <<: *api-env
+      LOG_FORMAT: console
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/app:/srv/app
+      - ./backend/engine:/srv/engine
+      - ./backend/entrypoints:/srv/entrypoints
+      - ./backend/configs:/srv/configs
+      # runtime assets: never baked into the image
+      - ./backend/data:/srv/data
+      - ./backend/data_demo:/srv/data_demo
+      - ./backend/weights:/srv/weights:ro
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      # the slim image has no curl
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz')"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+volumes:
+  pg-data:
