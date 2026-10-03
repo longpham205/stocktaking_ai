@@ -9,6 +9,7 @@ under pytest's `tmp_path`, so tests never depend on or mutate the real
 
 from __future__ import annotations
 
+import importlib.util
 import json
 from pathlib import Path
 
@@ -19,6 +20,31 @@ import yaml
 
 from engine.core.config import AppConfig
 from engine.pipeline.build import BuildPipeline
+
+
+def _skip_without_ml_extra(exc: ImportError) -> None:
+    """The light install (`uv sync` without `--extra ml`) has no EasyOCR: tests that build the real
+    OCR plugin are skipped there, with the reason, instead of failing. With EasyOCR installed an
+    ImportError is a real failure and is re-raised."""
+    if "easyocr" in str(exc) and importlib.util.find_spec("easyocr") is None:
+        pytest.skip("needs the ml extra: uv sync --extra ml (easyocr is not installed)")
+    raise exc
+
+
+@pytest.hookimpl(wrapper=True)
+def pytest_runtest_setup(item):
+    try:
+        return (yield)
+    except ImportError as exc:
+        _skip_without_ml_extra(exc)
+
+
+@pytest.hookimpl(wrapper=True)
+def pytest_runtest_call(item):
+    try:
+        return (yield)
+    except ImportError as exc:
+        _skip_without_ml_extra(exc)
 
 
 @pytest.fixture
