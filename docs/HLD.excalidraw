@@ -6,10 +6,10 @@
   {
    "id": "el1",
    "type": "text",
-   "x": 386.36,
-   "y": -90,
-   "width": 527.28,
-   "height": 32.5,
+   "x": 531.9599999999998,
+   "y": -118.80000000000001,
+   "width": 730.08,
+   "height": 45.0,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -31,7 +31,7 @@
    "locked": false,
    "text": "Stocktaking AI — Thiết kế mức cao (HLD)",
    "originalText": "Stocktaking AI — Thiết kế mức cao (HLD)",
-   "fontSize": 26,
+   "fontSize": 36,
    "fontFamily": 2,
    "textAlign": "center",
    "verticalAlign": "top",
@@ -42,10 +42,10 @@
   {
    "id": "el2",
    "type": "text",
-   "x": 318.5,
-   "y": -52,
-   "width": 663.0,
-   "height": 18.75,
+   "x": 432.89999999999986,
+   "y": -68.64,
+   "width": 928.2,
+   "height": 26.25,
    "angle": 0,
    "strokeColor": "#495057",
    "backgroundColor": "transparent",
@@ -67,7 +67,7 @@
    "locked": false,
    "text": "Thu ngân chụp rổ hàng → pipeline AI nhận diện SKU → web POS lập hoá đơn và thanh toán",
    "originalText": "Thu ngân chụp rổ hàng → pipeline AI nhận diện SKU → web POS lập hoá đơn và thanh toán",
-   "fontSize": 15,
+   "fontSize": 21,
    "fontFamily": 2,
    "textAlign": "center",
    "verticalAlign": "top",
@@ -78,10 +78,10 @@
   {
    "id": "el3",
    "type": "rectangle",
-   "x": 140,
-   "y": 330,
-   "width": 1020,
-   "height": 270,
+   "x": 193.2,
+   "y": 435.6,
+   "width": 1407.6,
+   "height": 356.40000000000003,
    "angle": 0,
    "strokeColor": "#2f9e44",
    "backgroundColor": "#ebfbee",
@@ -107,10 +107,10 @@
   {
    "id": "el4",
    "type": "text",
-   "x": 154,
-   "y": 340,
-   "width": 680.6800000000001,
-   "height": 21.25,
+   "x": 212.51999999999998,
+   "y": 448.8,
+   "width": 960.96,
+   "height": 30.0,
    "angle": 0,
    "strokeColor": "#343a40",
    "backgroundColor": "transparent",
@@ -132,7 +132,7 @@
    "locked": false,
    "text": "backend/ — API web POS (thư viện chuẩn http.server + sqlite3, một tiến trình)",
    "originalText": "backend/ — API web POS (thư viện chuẩn http.server + sqlite3, một tiến trình)",
-   "fontSize": 17,
+   "fontSize": 24,
    "fontFamily": 2,
    "textAlign": "left",
    "verticalAlign": "top",
@@ -143,10 +143,10 @@
   {
    "id": "el5",
    "type": "rectangle",
-   "x": 140,
-   "y": 690,
-   "width": 1020,
-   "height": 330,
+   "x": 193.2,
+   "y": 910.8000000000001,
+   "width": 1407.6,
+   "height": 435.6,
    "angle": 0,
    "strokeColor": "#e8590c",
    "backgroundColor": "#fff4e6",
@@ -172,10 +172,10 @@
   {
    "id": "el6",
    "type": "text",
-   "x": 154,
-   "y": 700,
-   "width": 442.0,
-   "height": 21.25,
+   "x": 212.51999999999998,
+   "y": 924.0,
+   "width": 624.0,
+   "height": 30.0,
    "angle": 0,
    "strokeColor": "#343a40",
    "backgroundColor": "transparent",
@@ -197,7 +197,7 @@
    "locked": false,
    "text": "src/ — pipeline AI (không bao giờ import backend/)",
    "originalText": "src/ — pipeline AI (không bao giờ import backend/)",
-   "fontSize": 17,
+   "fontSize": 24,
    "fontFamily": 2,
    "textAlign": "left",
    "verticalAlign": "top",
@@ -208,10 +208,10 @@
   {
    "id": "el7",
    "type": "rectangle",
-   "x": 140,
-   "y": 1090,
-   "width": 1020,
-   "height": 290,
+   "x": 193.2,
+   "y": 1438.8,
+   "width": 1407.6,
+   "height": 382.8,
    "angle": 0,
    "strokeColor": "#868e96",
    "backgroundColor": "#f1f3f5",
@@ -237,10 +237,10 @@
   {
    "id": "el8",
    "type": "text",
-   "x": 154,
-   "y": 1100,
-   "width": 291.72,
-   "height": 21.25,
+   "x": 212.51999999999998,
+   "y": 1452.0,
+   "width": 411.84000000000003,
+   "height": 30.0,
    "angle": 0,
    "strokeColor": "#343a40",
    "backgroundColor": "transparent",
@@ -262,7 +262,7 @@
    "locked": false,
    "text": "Dữ liệu và tài sản (không commit)",
    "originalText": "Dữ liệu và tài sản (không commit)",
-   "fontSize": 17,
+   "fontSize": 24,
    "fontFamily": 2,
    "textAlign": "left",
    "verticalAlign": "top",
@@ -273,10 +273,10 @@
   {
    "id": "el9",
    "type": "rectangle",
-   "x": 140,
-   "y": 120,
-   "width": 1020,
-   "height": 130,
+   "x": 193.2,
+   "y": 158.4,
+   "width": 1407.6,
+   "height": 171.6,
    "angle": 0,
    "strokeColor": "#1971c2",
    "backgroundColor": "#e7f5ff",
@@ -302,10 +302,10 @@
   {
    "id": "el10",
    "type": "text",
-   "x": 154,
-   "y": 130,
-   "width": 477.36,
-   "height": 21.25,
+   "x": 212.51999999999998,
+   "y": 171.6,
+   "width": 673.9200000000001,
+   "height": 30.0,
    "angle": 0,
    "strokeColor": "#343a40",
    "backgroundColor": "transparent",
@@ -327,7 +327,7 @@
    "locked": false,
    "text": "frontend/ — giao diện web (HTML/JS thuần, không build)",
    "originalText": "frontend/ — giao diện web (HTML/JS thuần, không build)",
-   "fontSize": 17,
+   "fontSize": 24,
    "fontFamily": 2,
    "textAlign": "left",
    "verticalAlign": "top",
@@ -338,10 +338,10 @@
   {
    "id": "el11",
    "type": "rectangle",
-   "x": 260,
-   "y": 0,
-   "width": 240,
-   "height": 64,
+   "x": 358.79999999999995,
+   "y": 0.0,
+   "width": 331.2,
+   "height": 84.48,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "#fff9db",
@@ -372,10 +372,10 @@
   {
    "id": "el12",
    "type": "text",
-   "x": 266,
-   "y": 13.25,
-   "width": 228,
-   "height": 37.5,
+   "x": 364.79999999999995,
+   "y": 15.990000000000002,
+   "width": 319.2,
+   "height": 52.5,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -397,7 +397,7 @@
    "locked": false,
    "text": "Thu ngân\n(trình duyệt điện thoại)",
    "originalText": "Thu ngân\n(trình duyệt điện thoại)",
-   "fontSize": 15,
+   "fontSize": 21,
    "fontFamily": 2,
    "textAlign": "center",
    "verticalAlign": "middle",
@@ -408,10 +408,10 @@
   {
    "id": "el13",
    "type": "rectangle",
-   "x": 800,
-   "y": 0,
-   "width": 240,
-   "height": 64,
+   "x": 1104.0,
+   "y": 0.0,
+   "width": 331.2,
+   "height": 84.48,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "#fff9db",
@@ -442,10 +442,10 @@
   {
    "id": "el14",
    "type": "text",
-   "x": 806,
-   "y": 13.25,
-   "width": 228,
-   "height": 37.5,
+   "x": 1110.0,
+   "y": 15.990000000000002,
+   "width": 319.2,
+   "height": 52.5,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -467,7 +467,7 @@
    "locked": false,
    "text": "Quản trị viên\n(trình duyệt laptop)",
    "originalText": "Quản trị viên\n(trình duyệt laptop)",
-   "fontSize": 15,
+   "fontSize": 21,
    "fontFamily": 2,
    "textAlign": "center",
    "verticalAlign": "middle",
@@ -478,10 +478,10 @@
   {
    "id": "el15",
    "type": "arrow",
-   "x": 380,
-   "y": 64,
-   "width": 0,
-   "height": 56,
+   "x": 524.4,
+   "y": 84.48,
+   "width": 0.0,
+   "height": 73.92,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -503,12 +503,12 @@
    "locked": false,
    "points": [
     [
-     0,
-     0
+     0.0,
+     0.0
     ],
     [
-     0,
-     56
+     0.0,
+     73.92
     ]
    ],
    "lastCommittedPoint": null,
@@ -521,10 +521,10 @@
   {
    "id": "el16",
    "type": "arrow",
-   "x": 920,
-   "y": 64,
-   "width": 0,
-   "height": 56,
+   "x": 1269.6,
+   "y": 84.48,
+   "width": 0.0,
+   "height": 73.92,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -546,12 +546,12 @@
    "locked": false,
    "points": [
     [
-     0,
-     0
+     0.0,
+     0.0
     ],
     [
-     0,
-     56
+     0.0,
+     73.92
     ]
    ],
    "lastCommittedPoint": null,
@@ -564,10 +564,10 @@
   {
    "id": "el17",
    "type": "rectangle",
-   "x": 170,
-   "y": 160,
-   "width": 960,
-   "height": 70,
+   "x": 234.6,
+   "y": 211.20000000000002,
+   "width": 1324.8,
+   "height": 92.4,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "#ffffff",
@@ -598,10 +598,10 @@
   {
    "id": "el18",
    "type": "text",
-   "x": 176,
-   "y": 176.25,
-   "width": 948,
-   "height": 37.5,
+   "x": 240.6,
+   "y": 231.15000000000003,
+   "width": 1312.8,
+   "height": 52.5,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -623,7 +623,7 @@
    "locked": false,
    "text": "index.html · app.js · app.css — do chính backend phục vụ\nmàn chụp · hoá đơn kèm ảnh + khung nhận diện · thanh toán · lịch sử · trang quản trị",
    "originalText": "index.html · app.js · app.css — do chính backend phục vụ\nmàn chụp · hoá đơn kèm ảnh + khung nhận diện · thanh toán · lịch sử · trang quản trị",
-   "fontSize": 15,
+   "fontSize": 21,
    "fontFamily": 2,
    "textAlign": "center",
    "verticalAlign": "middle",
@@ -634,10 +634,10 @@
   {
    "id": "el19",
    "type": "arrow",
-   "x": 650,
-   "y": 250,
-   "width": 0,
-   "height": 80,
+   "x": 896.9999999999999,
+   "y": 330.0,
+   "width": 0.0,
+   "height": 105.60000000000001,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -659,12 +659,12 @@
    "locked": false,
    "points": [
     [
-     0,
-     0
+     0.0,
+     0.0
     ],
     [
-     0,
-     80
+     0.0,
+     105.60000000000001
     ]
    ],
    "lastCommittedPoint": null,
@@ -677,10 +677,10 @@
   {
    "id": "el20",
    "type": "text",
-   "x": 665,
-   "y": 268,
-   "width": 392.08000000000004,
-   "height": 32.5,
+   "x": 917.6999999999999,
+   "y": 353.76,
+   "width": 542.88,
+   "height": 45.0,
    "angle": 0,
    "strokeColor": "#495057",
    "backgroundColor": "transparent",
@@ -702,7 +702,7 @@
    "locked": false,
    "text": "HTTP/JSON + ảnh JPEG · Bearer token · một cổng 8000\ntrạng thái lượt chụp: polling GET /api/jobs/{id} mỗi 0,6 s",
    "originalText": "HTTP/JSON + ảnh JPEG · Bearer token · một cổng 8000\ntrạng thái lượt chụp: polling GET /api/jobs/{id} mỗi 0,6 s",
-   "fontSize": 13,
+   "fontSize": 18,
    "fontFamily": 2,
    "textAlign": "left",
    "verticalAlign": "top",
@@ -713,10 +713,10 @@
   {
    "id": "el21",
    "type": "rectangle",
-   "x": 170,
-   "y": 376,
-   "width": 300,
-   "height": 86,
+   "x": 234.6,
+   "y": 496.32000000000005,
+   "width": 413.99999999999994,
+   "height": 113.52000000000001,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "#ffffff",
@@ -747,10 +747,10 @@
   {
    "id": "el22",
    "type": "text",
-   "x": 176,
-   "y": 392.75,
-   "width": 288,
-   "height": 52.5,
+   "x": 240.6,
+   "y": 515.58,
+   "width": 401.99999999999994,
+   "height": 75.0,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -772,7 +772,7 @@
    "locked": false,
    "text": "server.py\nđịnh tuyến /api/*, xác thực token,\nfile tĩnh, URL ảnh có chữ ký",
    "originalText": "server.py\nđịnh tuyến /api/*, xác thực token,\nfile tĩnh, URL ảnh có chữ ký",
-   "fontSize": 14,
+   "fontSize": 20,
    "fontFamily": 2,
    "textAlign": "center",
    "verticalAlign": "middle",
@@ -783,10 +783,10 @@
   {
    "id": "el23",
    "type": "rectangle",
-   "x": 500,
-   "y": 376,
-   "width": 300,
-   "height": 86,
+   "x": 690.0,
+   "y": 496.32000000000005,
+   "width": 413.99999999999994,
+   "height": 113.52000000000001,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "#ffffff",
@@ -817,10 +817,10 @@
   {
    "id": "el24",
    "type": "text",
-   "x": 506,
-   "y": 392.75,
-   "width": 288,
-   "height": 52.5,
+   "x": 696.0,
+   "y": 515.58,
+   "width": 401.99999999999994,
+   "height": 75.0,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -842,7 +842,7 @@
    "locked": false,
    "text": "service.py — App\nđăng nhập + ca, đơn hàng,\nhàng đợi lượt chụp, thanh toán",
    "originalText": "service.py — App\nđăng nhập + ca, đơn hàng,\nhàng đợi lượt chụp, thanh toán",
-   "fontSize": 14,
+   "fontSize": 20,
    "fontFamily": 2,
    "textAlign": "center",
    "verticalAlign": "middle",
@@ -853,10 +853,10 @@
   {
    "id": "el25",
    "type": "rectangle",
-   "x": 830,
-   "y": 376,
-   "width": 300,
-   "height": 86,
+   "x": 1145.3999999999999,
+   "y": 496.32000000000005,
+   "width": 413.99999999999994,
+   "height": 113.52000000000001,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "#ffffff",
@@ -887,10 +887,10 @@
   {
    "id": "el26",
    "type": "text",
-   "x": 836,
-   "y": 392.75,
-   "width": 288,
-   "height": 52.5,
+   "x": 1151.3999999999999,
+   "y": 515.58,
+   "width": 401.99999999999994,
+   "height": 75.0,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -912,7 +912,7 @@
    "locked": false,
    "text": "admin.py — AdminMixin\nsản phẩm, bằng chứng nhận diện,\nthiết lập nâng cao, kiểm định, báo cáo",
    "originalText": "admin.py — AdminMixin\nsản phẩm, bằng chứng nhận diện,\nthiết lập nâng cao, kiểm định, báo cáo",
-   "fontSize": 14,
+   "fontSize": 20,
    "fontFamily": 2,
    "textAlign": "center",
    "verticalAlign": "middle",
@@ -923,10 +923,10 @@
   {
    "id": "el27",
    "type": "rectangle",
-   "x": 170,
-   "y": 494,
-   "width": 300,
-   "height": 86,
+   "x": 234.6,
+   "y": 652.08,
+   "width": 413.99999999999994,
+   "height": 113.52000000000001,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "#ffffff",
@@ -957,10 +957,10 @@
   {
    "id": "el28",
    "type": "text",
-   "x": 176,
-   "y": 510.75,
-   "width": 288,
-   "height": 52.5,
+   "x": 240.6,
+   "y": 671.34,
+   "width": 401.99999999999994,
+   "height": 75.0,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -982,7 +982,7 @@
    "locked": false,
    "text": "inference.py — LocalExecutor\nmột luồng suy luận (tuần tự GPU),\ntimeout, nạp lại pipeline",
    "originalText": "inference.py — LocalExecutor\nmột luồng suy luận (tuần tự GPU),\ntimeout, nạp lại pipeline",
-   "fontSize": 14,
+   "fontSize": 20,
    "fontFamily": 2,
    "textAlign": "center",
    "verticalAlign": "middle",
@@ -993,10 +993,10 @@
   {
    "id": "el29",
    "type": "rectangle",
-   "x": 500,
-   "y": 494,
-   "width": 300,
-   "height": 86,
+   "x": 690.0,
+   "y": 652.08,
+   "width": 413.99999999999994,
+   "height": 113.52000000000001,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "#ffffff",
@@ -1027,10 +1027,10 @@
   {
    "id": "el30",
    "type": "text",
-   "x": 506,
-   "y": 510.75,
-   "width": 288,
-   "height": 52.5,
+   "x": 696.0,
+   "y": 671.34,
+   "width": 401.99999999999994,
+   "height": 75.0,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -1052,7 +1052,7 @@
    "locked": false,
    "text": "mapper.py\nInventoryResult → dòng hoá đơn\n+ bbox, ảnh thu nhỏ",
    "originalText": "mapper.py\nInventoryResult → dòng hoá đơn\n+ bbox, ảnh thu nhỏ",
-   "fontSize": 14,
+   "fontSize": 20,
    "fontFamily": 2,
    "textAlign": "center",
    "verticalAlign": "middle",
@@ -1063,10 +1063,10 @@
   {
    "id": "el31",
    "type": "rectangle",
-   "x": 830,
-   "y": 494,
-   "width": 300,
-   "height": 86,
+   "x": 1145.3999999999999,
+   "y": 652.08,
+   "width": 413.99999999999994,
+   "height": 113.52000000000001,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "#ffffff",
@@ -1097,10 +1097,10 @@
   {
    "id": "el32",
    "type": "text",
-   "x": 836,
-   "y": 510.75,
-   "width": 288,
-   "height": 52.5,
+   "x": 1151.3999999999999,
+   "y": 671.34,
+   "width": 401.99999999999994,
+   "height": 75.0,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -1122,7 +1122,7 @@
    "locked": false,
    "text": "catalog.py — DbCatalog\nđọc catalog qua\nSqliteCatalogRepository",
    "originalText": "catalog.py — DbCatalog\nđọc catalog qua\nSqliteCatalogRepository",
-   "fontSize": 14,
+   "fontSize": 20,
    "fontFamily": 2,
    "textAlign": "center",
    "verticalAlign": "middle",
@@ -1133,10 +1133,10 @@
   {
    "id": "el33",
    "type": "arrow",
-   "x": 470,
-   "y": 419,
-   "width": 30,
-   "height": 0,
+   "x": 648.5999999999999,
+   "y": 553.08,
+   "width": 41.4,
+   "height": 0.0,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -1158,12 +1158,12 @@
    "locked": false,
    "points": [
     [
-     0,
-     0
+     0.0,
+     0.0
     ],
     [
-     30,
-     0
+     41.4,
+     0.0
     ]
    ],
    "lastCommittedPoint": null,
@@ -1176,10 +1176,10 @@
   {
    "id": "el34",
    "type": "line",
-   "x": 800,
-   "y": 419,
-   "width": 30,
-   "height": 0,
+   "x": 1104.0,
+   "y": 553.08,
+   "width": 41.4,
+   "height": 0.0,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -1201,12 +1201,12 @@
    "locked": false,
    "points": [
     [
-     0,
-     0
+     0.0,
+     0.0
     ],
     [
-     30,
-     0
+     41.4,
+     0.0
     ]
    ],
    "lastCommittedPoint": null,
@@ -1218,10 +1218,10 @@
   {
    "id": "el35",
    "type": "arrow",
-   "x": 560,
-   "y": 462,
-   "width": 150,
-   "height": 32,
+   "x": 772.8,
+   "y": 609.84,
+   "width": 206.99999999999997,
+   "height": 42.24,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -1243,12 +1243,12 @@
    "locked": false,
    "points": [
     [
-     0,
-     0
+     0.0,
+     0.0
     ],
     [
-     -150,
-     32
+     -206.99999999999997,
+     42.24
     ]
    ],
    "lastCommittedPoint": null,
@@ -1261,10 +1261,10 @@
   {
    "id": "el36",
    "type": "arrow",
-   "x": 650,
-   "y": 462,
-   "width": 0,
-   "height": 32,
+   "x": 896.9999999999999,
+   "y": 609.84,
+   "width": 0.0,
+   "height": 42.24,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -1286,12 +1286,12 @@
    "locked": false,
    "points": [
     [
-     0,
-     0
+     0.0,
+     0.0
     ],
     [
-     0,
-     32
+     0.0,
+     42.24
     ]
    ],
    "lastCommittedPoint": null,
@@ -1304,10 +1304,10 @@
   {
    "id": "el37",
    "type": "arrow",
-   "x": 980,
-   "y": 462,
-   "width": 0,
-   "height": 32,
+   "x": 1352.3999999999999,
+   "y": 609.84,
+   "width": 0.0,
+   "height": 42.24,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -1329,12 +1329,12 @@
    "locked": false,
    "points": [
     [
-     0,
-     0
+     0.0,
+     0.0
     ],
     [
-     0,
-     32
+     0.0,
+     42.24
     ]
    ],
    "lastCommittedPoint": null,
@@ -1347,10 +1347,10 @@
   {
    "id": "el38",
    "type": "rectangle",
-   "x": 170,
-   "y": 736,
-   "width": 300,
-   "height": 60,
+   "x": 234.6,
+   "y": 971.5200000000001,
+   "width": 413.99999999999994,
+   "height": 79.2,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "#ffffff",
@@ -1381,10 +1381,10 @@
   {
    "id": "el39",
    "type": "text",
-   "x": 176,
-   "y": 748.5,
-   "width": 288,
-   "height": 35.0,
+   "x": 240.6,
+   "y": 986.1200000000001,
+   "width": 401.99999999999994,
+   "height": 50.0,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -1406,7 +1406,7 @@
    "locked": false,
    "text": "inference/ · validation/\nInferenceRunner · ValidationRunner",
    "originalText": "inference/ · validation/\nInferenceRunner · ValidationRunner",
-   "fontSize": 14,
+   "fontSize": 20,
    "fontFamily": 2,
    "textAlign": "center",
    "verticalAlign": "middle",
@@ -1417,10 +1417,10 @@
   {
    "id": "el40",
    "type": "rectangle",
-   "x": 500,
-   "y": 736,
-   "width": 300,
-   "height": 60,
+   "x": 690.0,
+   "y": 971.5200000000001,
+   "width": 413.99999999999994,
+   "height": 79.2,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "#ffffff",
@@ -1451,10 +1451,10 @@
   {
    "id": "el41",
    "type": "text",
-   "x": 506,
-   "y": 748.5,
-   "width": 288,
-   "height": 35.0,
+   "x": 696.0,
+   "y": 986.1200000000001,
+   "width": 401.99999999999994,
+   "height": 50.0,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -1476,7 +1476,7 @@
    "locked": false,
    "text": "pipeline/ — InventoryPipeline\nbộ điều phối duy nhất",
    "originalText": "pipeline/ — InventoryPipeline\nbộ điều phối duy nhất",
-   "fontSize": 14,
+   "fontSize": 20,
    "fontFamily": 2,
    "textAlign": "center",
    "verticalAlign": "middle",
@@ -1487,10 +1487,10 @@
   {
    "id": "el42",
    "type": "rectangle",
-   "x": 830,
-   "y": 736,
-   "width": 300,
-   "height": 60,
+   "x": 1145.3999999999999,
+   "y": 971.5200000000001,
+   "width": 413.99999999999994,
+   "height": 79.2,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "#ffffff",
@@ -1521,10 +1521,10 @@
   {
    "id": "el43",
    "type": "text",
-   "x": 836,
-   "y": 748.5,
-   "width": 288,
-   "height": 35.0,
+   "x": 1151.3999999999999,
+   "y": 986.1200000000001,
+   "width": 401.99999999999994,
+   "height": 50.0,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -1546,7 +1546,7 @@
    "locked": false,
    "text": "catalog/ — CatalogRepository\nSKU + bằng chứng (chỉ đọc)",
    "originalText": "catalog/ — CatalogRepository\nSKU + bằng chứng (chỉ đọc)",
-   "fontSize": 14,
+   "fontSize": 20,
    "fontFamily": 2,
    "textAlign": "center",
    "verticalAlign": "middle",
@@ -1557,10 +1557,10 @@
   {
    "id": "el44",
    "type": "arrow",
-   "x": 320,
-   "y": 580,
-   "width": 0,
-   "height": 156,
+   "x": 441.59999999999997,
+   "y": 765.6,
+   "width": 0.0,
+   "height": 205.92000000000002,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -1582,12 +1582,12 @@
    "locked": false,
    "points": [
     [
-     0,
-     0
+     0.0,
+     0.0
     ],
     [
-     0,
-     156
+     0.0,
+     205.92000000000002
     ]
    ],
    "lastCommittedPoint": null,
@@ -1600,10 +1600,10 @@
   {
    "id": "el45",
    "type": "text",
-   "x": 335,
-   "y": 632,
-   "width": 365.04,
-   "height": 32.5,
+   "x": 462.29999999999995,
+   "y": 834.24,
+   "width": 505.44,
+   "height": 45.0,
    "angle": 0,
    "strokeColor": "#495057",
    "backgroundColor": "transparent",
@@ -1625,7 +1625,7 @@
    "locked": false,
    "text": "InferenceRunner.run_single(ảnh, ngưỡng, persist=False)\nValidationRunner dùng lại pipeline đã nạp (kiểm định)",
    "originalText": "InferenceRunner.run_single(ảnh, ngưỡng, persist=False)\nValidationRunner dùng lại pipeline đã nạp (kiểm định)",
-   "fontSize": 13,
+   "fontSize": 18,
    "fontFamily": 2,
    "textAlign": "left",
    "verticalAlign": "top",
@@ -1636,10 +1636,10 @@
   {
    "id": "el46",
    "type": "arrow",
-   "x": 980,
-   "y": 580,
-   "width": 0,
-   "height": 156,
+   "x": 1352.3999999999999,
+   "y": 765.6,
+   "width": 0.0,
+   "height": 205.92000000000002,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -1661,12 +1661,12 @@
    "locked": false,
    "points": [
     [
-     0,
-     0
+     0.0,
+     0.0
     ],
     [
-     0,
-     156
+     0.0,
+     205.92000000000002
     ]
    ],
    "lastCommittedPoint": null,
@@ -1679,10 +1679,10 @@
   {
    "id": "el47",
    "type": "text",
-   "x": 768.96,
-   "y": 632,
-   "width": 196.04000000000002,
-   "height": 32.5,
+   "x": 1060.2599999999998,
+   "y": 834.24,
+   "width": 271.44,
+   "height": 45.0,
    "angle": 0,
    "strokeColor": "#495057",
    "backgroundColor": "transparent",
@@ -1704,7 +1704,7 @@
    "locked": false,
    "text": "reload_catalog()\nsau mỗi lần admin sửa catalog",
    "originalText": "reload_catalog()\nsau mỗi lần admin sửa catalog",
-   "fontSize": 13,
+   "fontSize": 18,
    "fontFamily": 2,
    "textAlign": "right",
    "verticalAlign": "top",
@@ -1715,10 +1715,10 @@
   {
    "id": "el48",
    "type": "arrow",
-   "x": 470,
-   "y": 766,
-   "width": 30,
-   "height": 0,
+   "x": 648.5999999999999,
+   "y": 1011.12,
+   "width": 41.4,
+   "height": 0.0,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -1740,12 +1740,12 @@
    "locked": false,
    "points": [
     [
-     0,
-     0
+     0.0,
+     0.0
     ],
     [
-     30,
-     0
+     41.4,
+     0.0
     ]
    ],
    "lastCommittedPoint": null,
@@ -1758,10 +1758,10 @@
   {
    "id": "el49",
    "type": "arrow",
-   "x": 830,
-   "y": 766,
-   "width": 30,
-   "height": 0,
+   "x": 1145.3999999999999,
+   "y": 1011.12,
+   "width": 41.4,
+   "height": 0.0,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -1783,12 +1783,12 @@
    "locked": false,
    "points": [
     [
-     0,
-     0
+     0.0,
+     0.0
     ],
     [
-     -30,
-     0
+     -41.4,
+     0.0
     ]
    ],
    "lastCommittedPoint": null,
@@ -1801,10 +1801,10 @@
   {
    "id": "el50",
    "type": "arrow",
-   "x": 650,
-   "y": 796,
-   "width": 368,
-   "height": 46,
+   "x": 896.9999999999999,
+   "y": 1050.72,
+   "width": 507.84,
+   "height": 60.720000000000006,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -1826,20 +1826,20 @@
    "locked": false,
    "points": [
     [
-     0,
-     0
+     0.0,
+     0.0
     ],
     [
-     0,
-     30
+     0.0,
+     39.6
     ],
     [
-     -368,
-     30
+     -507.84,
+     39.6
     ],
     [
-     -368,
-     46
+     -507.84,
+     60.720000000000006
     ]
    ],
    "lastCommittedPoint": null,
@@ -1852,10 +1852,10 @@
   {
    "id": "el51",
    "type": "rectangle",
-   "x": 170,
-   "y": 842,
-   "width": 225,
-   "height": 64,
+   "x": 234.6,
+   "y": 1111.44,
+   "width": 310.5,
+   "height": 84.48,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "#ffffff",
@@ -1886,10 +1886,10 @@
   {
    "id": "el52",
    "type": "text",
-   "x": 176,
-   "y": 857.75,
-   "width": 213,
-   "height": 32.5,
+   "x": 240.6,
+   "y": 1131.18,
+   "width": 298.5,
+   "height": 45.0,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -1911,7 +1911,7 @@
    "locked": false,
    "text": "1. Detector\nRF-DETR (không phân lớp)",
    "originalText": "1. Detector\nRF-DETR (không phân lớp)",
-   "fontSize": 13,
+   "fontSize": 18,
    "fontFamily": 2,
    "textAlign": "center",
    "verticalAlign": "middle",
@@ -1922,10 +1922,10 @@
   {
    "id": "el53",
    "type": "rectangle",
-   "x": 415,
-   "y": 842,
-   "width": 225,
-   "height": 64,
+   "x": 572.6999999999999,
+   "y": 1111.44,
+   "width": 310.5,
+   "height": 84.48,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "#ffffff",
@@ -1956,10 +1956,10 @@
   {
    "id": "el54",
    "type": "text",
-   "x": 421,
-   "y": 857.75,
-   "width": 213,
-   "height": 32.5,
+   "x": 578.6999999999999,
+   "y": 1131.18,
+   "width": 298.5,
+   "height": 45.0,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -1981,7 +1981,7 @@
    "locked": false,
    "text": "2. OverlapResolver\nphát hiện chồng lấp",
    "originalText": "2. OverlapResolver\nphát hiện chồng lấp",
-   "fontSize": 13,
+   "fontSize": 18,
    "fontFamily": 2,
    "textAlign": "center",
    "verticalAlign": "middle",
@@ -1992,10 +1992,10 @@
   {
    "id": "el55",
    "type": "arrow",
-   "x": 395,
-   "y": 874,
-   "width": 20,
-   "height": 0,
+   "x": 545.0999999999999,
+   "y": 1153.68,
+   "width": 27.599999999999998,
+   "height": 0.0,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -2017,12 +2017,12 @@
    "locked": false,
    "points": [
     [
-     0,
-     0
+     0.0,
+     0.0
     ],
     [
-     20,
-     0
+     27.599999999999998,
+     0.0
     ]
    ],
    "lastCommittedPoint": null,
@@ -2035,10 +2035,10 @@
   {
    "id": "el56",
    "type": "rectangle",
-   "x": 660,
-   "y": 842,
-   "width": 225,
-   "height": 64,
+   "x": 910.8,
+   "y": 1111.44,
+   "width": 310.5,
+   "height": 84.48,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "#ffffff",
@@ -2069,10 +2069,10 @@
   {
    "id": "el57",
    "type": "text",
-   "x": 666,
-   "y": 857.75,
-   "width": 213,
-   "height": 32.5,
+   "x": 916.8,
+   "y": 1131.18,
+   "width": 298.5,
+   "height": 45.0,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -2094,7 +2094,7 @@
    "locked": false,
    "text": "3. Refiner\nSAM2 (chỉ khi chồng lấp)",
    "originalText": "3. Refiner\nSAM2 (chỉ khi chồng lấp)",
-   "fontSize": 13,
+   "fontSize": 18,
    "fontFamily": 2,
    "textAlign": "center",
    "verticalAlign": "middle",
@@ -2105,10 +2105,10 @@
   {
    "id": "el58",
    "type": "arrow",
-   "x": 640,
-   "y": 874,
-   "width": 20,
-   "height": 0,
+   "x": 883.1999999999999,
+   "y": 1153.68,
+   "width": 27.599999999999998,
+   "height": 0.0,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -2130,12 +2130,12 @@
    "locked": false,
    "points": [
     [
-     0,
-     0
+     0.0,
+     0.0
     ],
     [
-     20,
-     0
+     27.599999999999998,
+     0.0
     ]
    ],
    "lastCommittedPoint": null,
@@ -2148,10 +2148,10 @@
   {
    "id": "el59",
    "type": "rectangle",
-   "x": 905,
-   "y": 842,
-   "width": 225,
-   "height": 64,
+   "x": 1248.8999999999999,
+   "y": 1111.44,
+   "width": 310.5,
+   "height": 84.48,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "#ffffff",
@@ -2182,10 +2182,10 @@
   {
    "id": "el60",
    "type": "text",
-   "x": 911,
-   "y": 857.75,
-   "width": 213,
-   "height": 32.5,
+   "x": 1254.8999999999999,
+   "y": 1131.18,
+   "width": 298.5,
+   "height": 45.0,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -2207,7 +2207,7 @@
    "locked": false,
    "text": "4. Cropper\ncrop hai độ phân giải",
    "originalText": "4. Cropper\ncrop hai độ phân giải",
-   "fontSize": 13,
+   "fontSize": 18,
    "fontFamily": 2,
    "textAlign": "center",
    "verticalAlign": "middle",
@@ -2218,10 +2218,10 @@
   {
    "id": "el61",
    "type": "arrow",
-   "x": 885,
-   "y": 874,
-   "width": 20,
-   "height": 0,
+   "x": 1221.3,
+   "y": 1153.68,
+   "width": 27.599999999999998,
+   "height": 0.0,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -2243,12 +2243,12 @@
    "locked": false,
    "points": [
     [
-     0,
-     0
+     0.0,
+     0.0
     ],
     [
-     20,
-     0
+     27.599999999999998,
+     0.0
     ]
    ],
    "lastCommittedPoint": null,
@@ -2261,10 +2261,10 @@
   {
    "id": "el62",
    "type": "rectangle",
-   "x": 170,
-   "y": 936,
-   "width": 225,
-   "height": 64,
+   "x": 234.6,
+   "y": 1235.52,
+   "width": 310.5,
+   "height": 84.48,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "#ffffff",
@@ -2295,10 +2295,10 @@
   {
    "id": "el63",
    "type": "text",
-   "x": 176,
-   "y": 951.75,
-   "width": 213,
-   "height": 32.5,
+   "x": 240.6,
+   "y": 1255.26,
+   "width": 298.5,
+   "height": 45.0,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -2320,7 +2320,7 @@
    "locked": false,
    "text": "8. Reranker\nhợp nhất bằng chứng",
    "originalText": "8. Reranker\nhợp nhất bằng chứng",
-   "fontSize": 13,
+   "fontSize": 18,
    "fontFamily": 2,
    "textAlign": "center",
    "verticalAlign": "middle",
@@ -2331,10 +2331,10 @@
   {
    "id": "el64",
    "type": "rectangle",
-   "x": 415,
-   "y": 936,
-   "width": 225,
-   "height": 64,
+   "x": 572.6999999999999,
+   "y": 1235.52,
+   "width": 310.5,
+   "height": 84.48,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "#ffffff",
@@ -2365,10 +2365,10 @@
   {
    "id": "el65",
    "type": "text",
-   "x": 421,
-   "y": 951.75,
-   "width": 213,
-   "height": 32.5,
+   "x": 578.6999999999999,
+   "y": 1255.26,
+   "width": 298.5,
+   "height": 45.0,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -2390,7 +2390,7 @@
    "locked": false,
    "text": "7. PluginManager\nOCR · Color · Barcode",
    "originalText": "7. PluginManager\nOCR · Color · Barcode",
-   "fontSize": 13,
+   "fontSize": 18,
    "fontFamily": 2,
    "textAlign": "center",
    "verticalAlign": "middle",
@@ -2401,10 +2401,10 @@
   {
    "id": "el66",
    "type": "arrow",
-   "x": 415,
-   "y": 968,
-   "width": 20,
-   "height": 0,
+   "x": 572.6999999999999,
+   "y": 1277.76,
+   "width": 27.599999999999998,
+   "height": 0.0,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -2426,12 +2426,12 @@
    "locked": false,
    "points": [
     [
-     0,
-     0
+     0.0,
+     0.0
     ],
     [
-     -20,
-     0
+     -27.599999999999998,
+     0.0
     ]
    ],
    "lastCommittedPoint": null,
@@ -2444,10 +2444,10 @@
   {
    "id": "el67",
    "type": "rectangle",
-   "x": 660,
-   "y": 936,
-   "width": 225,
-   "height": 64,
+   "x": 910.8,
+   "y": 1235.52,
+   "width": 310.5,
+   "height": 84.48,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "#ffffff",
@@ -2478,10 +2478,10 @@
   {
    "id": "el68",
    "type": "text",
-   "x": 666,
-   "y": 951.75,
-   "width": 213,
-   "height": 32.5,
+   "x": 916.8,
+   "y": 1255.26,
+   "width": 298.5,
+   "height": 45.0,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -2503,7 +2503,7 @@
    "locked": false,
    "text": "6. DecisionEngine\nchấp nhận / chưa chắc / loại",
    "originalText": "6. DecisionEngine\nchấp nhận / chưa chắc / loại",
-   "fontSize": 13,
+   "fontSize": 18,
    "fontFamily": 2,
    "textAlign": "center",
    "verticalAlign": "middle",
@@ -2514,10 +2514,10 @@
   {
    "id": "el69",
    "type": "arrow",
-   "x": 660,
-   "y": 968,
-   "width": 20,
-   "height": 0,
+   "x": 910.8,
+   "y": 1277.76,
+   "width": 27.599999999999998,
+   "height": 0.0,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -2539,12 +2539,12 @@
    "locked": false,
    "points": [
     [
-     0,
-     0
+     0.0,
+     0.0
     ],
     [
-     -20,
-     0
+     -27.599999999999998,
+     0.0
     ]
    ],
    "lastCommittedPoint": null,
@@ -2557,10 +2557,10 @@
   {
    "id": "el70",
    "type": "rectangle",
-   "x": 905,
-   "y": 936,
-   "width": 225,
-   "height": 64,
+   "x": 1248.8999999999999,
+   "y": 1235.52,
+   "width": 310.5,
+   "height": 84.48,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "#ffffff",
@@ -2591,10 +2591,10 @@
   {
    "id": "el71",
    "type": "text",
-   "x": 911,
-   "y": 951.75,
-   "width": 213,
-   "height": 32.5,
+   "x": 1254.8999999999999,
+   "y": 1255.26,
+   "width": 298.5,
+   "height": 45.0,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -2616,7 +2616,7 @@
    "locked": false,
    "text": "5. Retriever\nSigLIP2 + FAISS, Top-K",
    "originalText": "5. Retriever\nSigLIP2 + FAISS, Top-K",
-   "fontSize": 13,
+   "fontSize": 18,
    "fontFamily": 2,
    "textAlign": "center",
    "verticalAlign": "middle",
@@ -2627,10 +2627,10 @@
   {
    "id": "el72",
    "type": "arrow",
-   "x": 905,
-   "y": 968,
-   "width": 20,
-   "height": 0,
+   "x": 1248.8999999999999,
+   "y": 1277.76,
+   "width": 27.599999999999998,
+   "height": 0.0,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -2652,12 +2652,12 @@
    "locked": false,
    "points": [
     [
-     0,
-     0
+     0.0,
+     0.0
     ],
     [
-     -20,
-     0
+     -27.599999999999998,
+     0.0
     ]
    ],
    "lastCommittedPoint": null,
@@ -2670,10 +2670,10 @@
   {
    "id": "el73",
    "type": "arrow",
-   "x": 1017,
-   "y": 906,
-   "width": 0,
-   "height": 30,
+   "x": 1403.4599999999998,
+   "y": 1195.92,
+   "width": 0.0,
+   "height": 39.6,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -2695,12 +2695,12 @@
    "locked": false,
    "points": [
     [
-     0,
-     0
+     0.0,
+     0.0
     ],
     [
-     0,
-     30
+     0.0,
+     39.6
     ]
    ],
    "lastCommittedPoint": null,
@@ -2713,10 +2713,10 @@
   {
    "id": "el74",
    "type": "rectangle",
-   "x": 170,
-   "y": 1136,
-   "width": 230,
-   "height": 96,
+   "x": 234.6,
+   "y": 1499.52,
+   "width": 317.4,
+   "height": 126.72,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "#ffffff",
@@ -2747,10 +2747,10 @@
   {
    "id": "el75",
    "type": "text",
-   "x": 176,
-   "y": 1157.75,
-   "width": 218,
-   "height": 52.5,
+   "x": 240.6,
+   "y": 1525.3799999999999,
+   "width": 305.4,
+   "height": 75.0,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -2772,7 +2772,7 @@
    "locked": false,
    "text": "data/gallery/\nảnh tham chiếu\ntheo từng SKU",
    "originalText": "data/gallery/\nảnh tham chiếu\ntheo từng SKU",
-   "fontSize": 14,
+   "fontSize": 20,
    "fontFamily": 2,
    "textAlign": "center",
    "verticalAlign": "middle",
@@ -2783,10 +2783,10 @@
   {
    "id": "el76",
    "type": "rectangle",
-   "x": 420,
-   "y": 1136,
-   "width": 220,
-   "height": 96,
+   "x": 579.5999999999999,
+   "y": 1499.52,
+   "width": 303.59999999999997,
+   "height": 126.72,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "#ffffff",
@@ -2817,10 +2817,10 @@
   {
    "id": "el77",
    "type": "text",
-   "x": 426,
-   "y": 1157.75,
-   "width": 208,
-   "height": 52.5,
+   "x": 585.5999999999999,
+   "y": 1525.3799999999999,
+   "width": 291.59999999999997,
+   "height": 75.0,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -2842,7 +2842,7 @@
    "locked": false,
    "text": "data/cache/\nFAISS index + metadata\n+ fingerprint",
    "originalText": "data/cache/\nFAISS index + metadata\n+ fingerprint",
-   "fontSize": 14,
+   "fontSize": 20,
    "fontFamily": 2,
    "textAlign": "center",
    "verticalAlign": "middle",
@@ -2853,10 +2853,10 @@
   {
    "id": "el78",
    "type": "rectangle",
-   "x": 660,
-   "y": 1136,
-   "width": 470,
-   "height": 96,
+   "x": 910.8,
+   "y": 1499.52,
+   "width": 648.5999999999999,
+   "height": 126.72,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "#ffffff",
@@ -2887,10 +2887,10 @@
   {
    "id": "el79",
    "type": "text",
-   "x": 666,
-   "y": 1151.5,
-   "width": 458,
-   "height": 65.0,
+   "x": 916.8,
+   "y": 1517.8799999999999,
+   "width": 636.5999999999999,
+   "height": 90.0,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -2912,7 +2912,7 @@
    "locked": false,
    "text": "SQLite data/db/app.db (dùng chung một file)\ncatalog: product, product_evidence, color_reference\nweb: orders, order_items, captures, users, shifts,\nproduct_prices, settings, config_overrides, change_log",
    "originalText": "SQLite data/db/app.db (dùng chung một file)\ncatalog: product, product_evidence, color_reference\nweb: orders, order_items, captures, users, shifts,\nproduct_prices, settings, config_overrides, change_log",
-   "fontSize": 13,
+   "fontSize": 18,
    "fontFamily": 2,
    "textAlign": "center",
    "verticalAlign": "middle",
@@ -2923,10 +2923,10 @@
   {
    "id": "el80",
    "type": "rectangle",
-   "x": 170,
-   "y": 1284,
-   "width": 470,
-   "height": 76,
+   "x": 234.6,
+   "y": 1694.88,
+   "width": 648.5999999999999,
+   "height": 100.32000000000001,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "#ffffff",
@@ -2957,10 +2957,10 @@
   {
    "id": "el81",
    "type": "text",
-   "x": 176,
-   "y": 1297.625,
-   "width": 458,
-   "height": 48.75,
+   "x": 240.6,
+   "y": 1711.2900000000002,
+   "width": 636.5999999999999,
+   "height": 67.5,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -2982,7 +2982,7 @@
    "locked": false,
    "text": "Build ngoại tuyến (run.py, trước mọi mode)\nsync_gallery: thư mục mới → SKU mới\nGalleryIndexBuilder: chỉ build lại khi fingerprint đổi",
    "originalText": "Build ngoại tuyến (run.py, trước mọi mode)\nsync_gallery: thư mục mới → SKU mới\nGalleryIndexBuilder: chỉ build lại khi fingerprint đổi",
-   "fontSize": 13,
+   "fontSize": 18,
    "fontFamily": 2,
    "textAlign": "center",
    "verticalAlign": "middle",
@@ -2993,10 +2993,10 @@
   {
    "id": "el82",
    "type": "rectangle",
-   "x": 660,
-   "y": 1284,
-   "width": 470,
-   "height": 76,
+   "x": 910.8,
+   "y": 1694.88,
+   "width": 648.5999999999999,
+   "height": 100.32000000000001,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "#ffffff",
@@ -3027,10 +3027,10 @@
   {
    "id": "el83",
    "type": "text",
-   "x": 666,
-   "y": 1297.625,
-   "width": 458,
-   "height": 48.75,
+   "x": 916.8,
+   "y": 1711.2900000000002,
+   "width": 636.5999999999999,
+   "height": 67.5,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -3052,7 +3052,7 @@
    "locked": false,
    "text": "weights/\nRF-DETR (detector) · SAM2 (refinement)\nSigLIP2 tải từ Hugging Face",
    "originalText": "weights/\nRF-DETR (detector) · SAM2 (refinement)\nSigLIP2 tải từ Hugging Face",
-   "fontSize": 13,
+   "fontSize": 18,
    "fontFamily": 2,
    "textAlign": "center",
    "verticalAlign": "middle",
@@ -3063,10 +3063,10 @@
   {
    "id": "el84",
    "type": "arrow",
-   "x": 285,
-   "y": 1284,
-   "width": 0,
-   "height": 52,
+   "x": 393.29999999999995,
+   "y": 1694.88,
+   "width": 0.0,
+   "height": 68.64,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -3088,12 +3088,12 @@
    "locked": false,
    "points": [
     [
-     0,
-     0
+     0.0,
+     0.0
     ],
     [
-     0,
-     -52
+     0.0,
+     -68.64
     ]
    ],
    "lastCommittedPoint": null,
@@ -3106,10 +3106,10 @@
   {
    "id": "el85",
    "type": "arrow",
-   "x": 530,
-   "y": 1284,
-   "width": 0,
-   "height": 52,
+   "x": 731.4,
+   "y": 1694.88,
+   "width": 0.0,
+   "height": 68.64,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -3131,12 +3131,12 @@
    "locked": false,
    "points": [
     [
-     0,
-     0
+     0.0,
+     0.0
     ],
     [
-     0,
-     -52
+     0.0,
+     -68.64
     ]
    ],
    "lastCommittedPoint": null,
@@ -3149,10 +3149,10 @@
   {
    "id": "el86",
    "type": "arrow",
-   "x": 1160,
-   "y": 440,
-   "width": 70,
-   "height": 775,
+   "x": 1600.8,
+   "y": 580.8000000000001,
+   "width": 96.6,
+   "height": 1023.0,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -3174,20 +3174,20 @@
    "locked": false,
    "points": [
     [
-     0,
-     0
+     0.0,
+     0.0
     ],
     [
-     40,
-     0
+     55.199999999999996,
+     0.0
     ],
     [
-     40,
-     775
+     55.199999999999996,
+     1023.0
     ],
     [
-     -30,
-     775
+     -41.4,
+     1023.0
     ]
    ],
    "lastCommittedPoint": null,
@@ -3200,10 +3200,10 @@
   {
    "id": "el87",
    "type": "text",
-   "x": 1212,
-   "y": 560,
-   "width": 155.48000000000002,
-   "height": 48.75,
+   "x": 1672.56,
+   "y": 739.2,
+   "width": 215.28,
+   "height": 67.5,
    "angle": 0,
    "strokeColor": "#495057",
    "backgroundColor": "transparent",
@@ -3225,7 +3225,7 @@
    "locked": false,
    "text": "đọc/ghi: đơn hàng, giá,\nnhật ký thay đổi;\nadmin ghi catalog",
    "originalText": "đọc/ghi: đơn hàng, giá,\nnhật ký thay đổi;\nadmin ghi catalog",
-   "fontSize": 13,
+   "fontSize": 18,
    "fontFamily": 2,
    "textAlign": "left",
    "verticalAlign": "top",
@@ -3236,10 +3236,10 @@
   {
    "id": "el88",
    "type": "arrow",
-   "x": 1130,
-   "y": 766,
-   "width": 48,
-   "height": 409,
+   "x": 1559.3999999999999,
+   "y": 1011.12,
+   "width": 66.24,
+   "height": 539.88,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -3261,20 +3261,20 @@
    "locked": false,
    "points": [
     [
-     0,
-     0
+     0.0,
+     0.0
     ],
     [
-     48,
-     0
+     66.24,
+     0.0
     ],
     [
-     48,
-     409
+     66.24,
+     539.88
     ],
     [
-     0,
-     409
+     0.0,
+     539.88
     ]
    ],
    "lastCommittedPoint": null,
@@ -3287,10 +3287,10 @@
   {
    "id": "el89",
    "type": "text",
-   "x": 1212,
-   "y": 860,
-   "width": 114.92,
-   "height": 32.5,
+   "x": 1672.56,
+   "y": 1135.2,
+   "width": 159.12,
+   "height": 45.0,
    "angle": 0,
    "strokeColor": "#495057",
    "backgroundColor": "transparent",
@@ -3312,7 +3312,7 @@
    "locked": false,
    "text": "CatalogRepository\nđọc catalog",
    "originalText": "CatalogRepository\nđọc catalog",
-   "fontSize": 13,
+   "fontSize": 18,
    "fontFamily": 2,
    "textAlign": "left",
    "verticalAlign": "top",
@@ -3323,10 +3323,10 @@
   {
    "id": "el90",
    "type": "arrow",
-   "x": 1017,
-   "y": 1000,
-   "width": 487,
-   "height": 136,
+   "x": 1403.4599999999998,
+   "y": 1320.0,
+   "width": 672.06,
+   "height": 179.52,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -3348,20 +3348,20 @@
    "locked": false,
    "points": [
     [
-     0,
-     0
+     0.0,
+     0.0
     ],
     [
-     0,
-     52
+     0.0,
+     68.64
     ],
     [
-     -487,
-     52
+     -672.06,
+     68.64
     ],
     [
-     -487,
-     136
+     -672.06,
+     179.52
     ]
    ],
    "lastCommittedPoint": null,
@@ -3374,10 +3374,10 @@
   {
    "id": "el91",
    "type": "text",
-   "x": 545,
-   "y": 1056,
-   "width": 121.68,
-   "height": 16.25,
+   "x": 752.0999999999999,
+   "y": 1393.92,
+   "width": 168.48000000000002,
+   "height": 22.5,
    "angle": 0,
    "strokeColor": "#495057",
    "backgroundColor": "transparent",
@@ -3399,7 +3399,7 @@
    "locked": false,
    "text": "nạp index dựng sẵn",
    "originalText": "nạp index dựng sẵn",
-   "fontSize": 13,
+   "fontSize": 18,
    "fontFamily": 2,
    "textAlign": "left",
    "verticalAlign": "top",

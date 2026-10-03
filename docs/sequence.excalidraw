@@ -6,10 +6,10 @@
   {
    "id": "el70",
    "type": "line",
-   "x": 110,
-   "y": 62,
-   "width": 0,
-   "height": 1604,
+   "x": 110.0,
+   "y": 80.60000000000001,
+   "width": 0.0,
+   "height": 2260.3,
    "angle": 0,
    "strokeColor": "#adb5bd",
    "backgroundColor": "transparent",
@@ -31,12 +31,12 @@
    "locked": false,
    "points": [
     [
-     0,
-     0
+     0.0,
+     0.0
     ],
     [
-     0,
-     1604
+     0.0,
+     2260.3
     ]
    ],
    "lastCommittedPoint": null,
@@ -48,10 +48,10 @@
   {
    "id": "el71",
    "type": "line",
-   "x": 430,
-   "y": 62,
-   "width": 0,
-   "height": 1604,
+   "x": 470.0,
+   "y": 80.60000000000001,
+   "width": 0.0,
+   "height": 2260.3,
    "angle": 0,
    "strokeColor": "#adb5bd",
    "backgroundColor": "transparent",
@@ -73,12 +73,12 @@
    "locked": false,
    "points": [
     [
-     0,
-     0
+     0.0,
+     0.0
     ],
     [
-     0,
-     1604
+     0.0,
+     2260.3
     ]
    ],
    "lastCommittedPoint": null,
@@ -90,10 +90,10 @@
   {
    "id": "el72",
    "type": "line",
-   "x": 860,
-   "y": 62,
-   "width": 0,
-   "height": 1604,
+   "x": 920.0,
+   "y": 80.60000000000001,
+   "width": 0.0,
+   "height": 2260.3,
    "angle": 0,
    "strokeColor": "#adb5bd",
    "backgroundColor": "transparent",
@@ -115,12 +115,12 @@
    "locked": false,
    "points": [
     [
-     0,
-     0
+     0.0,
+     0.0
     ],
     [
-     0,
-     1604
+     0.0,
+     2260.3
     ]
    ],
    "lastCommittedPoint": null,
@@ -132,10 +132,10 @@
   {
    "id": "el73",
    "type": "line",
-   "x": 1210,
-   "y": 62,
-   "width": 0,
-   "height": 1604,
+   "x": 1260.0,
+   "y": 80.60000000000001,
+   "width": 0.0,
+   "height": 2260.3,
    "angle": 0,
    "strokeColor": "#adb5bd",
    "backgroundColor": "transparent",
@@ -157,12 +157,12 @@
    "locked": false,
    "points": [
     [
-     0,
-     0
+     0.0,
+     0.0
     ],
     [
-     0,
-     1604
+     0.0,
+     2260.3
     ]
    ],
    "lastCommittedPoint": null,
@@ -174,10 +174,10 @@
   {
    "id": "el74",
    "type": "line",
-   "x": 1640,
-   "y": 62,
-   "width": 0,
-   "height": 1604,
+   "x": 1640.0,
+   "y": 80.60000000000001,
+   "width": 0.0,
+   "height": 2260.3,
    "angle": 0,
    "strokeColor": "#adb5bd",
    "backgroundColor": "transparent",
@@ -199,12 +199,12 @@
    "locked": false,
    "points": [
     [
-     0,
-     0
+     0.0,
+     0.0
     ],
     [
-     0,
-     1604
+     0.0,
+     2260.3
     ]
    ],
    "lastCommittedPoint": null,
@@ -216,10 +216,10 @@
   {
    "id": "el75",
    "type": "line",
-   "x": 1940,
-   "y": 62,
-   "width": 0,
-   "height": 1604,
+   "x": 1950.0,
+   "y": 80.60000000000001,
+   "width": 0.0,
+   "height": 2260.3,
    "angle": 0,
    "strokeColor": "#adb5bd",
    "backgroundColor": "transparent",
@@ -241,12 +241,12 @@
    "locked": false,
    "points": [
     [
-     0,
-     0
+     0.0,
+     0.0
     ],
     [
-     0,
-     1604
+     0.0,
+     2260.3
     ]
    ],
    "lastCommittedPoint": null,
@@ -258,10 +258,10 @@
   {
    "id": "el1",
    "type": "text",
-   "x": 747.8399999999999,
-   "y": -100,
-   "width": 554.32,
-   "height": 32.5,
+   "x": 624.92,
+   "y": -143.0,
+   "width": 810.1600000000001,
+   "height": 47.5,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -283,7 +283,7 @@
    "locked": false,
    "text": "Luồng chụp rổ hàng → hoá đơn → thanh toán",
    "originalText": "Luồng chụp rổ hàng → hoá đơn → thanh toán",
-   "fontSize": 26,
+   "fontSize": 38,
    "fontFamily": 2,
    "textAlign": "center",
    "verticalAlign": "top",
@@ -294,10 +294,10 @@
   {
    "id": "el2",
    "type": "text",
-   "x": 802.7,
-   "y": -62,
-   "width": 444.6,
-   "height": 18.75,
+   "x": 703.96,
+   "y": -83.2,
+   "width": 652.08,
+   "height": 27.5,
    "angle": 0,
    "strokeColor": "#495057",
    "backgroundColor": "transparent",
@@ -319,7 +319,7 @@
    "locked": false,
    "text": "Web POS · một lượt chụp thành công (nhánh lỗi ghi ở cuối)",
    "originalText": "Web POS · một lượt chụp thành công (nhánh lỗi ghi ở cuối)",
-   "fontSize": 15,
+   "fontSize": 22,
    "fontFamily": 2,
    "textAlign": "center",
    "verticalAlign": "top",
@@ -330,10 +330,10 @@
   {
    "id": "el3",
    "type": "rectangle",
-   "x": -15,
-   "y": 0,
-   "width": 250,
-   "height": 62,
+   "x": -35.0,
+   "y": 0.0,
+   "width": 290.0,
+   "height": 80.60000000000001,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "#fff9db",
@@ -364,10 +364,10 @@
   {
    "id": "el4",
    "type": "text",
-   "x": -9,
-   "y": 22.25,
-   "width": 238,
-   "height": 17.5,
+   "x": -29.0,
+   "y": 27.175000000000004,
+   "width": 278.0,
+   "height": 26.25,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -389,7 +389,7 @@
    "locked": false,
    "text": "Thu ngân",
    "originalText": "Thu ngân",
-   "fontSize": 14,
+   "fontSize": 21,
    "fontFamily": 2,
    "textAlign": "center",
    "verticalAlign": "middle",
@@ -400,10 +400,10 @@
   {
    "id": "el5",
    "type": "rectangle",
-   "x": 305,
-   "y": 0,
-   "width": 250,
-   "height": 62,
+   "x": 325.0,
+   "y": 0.0,
+   "width": 290.0,
+   "height": 80.60000000000001,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "#e7f5ff",
@@ -434,10 +434,10 @@
   {
    "id": "el6",
    "type": "text",
-   "x": 311,
-   "y": 13.5,
-   "width": 238,
-   "height": 35.0,
+   "x": 331.0,
+   "y": 14.050000000000004,
+   "width": 278.0,
+   "height": 52.5,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -459,7 +459,7 @@
    "locked": false,
    "text": "Frontend\n(app.js)",
    "originalText": "Frontend\n(app.js)",
-   "fontSize": 14,
+   "fontSize": 21,
    "fontFamily": 2,
    "textAlign": "center",
    "verticalAlign": "middle",
@@ -470,10 +470,10 @@
   {
    "id": "el7",
    "type": "rectangle",
-   "x": 735,
-   "y": 0,
-   "width": 250,
-   "height": 62,
+   "x": 775.0,
+   "y": 0.0,
+   "width": 290.0,
+   "height": 80.60000000000001,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "#ebfbee",
@@ -504,10 +504,10 @@
   {
    "id": "el8",
    "type": "text",
-   "x": 741,
-   "y": 13.5,
-   "width": 238,
-   "height": 35.0,
+   "x": 781.0,
+   "y": 14.050000000000004,
+   "width": 278.0,
+   "height": 52.5,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -529,7 +529,7 @@
    "locked": false,
    "text": "Backend API\n(server.py + service.py)",
    "originalText": "Backend API\n(server.py + service.py)",
-   "fontSize": 14,
+   "fontSize": 21,
    "fontFamily": 2,
    "textAlign": "center",
    "verticalAlign": "middle",
@@ -540,10 +540,10 @@
   {
    "id": "el9",
    "type": "rectangle",
-   "x": 1085,
-   "y": 0,
-   "width": 250,
-   "height": 62,
+   "x": 1115.0,
+   "y": 0.0,
+   "width": 290.0,
+   "height": 80.60000000000001,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "#ebfbee",
@@ -574,10 +574,10 @@
   {
    "id": "el10",
    "type": "text",
-   "x": 1091,
-   "y": 13.5,
-   "width": 238,
-   "height": 35.0,
+   "x": 1121.0,
+   "y": 14.050000000000004,
+   "width": 278.0,
+   "height": 52.5,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -597,9 +597,9 @@
    "updated": 1,
    "link": null,
    "locked": false,
-   "text": "Worker + luồng suy luận\n(service.py, inference.py)",
-   "originalText": "Worker + luồng suy luận\n(service.py, inference.py)",
-   "fontSize": 14,
+   "text": "Worker suy luận\n(service + inference)",
+   "originalText": "Worker suy luận\n(service + inference)",
+   "fontSize": 21,
    "fontFamily": 2,
    "textAlign": "center",
    "verticalAlign": "middle",
@@ -610,10 +610,10 @@
   {
    "id": "el11",
    "type": "rectangle",
-   "x": 1515,
-   "y": 0,
-   "width": 250,
-   "height": 62,
+   "x": 1495.0,
+   "y": 0.0,
+   "width": 290.0,
+   "height": 80.60000000000001,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "#fff4e6",
@@ -644,10 +644,10 @@
   {
    "id": "el12",
    "type": "text",
-   "x": 1521,
-   "y": 13.5,
-   "width": 238,
-   "height": 35.0,
+   "x": 1501.0,
+   "y": 14.050000000000004,
+   "width": 278.0,
+   "height": 52.5,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -669,7 +669,7 @@
    "locked": false,
    "text": "Pipeline AI\n(InferenceRunner)",
    "originalText": "Pipeline AI\n(InferenceRunner)",
-   "fontSize": 14,
+   "fontSize": 21,
    "fontFamily": 2,
    "textAlign": "center",
    "verticalAlign": "middle",
@@ -680,10 +680,10 @@
   {
    "id": "el13",
    "type": "rectangle",
-   "x": 1815,
-   "y": 0,
-   "width": 250,
-   "height": 62,
+   "x": 1805.0,
+   "y": 0.0,
+   "width": 290.0,
+   "height": 80.60000000000001,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "#f1f3f5",
@@ -714,10 +714,10 @@
   {
    "id": "el14",
    "type": "text",
-   "x": 1821,
-   "y": 13.5,
-   "width": 238,
-   "height": 35.0,
+   "x": 1811.0,
+   "y": 14.050000000000004,
+   "width": 278.0,
+   "height": 52.5,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -739,7 +739,7 @@
    "locked": false,
    "text": "SQLite\napp.db",
    "originalText": "SQLite\napp.db",
-   "fontSize": 14,
+   "fontSize": 21,
    "fontFamily": 2,
    "textAlign": "center",
    "verticalAlign": "middle",
@@ -750,10 +750,10 @@
   {
    "id": "el15",
    "type": "text",
-   "x": -340,
-   "y": 132,
-   "width": 140.4,
-   "height": 18.75,
+   "x": -340.0,
+   "y": 174.20000000000002,
+   "width": 224.64000000000001,
+   "height": 30.0,
    "angle": 0,
    "strokeColor": "#1971c2",
    "backgroundColor": "transparent",
@@ -775,7 +775,7 @@
    "locked": false,
    "text": "1. Chụp và gửi ảnh",
    "originalText": "1. Chụp và gửi ảnh",
-   "fontSize": 15,
+   "fontSize": 24,
    "fontFamily": 2,
    "textAlign": "left",
    "verticalAlign": "top",
@@ -786,10 +786,10 @@
   {
    "id": "el16",
    "type": "arrow",
-   "x": 110,
-   "y": 126,
-   "width": 320,
-   "height": 0,
+   "x": 110.0,
+   "y": 174.20000000000002,
+   "width": 360.0,
+   "height": 0.0,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -811,12 +811,12 @@
    "locked": false,
    "points": [
     [
-     0,
-     0
+     0.0,
+     0.0
     ],
     [
-     320,
-     0
+     360.0,
+     0.0
     ]
    ],
    "lastCommittedPoint": null,
@@ -829,10 +829,10 @@
   {
    "id": "el17",
    "type": "text",
-   "x": 205.78,
-   "y": 104,
-   "width": 128.44,
-   "height": 16.25,
+   "x": 186.26,
+   "y": 141.95000000000002,
+   "width": 207.48000000000002,
+   "height": 26.25,
    "angle": 0,
    "strokeColor": "#495057",
    "backgroundColor": "transparent",
@@ -854,7 +854,7 @@
    "locked": false,
    "text": "bấm chụp / chọn ảnh",
    "originalText": "bấm chụp / chọn ảnh",
-   "fontSize": 13,
+   "fontSize": 21,
    "fontFamily": 2,
    "textAlign": "center",
    "verticalAlign": "top",
@@ -865,10 +865,10 @@
   {
    "id": "el18",
    "type": "rectangle",
-   "x": 422,
-   "y": 164,
-   "width": 345.72,
-   "height": 30.25,
+   "x": 462.0,
+   "y": 210.6,
+   "width": 405.44,
+   "height": 75.89999999999999,
    "angle": 0,
    "strokeColor": "#f08c00",
    "backgroundColor": "#fff9db",
@@ -899,10 +899,10 @@
   {
    "id": "el19",
    "type": "text",
-   "x": 428,
-   "y": 171.0,
-   "width": 333.72,
-   "height": 16.25,
+   "x": 468.0,
+   "y": 222.29999999999998,
+   "width": 393.44,
+   "height": 52.5,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -922,9 +922,9 @@
    "updated": 1,
    "link": null,
    "locked": false,
-   "text": "prepareImage: thu nhỏ ≤ 2048 px, sửa hướng EXIF",
-   "originalText": "prepareImage: thu nhỏ ≤ 2048 px, sửa hướng EXIF",
-   "fontSize": 13,
+   "text": "prepareImage: thu nhỏ ≤ 2048 px,\nsửa hướng EXIF",
+   "originalText": "prepareImage: thu nhỏ ≤ 2048 px,\nsửa hướng EXIF",
+   "fontSize": 21,
    "fontFamily": 2,
    "textAlign": "center",
    "verticalAlign": "middle",
@@ -935,10 +935,10 @@
   {
    "id": "el20",
    "type": "arrow",
-   "x": 430,
-   "y": 242,
-   "width": 430,
-   "height": 0,
+   "x": 470.0,
+   "y": 356.7,
+   "width": 450.0,
+   "height": 0.0,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -960,12 +960,12 @@
    "locked": false,
    "points": [
     [
-     0,
-     0
+     0.0,
+     0.0
     ],
     [
-     430,
-     0
+     450.0,
+     0.0
     ]
    ],
    "lastCommittedPoint": null,
@@ -978,10 +978,10 @@
   {
    "id": "el21",
    "type": "text",
-   "x": 516.56,
-   "y": 220,
-   "width": 256.88,
-   "height": 16.25,
+   "x": 585.8,
+   "y": 298.2,
+   "width": 218.4,
+   "height": 52.5,
    "angle": 0,
    "strokeColor": "#495057",
    "backgroundColor": "transparent",
@@ -1001,9 +1001,9 @@
    "updated": 1,
    "link": null,
    "locked": false,
-   "text": "POST /api/orders  (khi chưa có đơn mở)",
-   "originalText": "POST /api/orders  (khi chưa có đơn mở)",
-   "fontSize": 13,
+   "text": "POST /api/orders\n(khi chưa có đơn mở)",
+   "originalText": "POST /api/orders\n(khi chưa có đơn mở)",
+   "fontSize": 21,
    "fontFamily": 2,
    "textAlign": "center",
    "verticalAlign": "top",
@@ -1014,10 +1014,10 @@
   {
    "id": "el22",
    "type": "arrow",
-   "x": 860,
-   "y": 300,
-   "width": 1080,
-   "height": 0,
+   "x": 920.0,
+   "y": 421.7,
+   "width": 1030.0,
+   "height": 0.0,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -1039,12 +1039,12 @@
    "locked": false,
    "points": [
     [
-     0,
-     0
+     0.0,
+     0.0
     ],
     [
-     1080,
-     0
+     1030.0,
+     0.0
     ]
    ],
    "lastCommittedPoint": null,
@@ -1057,10 +1057,10 @@
   {
    "id": "el23",
    "type": "text",
-   "x": 1356.06,
-   "y": 278,
-   "width": 87.88000000000001,
-   "height": 16.25,
+   "x": 1364.02,
+   "y": 389.45,
+   "width": 141.96,
+   "height": 26.25,
    "angle": 0,
    "strokeColor": "#495057",
    "backgroundColor": "transparent",
@@ -1082,7 +1082,7 @@
    "locked": false,
    "text": "INSERT orders",
    "originalText": "INSERT orders",
-   "fontSize": 13,
+   "fontSize": 21,
    "fontFamily": 2,
    "textAlign": "center",
    "verticalAlign": "top",
@@ -1093,10 +1093,10 @@
   {
    "id": "el24",
    "type": "arrow",
-   "x": 860,
-   "y": 358,
-   "width": 430,
-   "height": 0,
+   "x": 920.0,
+   "y": 486.7,
+   "width": 450.0,
+   "height": 0.0,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -1118,12 +1118,12 @@
    "locked": false,
    "points": [
     [
-     0,
-     0
+     0.0,
+     0.0
     ],
     [
-     -430,
-     0
+     -450.0,
+     0.0
     ]
    ],
    "lastCommittedPoint": null,
@@ -1136,10 +1136,10 @@
   {
    "id": "el25",
    "type": "text",
-   "x": 621.34,
-   "y": 336,
-   "width": 47.32,
-   "height": 16.25,
+   "x": 656.78,
+   "y": 454.45,
+   "width": 76.44,
+   "height": 26.25,
    "angle": 0,
    "strokeColor": "#495057",
    "backgroundColor": "transparent",
@@ -1161,7 +1161,7 @@
    "locked": false,
    "text": "{order}",
    "originalText": "{order}",
-   "fontSize": 13,
+   "fontSize": 21,
    "fontFamily": 2,
    "textAlign": "center",
    "verticalAlign": "top",
@@ -1172,10 +1172,10 @@
   {
    "id": "el26",
    "type": "arrow",
-   "x": 430,
-   "y": 416,
-   "width": 430,
-   "height": 0,
+   "x": 470.0,
+   "y": 577.9499999999999,
+   "width": 450.0,
+   "height": 0.0,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -1197,12 +1197,12 @@
    "locked": false,
    "points": [
     [
-     0,
-     0
+     0.0,
+     0.0
     ],
     [
-     430,
-     0
+     450.0,
+     0.0
     ]
    ],
    "lastCommittedPoint": null,
@@ -1215,10 +1215,10 @@
   {
    "id": "el27",
    "type": "text",
-   "x": 462.48,
-   "y": 394,
-   "width": 365.04,
-   "height": 16.25,
+   "x": 531.2,
+   "y": 519.4499999999999,
+   "width": 327.6,
+   "height": 52.5,
    "angle": 0,
    "strokeColor": "#495057",
    "backgroundColor": "transparent",
@@ -1238,9 +1238,9 @@
    "updated": 1,
    "link": null,
    "locked": false,
-   "text": "POST /api/orders/{id}/captures  (ảnh, Idempotency-Key)",
-   "originalText": "POST /api/orders/{id}/captures  (ảnh, Idempotency-Key)",
-   "fontSize": 13,
+   "text": "POST /api/orders/{id}/captures\n(ảnh, Idempotency-Key)",
+   "originalText": "POST /api/orders/{id}/captures\n(ảnh, Idempotency-Key)",
+   "fontSize": 21,
    "fontFamily": 2,
    "textAlign": "center",
    "verticalAlign": "top",
@@ -1251,10 +1251,10 @@
   {
    "id": "el28",
    "type": "rectangle",
-   "x": 852,
-   "y": 454,
-   "width": 345.72,
-   "height": 30.25,
+   "x": 912.0,
+   "y": 614.35,
+   "width": 383.6,
+   "height": 75.89999999999999,
    "angle": 0,
    "strokeColor": "#f08c00",
    "backgroundColor": "#fff9db",
@@ -1285,10 +1285,10 @@
   {
    "id": "el29",
    "type": "text",
-   "x": 858,
-   "y": 461.0,
-   "width": 333.72,
-   "height": 16.25,
+   "x": 918.0,
+   "y": 626.0500000000001,
+   "width": 371.6,
+   "height": 52.5,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -1308,9 +1308,9 @@
    "updated": 1,
    "link": null,
    "locked": false,
-   "text": "giải mã để kiểm ảnh, lưu file, tạo job (queued)",
-   "originalText": "giải mã để kiểm ảnh, lưu file, tạo job (queued)",
-   "fontSize": 13,
+   "text": "giải mã để kiểm ảnh, lưu file,\ntạo job (queued)",
+   "originalText": "giải mã để kiểm ảnh, lưu file,\ntạo job (queued)",
+   "fontSize": 21,
    "fontFamily": 2,
    "textAlign": "center",
    "verticalAlign": "middle",
@@ -1321,10 +1321,10 @@
   {
    "id": "el30",
    "type": "arrow",
-   "x": 860,
-   "y": 532,
-   "width": 350,
-   "height": 0,
+   "x": 920.0,
+   "y": 734.1999999999999,
+   "width": 340.0,
+   "height": 0.0,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -1346,12 +1346,12 @@
    "locked": false,
    "points": [
     [
-     0,
-     0
+     0.0,
+     0.0
     ],
     [
-     350,
-     0
+     340.0,
+     0.0
     ]
    ],
    "lastCommittedPoint": null,
@@ -1364,10 +1364,10 @@
   {
    "id": "el31",
    "type": "text",
-   "x": 967.4,
-   "y": 510,
-   "width": 135.20000000000002,
-   "height": 16.25,
+   "x": 980.8,
+   "y": 701.95,
+   "width": 218.4,
+   "height": 26.25,
    "angle": 0,
    "strokeColor": "#495057",
    "backgroundColor": "transparent",
@@ -1389,7 +1389,7 @@
    "locked": false,
    "text": "đưa job vào hàng đợi",
    "originalText": "đưa job vào hàng đợi",
-   "fontSize": 13,
+   "fontSize": 21,
    "fontFamily": 2,
    "textAlign": "center",
    "verticalAlign": "top",
@@ -1400,10 +1400,10 @@
   {
    "id": "el32",
    "type": "arrow",
-   "x": 860,
-   "y": 590,
-   "width": 430,
-   "height": 0,
+   "x": 920.0,
+   "y": 799.1999999999999,
+   "width": 450.0,
+   "height": 0.0,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -1425,12 +1425,12 @@
    "locked": false,
    "points": [
     [
-     0,
-     0
+     0.0,
+     0.0
     ],
     [
-     -430,
-     0
+     -450.0,
+     0.0
     ]
    ],
    "lastCommittedPoint": null,
@@ -1443,10 +1443,10 @@
   {
    "id": "el33",
    "type": "text",
-   "x": 604.44,
-   "y": 568,
-   "width": 81.12,
-   "height": 16.25,
+   "x": 629.48,
+   "y": 766.95,
+   "width": 131.04,
+   "height": 26.25,
    "angle": 0,
    "strokeColor": "#495057",
    "backgroundColor": "transparent",
@@ -1468,7 +1468,7 @@
    "locked": false,
    "text": "202 {job_id}",
    "originalText": "202 {job_id}",
-   "fontSize": 13,
+   "fontSize": 21,
    "fontFamily": 2,
    "textAlign": "center",
    "verticalAlign": "top",
@@ -1479,10 +1479,10 @@
   {
    "id": "el34",
    "type": "text",
-   "x": -340,
-   "y": 670,
-   "width": 374.40000000000003,
-   "height": 18.75,
+   "x": -340.0,
+   "y": 942.1999999999999,
+   "width": 174.72,
+   "height": 30.0,
    "angle": 0,
    "strokeColor": "#1971c2",
    "backgroundColor": "transparent",
@@ -1502,9 +1502,9 @@
    "updated": 1,
    "link": null,
    "locked": false,
-   "text": "2. Chờ kết quả (polling) trong khi pipeline chạy",
-   "originalText": "2. Chờ kết quả (polling) trong khi pipeline chạy",
-   "fontSize": 15,
+   "text": "2. Chờ kết quả",
+   "originalText": "2. Chờ kết quả",
+   "fontSize": 24,
    "fontFamily": 2,
    "textAlign": "left",
    "verticalAlign": "top",
@@ -1515,10 +1515,10 @@
   {
    "id": "el35",
    "type": "arrow",
-   "x": 430,
-   "y": 664,
-   "width": 430,
-   "height": 0,
+   "x": 470.0,
+   "y": 968.45,
+   "width": 450.0,
+   "height": 0.0,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -1540,12 +1540,12 @@
    "locked": false,
    "points": [
     [
-     0,
-     0
+     0.0,
+     0.0
     ],
     [
-     430,
-     0
+     450.0,
+     0.0
     ]
    ],
    "lastCommittedPoint": null,
@@ -1558,10 +1558,10 @@
   {
    "id": "el36",
    "type": "text",
-   "x": 513.1800000000001,
-   "y": 642,
-   "width": 263.64,
-   "height": 16.25,
+   "x": 574.88,
+   "y": 909.95,
+   "width": 240.24,
+   "height": 52.5,
    "angle": 0,
    "strokeColor": "#495057",
    "backgroundColor": "transparent",
@@ -1581,9 +1581,9 @@
    "updated": 1,
    "link": null,
    "locked": false,
-   "text": "GET /api/jobs/{job_id}  (lặp mỗi 0,6 s)",
-   "originalText": "GET /api/jobs/{job_id}  (lặp mỗi 0,6 s)",
-   "fontSize": 13,
+   "text": "GET /api/jobs/{job_id}\n(lặp mỗi 0,6 s)",
+   "originalText": "GET /api/jobs/{job_id}\n(lặp mỗi 0,6 s)",
+   "fontSize": 21,
    "fontFamily": 2,
    "textAlign": "center",
    "verticalAlign": "top",
@@ -1594,10 +1594,10 @@
   {
    "id": "el37",
    "type": "arrow",
-   "x": 860,
-   "y": 722,
-   "width": 430,
-   "height": 0,
+   "x": 920.0,
+   "y": 1059.7,
+   "width": 450.0,
+   "height": 0.0,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -1619,12 +1619,12 @@
    "locked": false,
    "points": [
     [
-     0,
-     0
+     0.0,
+     0.0
     ],
     [
-     -430,
-     0
+     -450.0,
+     0.0
     ]
    ],
    "lastCommittedPoint": null,
@@ -1637,10 +1637,10 @@
   {
    "id": "el38",
    "type": "text",
-   "x": 452.34000000000003,
-   "y": 700,
-   "width": 385.32,
-   "height": 16.25,
+   "x": 536.66,
+   "y": 1001.2,
+   "width": 316.68,
+   "height": 52.5,
    "angle": 0,
    "strokeColor": "#495057",
    "backgroundColor": "transparent",
@@ -1660,9 +1660,9 @@
    "updated": 1,
    "link": null,
    "locked": false,
-   "text": "{status: queued | processing, position, system_reloading}",
-   "originalText": "{status: queued | processing, position, system_reloading}",
-   "fontSize": 13,
+   "text": "{status: queued | processing,\nposition, system_reloading}",
+   "originalText": "{status: queued | processing,\nposition, system_reloading}",
+   "fontSize": 21,
    "fontFamily": 2,
    "textAlign": "center",
    "verticalAlign": "top",
@@ -1673,10 +1673,10 @@
   {
    "id": "el39",
    "type": "arrow",
-   "x": 1210,
-   "y": 780,
-   "width": 430,
-   "height": 0,
+   "x": 1260.0,
+   "y": 1150.95,
+   "width": 380.0,
+   "height": 0.0,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -1698,12 +1698,12 @@
    "locked": false,
    "points": [
     [
-     0,
-     0
+     0.0,
+     0.0
     ],
     [
-     430,
-     0
+     380.0,
+     0.0
     ]
    ],
    "lastCommittedPoint": null,
@@ -1716,10 +1716,10 @@
   {
    "id": "el40",
    "type": "text",
-   "x": 1293.18,
-   "y": 758,
-   "width": 263.64,
-   "height": 16.25,
+   "x": 1318.96,
+   "y": 1092.45,
+   "width": 262.08,
+   "height": 52.5,
    "angle": 0,
    "strokeColor": "#495057",
    "backgroundColor": "transparent",
@@ -1739,9 +1739,9 @@
    "updated": 1,
    "link": null,
    "locked": false,
-   "text": "run_single(path, ngưỡng, persist=False)",
-   "originalText": "run_single(path, ngưỡng, persist=False)",
-   "fontSize": 13,
+   "text": "run_single(path, ngưỡng,\npersist=False)",
+   "originalText": "run_single(path, ngưỡng,\npersist=False)",
+   "fontSize": 21,
    "fontFamily": 2,
    "textAlign": "center",
    "verticalAlign": "top",
@@ -1752,10 +1752,10 @@
   {
    "id": "el41",
    "type": "rectangle",
-   "x": 1632,
-   "y": 818,
-   "width": 338.96000000000004,
-   "height": 46.5,
+   "x": 1632.0,
+   "y": 1187.3500000000001,
+   "width": 405.44,
+   "height": 102.14999999999999,
    "angle": 0,
    "strokeColor": "#f08c00",
    "backgroundColor": "#fff9db",
@@ -1786,10 +1786,10 @@
   {
    "id": "el42",
    "type": "text",
-   "x": 1638,
-   "y": 825.0,
-   "width": 326.96000000000004,
-   "height": 32.5,
+   "x": 1638.0,
+   "y": 1199.0500000000002,
+   "width": 393.44,
+   "height": 78.75,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -1809,9 +1809,9 @@
    "updated": 1,
    "link": null,
    "locked": false,
-   "text": "Detect → Overlap → SAM2 → Crop →\nmỗi crop: Retrieve → Decide → Plugins → Rerank",
-   "originalText": "Detect → Overlap → SAM2 → Crop →\nmỗi crop: Retrieve → Decide → Plugins → Rerank",
-   "fontSize": 13,
+   "text": "Detect → Overlap → SAM2 → Crop →\nmỗi crop: Retrieve → Decide →\nPlugins → Rerank",
+   "originalText": "Detect → Overlap → SAM2 → Crop →\nmỗi crop: Retrieve → Decide →\nPlugins → Rerank",
+   "fontSize": 21,
    "fontFamily": 2,
    "textAlign": "center",
    "verticalAlign": "middle",
@@ -1822,10 +1822,10 @@
   {
    "id": "el43",
    "type": "arrow",
-   "x": 1640,
-   "y": 896,
-   "width": 430,
-   "height": 0,
+   "x": 1640.0,
+   "y": 1385.9500000000003,
+   "width": 380.0,
+   "height": 0.0,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -1847,12 +1847,12 @@
    "locked": false,
    "points": [
     [
-     0,
-     0
+     0.0,
+     0.0
     ],
     [
-     -430,
-     0
+     -380.0,
+     0.0
     ]
    ],
    "lastCommittedPoint": null,
@@ -1865,10 +1865,10 @@
   {
    "id": "el44",
    "type": "text",
-   "x": 1191.78,
-   "y": 874,
-   "width": 466.44,
-   "height": 16.25,
+   "x": 1297.12,
+   "y": 1301.2000000000003,
+   "width": 305.76,
+   "height": 78.75,
    "angle": 0,
    "strokeColor": "#495057",
    "backgroundColor": "transparent",
@@ -1888,9 +1888,9 @@
    "updated": 1,
    "link": null,
    "locked": false,
-   "text": "InventoryResult (items, rejected_bboxes, has_overlap, detected_count)",
-   "originalText": "InventoryResult (items, rejected_bboxes, has_overlap, detected_count)",
-   "fontSize": 13,
+   "text": "InventoryResult\n(items, rejected_bboxes,\nhas_overlap, detected_count)",
+   "originalText": "InventoryResult\n(items, rejected_bboxes,\nhas_overlap, detected_count)",
+   "fontSize": 21,
    "fontFamily": 2,
    "textAlign": "center",
    "verticalAlign": "top",
@@ -1901,10 +1901,10 @@
   {
    "id": "el45",
    "type": "arrow",
-   "x": 1210,
-   "y": 954,
-   "width": 730,
-   "height": 0,
+   "x": 1260.0,
+   "y": 1450.9500000000003,
+   "width": 690.0,
+   "height": 0.0,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -1926,12 +1926,12 @@
    "locked": false,
    "points": [
     [
-     0,
-     0
+     0.0,
+     0.0
     ],
     [
-     730,
-     0
+     690.0,
+     0.0
     ]
    ],
    "lastCommittedPoint": null,
@@ -1944,10 +1944,10 @@
   {
    "id": "el46",
    "type": "text",
-   "x": 1399.24,
-   "y": 932,
-   "width": 351.52000000000004,
-   "height": 16.25,
+   "x": 1321.08,
+   "y": 1418.7,
+   "width": 567.84,
+   "height": 26.25,
    "angle": 0,
    "strokeColor": "#495057",
    "backgroundColor": "transparent",
@@ -1969,7 +1969,7 @@
    "locked": false,
    "text": "gộp vào order_items · lưu captures (detections_json)",
    "originalText": "gộp vào order_items · lưu captures (detections_json)",
-   "fontSize": 13,
+   "fontSize": 21,
    "fontFamily": 2,
    "textAlign": "center",
    "verticalAlign": "top",
@@ -1980,10 +1980,10 @@
   {
    "id": "el47",
    "type": "arrow",
-   "x": 430,
-   "y": 1012,
-   "width": 430,
-   "height": 0,
+   "x": 470.0,
+   "y": 1515.9500000000003,
+   "width": 450.0,
+   "height": 0.0,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -2005,12 +2005,12 @@
    "locked": false,
    "points": [
     [
-     0,
-     0
+     0.0,
+     0.0
     ],
     [
-     430,
-     0
+     450.0,
+     0.0
     ]
    ],
    "lastCommittedPoint": null,
@@ -2023,10 +2023,10 @@
   {
    "id": "el48",
    "type": "text",
-   "x": 570.64,
-   "y": 990,
-   "width": 148.72,
-   "height": 16.25,
+   "x": 574.88,
+   "y": 1483.7,
+   "width": 240.24,
+   "height": 26.25,
    "angle": 0,
    "strokeColor": "#495057",
    "backgroundColor": "transparent",
@@ -2048,7 +2048,7 @@
    "locked": false,
    "text": "GET /api/jobs/{job_id}",
    "originalText": "GET /api/jobs/{job_id}",
-   "fontSize": 13,
+   "fontSize": 21,
    "fontFamily": 2,
    "textAlign": "center",
    "verticalAlign": "top",
@@ -2059,10 +2059,10 @@
   {
    "id": "el49",
    "type": "arrow",
-   "x": 860,
-   "y": 1070,
-   "width": 430,
-   "height": 0,
+   "x": 920.0,
+   "y": 1580.9500000000003,
+   "width": 450.0,
+   "height": 0.0,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -2084,12 +2084,12 @@
    "locked": false,
    "points": [
     [
-     0,
-     0
+     0.0,
+     0.0
     ],
     [
-     -430,
-     0
+     -450.0,
+     0.0
     ]
    ],
    "lastCommittedPoint": null,
@@ -2102,10 +2102,10 @@
   {
    "id": "el50",
    "type": "text",
-   "x": 540.22,
-   "y": 1048,
-   "width": 209.56,
-   "height": 16.25,
+   "x": 525.74,
+   "y": 1548.7,
+   "width": 338.52000000000004,
+   "height": 26.25,
    "angle": 0,
    "strokeColor": "#495057",
    "backgroundColor": "transparent",
@@ -2127,7 +2127,7 @@
    "locked": false,
    "text": "{status: done, order, warnings}",
    "originalText": "{status: done, order, warnings}",
-   "fontSize": 13,
+   "fontSize": 21,
    "fontFamily": 2,
    "textAlign": "center",
    "verticalAlign": "top",
@@ -2138,10 +2138,10 @@
   {
    "id": "el51",
    "type": "arrow",
-   "x": 430,
-   "y": 1128,
-   "width": 320,
-   "height": 0,
+   "x": 470.0,
+   "y": 1672.2,
+   "width": 360.0,
+   "height": 0.0,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -2163,12 +2163,12 @@
    "locked": false,
    "points": [
     [
-     0,
-     0
+     0.0,
+     0.0
     ],
     [
-     -320,
-     0
+     -360.0,
+     0.0
     ]
    ],
    "lastCommittedPoint": null,
@@ -2181,10 +2181,10 @@
   {
    "id": "el52",
    "type": "text",
-   "x": 138.18,
-   "y": 1106,
-   "width": 263.64,
-   "height": 16.25,
+   "x": 169.88,
+   "y": 1613.7,
+   "width": 240.24,
+   "height": 52.5,
    "angle": 0,
    "strokeColor": "#495057",
    "backgroundColor": "transparent",
@@ -2204,9 +2204,9 @@
    "updated": 1,
    "link": null,
    "locked": false,
-   "text": "hoá đơn + ảnh có khung xanh / vàng / đỏ",
-   "originalText": "hoá đơn + ảnh có khung xanh / vàng / đỏ",
-   "fontSize": 13,
+   "text": "hoá đơn + ảnh có khung\nxanh / vàng / đỏ",
+   "originalText": "hoá đơn + ảnh có khung\nxanh / vàng / đỏ",
+   "fontSize": 21,
    "fontFamily": 2,
    "textAlign": "center",
    "verticalAlign": "top",
@@ -2217,10 +2217,10 @@
   {
    "id": "el53",
    "type": "text",
-   "x": -340,
-   "y": 1208,
-   "width": 195.0,
-   "height": 18.75,
+   "x": -340.0,
+   "y": 1768.4,
+   "width": 287.04,
+   "height": 30.0,
    "angle": 0,
    "strokeColor": "#1971c2",
    "backgroundColor": "transparent",
@@ -2240,9 +2240,9 @@
    "updated": 1,
    "link": null,
    "locked": false,
-   "text": "3. Xác nhận và thanh toán",
-   "originalText": "3. Xác nhận và thanh toán",
-   "fontSize": 15,
+   "text": "3. Xác nhận, thanh toán",
+   "originalText": "3. Xác nhận, thanh toán",
+   "fontSize": 24,
    "fontFamily": 2,
    "textAlign": "left",
    "verticalAlign": "top",
@@ -2253,10 +2253,10 @@
   {
    "id": "el54",
    "type": "arrow",
-   "x": 110,
-   "y": 1202,
-   "width": 320,
-   "height": 0,
+   "x": 110.0,
+   "y": 1794.65,
+   "width": 360.0,
+   "height": 0.0,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -2278,12 +2278,12 @@
    "locked": false,
    "points": [
     [
-     0,
-     0
+     0.0,
+     0.0
     ],
     [
-     320,
-     0
+     360.0,
+     0.0
     ]
    ],
    "lastCommittedPoint": null,
@@ -2296,10 +2296,10 @@
   {
    "id": "el55",
    "type": "text",
-   "x": 141.56,
-   "y": 1180,
-   "width": 256.88,
-   "height": 16.25,
+   "x": 153.5,
+   "y": 1736.15,
+   "width": 273.0,
+   "height": 52.5,
    "angle": 0,
    "strokeColor": "#495057",
    "backgroundColor": "transparent",
@@ -2319,9 +2319,9 @@
    "updated": 1,
    "link": null,
    "locked": false,
-   "text": "xác nhận dòng viền vàng / sửa số lượng",
-   "originalText": "xác nhận dòng viền vàng / sửa số lượng",
-   "fontSize": 13,
+   "text": "xác nhận dòng viền vàng /\nsửa số lượng",
+   "originalText": "xác nhận dòng viền vàng /\nsửa số lượng",
+   "fontSize": 21,
    "fontFamily": 2,
    "textAlign": "center",
    "verticalAlign": "top",
@@ -2332,10 +2332,10 @@
   {
    "id": "el56",
    "type": "arrow",
-   "x": 430,
-   "y": 1260,
-   "width": 430,
-   "height": 0,
+   "x": 470.0,
+   "y": 1859.65,
+   "width": 450.0,
+   "height": 0.0,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -2357,12 +2357,12 @@
    "locked": false,
    "points": [
     [
-     0,
-     0
+     0.0,
+     0.0
     ],
     [
-     430,
-     0
+     450.0,
+     0.0
     ]
    ],
    "lastCommittedPoint": null,
@@ -2375,10 +2375,10 @@
   {
    "id": "el57",
    "type": "text",
-   "x": 526.7,
-   "y": 1238,
-   "width": 236.6,
-   "height": 16.25,
+   "x": 503.9,
+   "y": 1827.3999999999999,
+   "width": 382.2,
+   "height": 26.25,
    "angle": 0,
    "strokeColor": "#495057",
    "backgroundColor": "transparent",
@@ -2400,7 +2400,7 @@
    "locked": false,
    "text": "PATCH /api/orders/{id}/items/{item}",
    "originalText": "PATCH /api/orders/{id}/items/{item}",
-   "fontSize": 13,
+   "fontSize": 21,
    "fontFamily": 2,
    "textAlign": "center",
    "verticalAlign": "top",
@@ -2411,10 +2411,10 @@
   {
    "id": "el58",
    "type": "arrow",
-   "x": 860,
-   "y": 1318,
-   "width": 1080,
-   "height": 0,
+   "x": 920.0,
+   "y": 1924.65,
+   "width": 1030.0,
+   "height": 0.0,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -2436,12 +2436,12 @@
    "locked": false,
    "points": [
     [
-     0,
-     0
+     0.0,
+     0.0
     ],
     [
-     1080,
-     0
+     1030.0,
+     0.0
     ]
    ],
    "lastCommittedPoint": null,
@@ -2454,10 +2454,10 @@
   {
    "id": "el59",
    "type": "text",
-   "x": 1339.16,
-   "y": 1296,
-   "width": 121.68,
-   "height": 16.25,
+   "x": 1336.72,
+   "y": 1892.3999999999999,
+   "width": 196.56,
+   "height": 26.25,
    "angle": 0,
    "strokeColor": "#495057",
    "backgroundColor": "transparent",
@@ -2479,7 +2479,7 @@
    "locked": false,
    "text": "UPDATE order_items",
    "originalText": "UPDATE order_items",
-   "fontSize": 13,
+   "fontSize": 21,
    "fontFamily": 2,
    "textAlign": "center",
    "verticalAlign": "top",
@@ -2490,10 +2490,10 @@
   {
    "id": "el60",
    "type": "arrow",
-   "x": 110,
-   "y": 1376,
-   "width": 320,
-   "height": 0,
+   "x": 110.0,
+   "y": 2015.9,
+   "width": 360.0,
+   "height": 0.0,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -2515,12 +2515,12 @@
    "locked": false,
    "points": [
     [
-     0,
-     0
+     0.0,
+     0.0
     ],
     [
-     320,
-     0
+     360.0,
+     0.0
     ]
    ],
    "lastCommittedPoint": null,
@@ -2533,10 +2533,10 @@
   {
    "id": "el61",
    "type": "text",
-   "x": 148.32,
-   "y": 1354,
-   "width": 243.36,
-   "height": 16.25,
+   "x": 153.5,
+   "y": 1957.3999999999999,
+   "width": 273.0,
+   "height": 52.5,
    "angle": 0,
    "strokeColor": "#495057",
    "backgroundColor": "transparent",
@@ -2556,9 +2556,9 @@
    "updated": 1,
    "link": null,
    "locked": false,
-   "text": "thanh toán (tiền mặt / chuyển khoản)",
-   "originalText": "thanh toán (tiền mặt / chuyển khoản)",
-   "fontSize": 13,
+   "text": "thanh toán\n(tiền mặt / chuyển khoản)",
+   "originalText": "thanh toán\n(tiền mặt / chuyển khoản)",
+   "fontSize": 21,
    "fontFamily": 2,
    "textAlign": "center",
    "verticalAlign": "top",
@@ -2569,10 +2569,10 @@
   {
    "id": "el62",
    "type": "arrow",
-   "x": 430,
-   "y": 1434,
-   "width": 430,
-   "height": 0,
+   "x": 470.0,
+   "y": 2080.9,
+   "width": 450.0,
+   "height": 0.0,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -2594,12 +2594,12 @@
    "locked": false,
    "points": [
     [
-     0,
-     0
+     0.0,
+     0.0
     ],
     [
-     430,
-     0
+     450.0,
+     0.0
     ]
    ],
    "lastCommittedPoint": null,
@@ -2612,10 +2612,10 @@
   {
    "id": "el63",
    "type": "text",
-   "x": 543.6,
-   "y": 1412,
-   "width": 202.8,
-   "height": 16.25,
+   "x": 531.2,
+   "y": 2048.65,
+   "width": 327.6,
+   "height": 26.25,
    "angle": 0,
    "strokeColor": "#495057",
    "backgroundColor": "transparent",
@@ -2637,7 +2637,7 @@
    "locked": false,
    "text": "POST /api/orders/{id}/checkout",
    "originalText": "POST /api/orders/{id}/checkout",
-   "fontSize": 13,
+   "fontSize": 21,
    "fontFamily": 2,
    "textAlign": "center",
    "verticalAlign": "top",
@@ -2648,10 +2648,10 @@
   {
    "id": "el64",
    "type": "arrow",
-   "x": 860,
-   "y": 1492,
-   "width": 1080,
-   "height": 0,
+   "x": 920.0,
+   "y": 2145.9,
+   "width": 1030.0,
+   "height": 0.0,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -2673,12 +2673,12 @@
    "locked": false,
    "points": [
     [
-     0,
-     0
+     0.0,
+     0.0
     ],
     [
-     1080,
-     0
+     1030.0,
+     0.0
     ]
    ],
    "lastCommittedPoint": null,
@@ -2691,10 +2691,10 @@
   {
    "id": "el65",
    "type": "text",
-   "x": 1332.4,
-   "y": 1470,
-   "width": 135.20000000000002,
-   "height": 16.25,
+   "x": 1325.8,
+   "y": 2113.65,
+   "width": 218.4,
+   "height": 26.25,
    "angle": 0,
    "strokeColor": "#495057",
    "backgroundColor": "transparent",
@@ -2716,7 +2716,7 @@
    "locked": false,
    "text": "orders.status = paid",
    "originalText": "orders.status = paid",
-   "fontSize": 13,
+   "fontSize": 21,
    "fontFamily": 2,
    "textAlign": "center",
    "verticalAlign": "top",
@@ -2727,10 +2727,10 @@
   {
    "id": "el66",
    "type": "arrow",
-   "x": 860,
-   "y": 1550,
-   "width": 430,
-   "height": 0,
+   "x": 920.0,
+   "y": 2210.9,
+   "width": 450.0,
+   "height": 0.0,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -2752,12 +2752,12 @@
    "locked": false,
    "points": [
     [
-     0,
-     0
+     0.0,
+     0.0
     ],
     [
-     -430,
-     0
+     -450.0,
+     0.0
     ]
    ],
    "lastCommittedPoint": null,
@@ -2770,10 +2770,10 @@
   {
    "id": "el67",
    "type": "text",
-   "x": 574.02,
-   "y": 1528,
-   "width": 141.96,
-   "height": 16.25,
+   "x": 580.34,
+   "y": 2178.65,
+   "width": 229.32000000000002,
+   "height": 26.25,
    "angle": 0,
    "strokeColor": "#495057",
    "backgroundColor": "transparent",
@@ -2795,7 +2795,7 @@
    "locked": false,
    "text": "{order đã thanh toán}",
    "originalText": "{order đã thanh toán}",
-   "fontSize": 13,
+   "fontSize": 21,
    "fontFamily": 2,
    "textAlign": "center",
    "verticalAlign": "top",
@@ -2806,10 +2806,10 @@
   {
    "id": "el68",
    "type": "arrow",
-   "x": 430,
-   "y": 1608,
-   "width": 320,
-   "height": 0,
+   "x": 470.0,
+   "y": 2275.9,
+   "width": 360.0,
+   "height": 0.0,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -2831,12 +2831,12 @@
    "locked": false,
    "points": [
     [
-     0,
-     0
+     0.0,
+     0.0
     ],
     [
-     -320,
-     0
+     -360.0,
+     0.0
     ]
    ],
    "lastCommittedPoint": null,
@@ -2849,10 +2849,10 @@
   {
    "id": "el69",
    "type": "text",
-   "x": 188.88,
-   "y": 1586,
-   "width": 162.24,
-   "height": 16.25,
+   "x": 158.96,
+   "y": 2243.65,
+   "width": 262.08,
+   "height": 26.25,
    "angle": 0,
    "strokeColor": "#495057",
    "backgroundColor": "transparent",
@@ -2874,7 +2874,7 @@
    "locked": false,
    "text": "màn hoàn tất, in hoá đơn",
    "originalText": "màn hoàn tất, in hoá đơn",
-   "fontSize": 13,
+   "fontSize": 21,
    "fontFamily": 2,
    "textAlign": "center",
    "verticalAlign": "top",
@@ -2885,10 +2885,10 @@
   {
    "id": "el76",
    "type": "rectangle",
-   "x": 370,
-   "y": 630,
-   "width": 550,
-   "height": 116,
+   "x": 400.0,
+   "y": 892.8,
+   "width": 590.0,
+   "height": 192.90000000000012,
    "angle": 0,
    "strokeColor": "#1971c2",
    "backgroundColor": "transparent",
@@ -2912,10 +2912,10 @@
   {
    "id": "el77",
    "type": "text",
-   "x": 370,
-   "y": 612,
-   "width": 205.92000000000002,
-   "height": 15.0,
+   "x": 400.0,
+   "y": 861.5999999999999,
+   "width": 308.88,
+   "height": 22.5,
    "angle": 0,
    "strokeColor": "#1971c2",
    "backgroundColor": "transparent",
@@ -2937,7 +2937,7 @@
    "locked": false,
    "text": "lặp tới khi status = done / error",
    "originalText": "lặp tới khi status = done / error",
-   "fontSize": 12,
+   "fontSize": 18,
    "fontFamily": 2,
    "textAlign": "left",
    "verticalAlign": "top",
@@ -2948,10 +2948,10 @@
   {
    "id": "el78",
    "type": "rectangle",
-   "x": -340,
-   "y": 1686,
-   "width": 900,
-   "height": 84,
+   "x": -340.0,
+   "y": 2372.1,
+   "width": 1284.88,
+   "height": 107.35,
    "angle": 0,
    "strokeColor": "#e03131",
    "backgroundColor": "#fff5f5",
@@ -2982,10 +2982,10 @@
   {
    "id": "el79",
    "type": "text",
-   "x": -334,
-   "y": 1703.625,
-   "width": 888,
-   "height": 48.75,
+   "x": -334.0,
+   "y": 2386.4,
+   "width": 1272.88,
+   "height": 78.75,
    "angle": 0,
    "strokeColor": "#1e1e1e",
    "backgroundColor": "transparent",
@@ -3007,7 +3007,7 @@
    "locked": false,
    "text": "Nhánh lỗi: pipeline lỗi hoặc quá timeout (60 s) → job status = error (PIPELINE_ERROR / PIPELINE_TIMEOUT / GPU_OOM)\n→ frontend báo lỗi và cho chụp lại. Hàng đợi đầy → 503 QUEUE_FULL. Đang kiểm định → 503 SYSTEM_BUSY.\nCatalog được nạp một lần vào bộ nhớ (CatalogRepository); pipeline không truy vấn DB trong từng lượt chụp.",
    "originalText": "Nhánh lỗi: pipeline lỗi hoặc quá timeout (60 s) → job status = error (PIPELINE_ERROR / PIPELINE_TIMEOUT / GPU_OOM)\n→ frontend báo lỗi và cho chụp lại. Hàng đợi đầy → 503 QUEUE_FULL. Đang kiểm định → 503 SYSTEM_BUSY.\nCatalog được nạp một lần vào bộ nhớ (CatalogRepository); pipeline không truy vấn DB trong từng lượt chụp.",
-   "fontSize": 13,
+   "fontSize": 21,
    "fontFamily": 2,
    "textAlign": "center",
    "verticalAlign": "middle",
