@@ -1,0 +1,58 @@
+[
+  {
+    "type": "same",
+    "note": "cùng sản phẩm - khác góc chụp",
+    "product1": "アネッサ　パーフェクトUV　スキンケアスプレー",
+    "image1": "IMG-0460.jpg",
+    "product2": "アネッサ　パーフェクトUV　スキンケアスプレー",
+    "image2": "IMG-0464.jpg"
+  },
+  {
+    "type": "same",
+    "note": "cùng sản phẩm - khác góc chụp",
+    "product1": "7000000000",
+    "image1": "IMG_2779.HEIC.png",
+    "product2": "7000000000",
+    "image2": "IMG_2784.HEIC.png"
+  },
+  {
+    "type": "similar",
+    "note": "khác sản phẩm, cùng góc chụp, gần giống nhau, khác 1 mã trên bao bì (dùng plugin ocr)",
+    "product1": "外箱ABA",
+    "image1": "IMG_0543.jpg",
+    "product2": "外箱ABC",
+    "image2": "IMG_0554.jpg"
+  },
+  {
+    "type": "similar",
+    "note": "khác sản phẩm, cùng góc chụp, gần giống nhau, khác màu sắc (dùng plugin color)",
+    "product1": "マジョリカマジョルカ　シャドーカスタマイズ（BE203）",
+    "image1": "IMG-0480.jpg",
+    "product2": "マジョリカマジョルカ　シャドーカスタマイズ（PK300）",
+    "image2": "IMG-0470.jpg"
+  },
+  {
+    "type": "similar",
+    "note": "khác sản phẩm, cùng góc chụp, gần giống nhau, khác hình dạng",
+    "product1": "7000000006",
+    "image1": "IMG_2687.HEIC.png",
+    "product2": "7000000011",
+    "image2": "IMG_2641.HEIC.png"
+  },
+  {
+    "type": "different",
+    "note": "khác hoàn toàn",
+    "product1": "アネッサ　パーフェクトUV　スキンケアスプレー",
+    "image1": "IMG-0458.jpg",
+    "product2": "7000000000",
+    "image2": "IMG_2779.HEIC.png"
+  },
+  {
+    "type": "different",
+    "note": "khác hoàn toàn",
+    "product1": "7000000001",
+    "image1": "IMG_2845.HEIC.png",
+    "product2": "7000000002",
+    "image2": "IMG_2796.HEIC.png"
+  }
+]

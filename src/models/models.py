@@ -586,6 +586,10 @@ class InventoryResult:
             decision step. Regions that were rejected are not in `items`, so
             `detected_count - len(items)` is how many detected objects could
             not be recognised (consumers use it to tell the user).
+        rejected_bboxes: Source-image boxes of the regions whose final decision
+            was `rejected` (not in `items`), so a UI can show WHERE the
+            unrecognised objects are. Detections dropped earlier (e.g. no valid
+            crop) are counted in `detected_count` but have no box here.
     """
 
     image_id: str
@@ -596,6 +600,7 @@ class InventoryResult:
     timestamp: str = ""
     has_overlap: bool = False
     detected_count: int = 0
+    rejected_bboxes: list[BoundingBox] = field(default_factory=list)
 
 
 # =============================================================================

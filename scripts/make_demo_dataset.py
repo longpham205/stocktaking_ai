@@ -1,7 +1,6 @@
 """Sinh bộ DỮ LIỆU DEMO TỔNG HỢP cho Stocktaking AI (ảnh thật do script vẽ ra).
 
-Khác `scripts/generate_demo.py` (chỉ sinh số liệu báo cáo giả), script này sinh
-ẢNH + nhãn + metadata để chạy pipeline thật bằng backend mock trên CPU.
+Sinh ẢNH + nhãn + metadata để chạy pipeline thật bằng backend mock trên CPU.
 
 Chỉ cần numpy + opencv (không cần torch/faiss/pydantic). Xác định (seed cố định).
 
@@ -483,7 +482,9 @@ def write_metadata(out: Path, skus: list[dict]) -> None:
     colors = {c: dict(name=c, rgb=list(rgb), hex="#%02X%02X%02X" % rgb) for c, rgb in COLOR_REFS.items()}
     evidence = {}
     for s in skus:
-        kw = [s["front"]] + ([s["weight"]] if s["weight"] else [])
+        # Cặp chỉ khác khối lượng: chữ mặt trước ("MIX120") in giống nhau ở cả hai SKU nên KHÔNG
+        # được làm từ khoá (luật: cặp dễ nhầm bắt buộc OCR không được trùng token).
+        kw = [s["weight"]] if s["weight"] else [s["front"]]
         evidence[str(s["pid"])] = dict(
             ocr_keywords=kw, color_code=s["color_code"] or None, barcode=s["barcode"] or None,
             force_evidence=FORCE.get(s["pid"], []),
@@ -501,10 +502,14 @@ def write_metadata(out: Path, skus: list[dict]) -> None:
     (out / "seed" / "expected_evidence.json").write_text(json.dumps(evidence, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
-def write_demo_config(out_rel: str, skus: list[dict]) -> Path:
-    src = (ROOT / "configs" / "config.yaml")
-    legacy = ROOT / "configs" / "config.yaml.legacy"
-    base = legacy if legacy.is_file() else src  # sau P0 bản gốc nằm ở .legacy
+def write_demo_config(out_rel: str, skus: list[dict], path: Path | None = None) -> Path:
+    """Sinh config demo từ configs/config.yaml (schema sau Phase 1B: catalog trong DB).
+
+    Catalog demo nằm ở <out_rel>/db/app.db, nạp bằng:
+        python -m src.catalog.migrate --seed-dir <out_rel>/seed --legacy-config configs/config.demo.yaml --db <out_rel>/db/app.db
+    (force_evidence/confusable_with lấy từ seed/expected_evidence.json.)
+    """
+    base = ROOT / "configs" / "config.yaml"
     t = base.read_text(encoding="utf-8").replace("\r\n", "\n")
 
     def sub(pattern, repl, count=None, flags=0):
@@ -521,21 +526,15 @@ def write_demo_config(out_rel: str, skus: list[dict]) -> Path:
         rf'"{out_rel}/\1"', 8)
     sub(r'"data/cache/(gallery_index\.faiss|gallery_metadata\.json)"', rf'"{out_rel}/cache/\1"')
     sub(r'"data/cache/logs"', f'"{out_rel}/cache/logs"', 1)
-    sub(r'"data/metadata/product_colors\.json"', f'"{out_rel}/metadata/product_colors.json"', 1)
+    sub(r'(  db_path: )"data/db/app\.db"', rf'\1"{out_rel}/db/app.db"', 1)
     sub(r'(  ocr:\n    enabled: )true', r'\1false  # demo: bật lại (true) để thử EasyOCR', 1)
     # Config thật có index FAISS build sẵn (cờ = false); bộ demo chưa có index nên phải bật để run.py tự build.
-    # build_metadata giữ false: products.json/product_ids.json đã được sinh sẵn ở data_demo/metadata/.
     sub(r'(  build_gallery_index: )false', r'\1true  # demo: build index từ data_demo/gallery ở lần chạy đầu', 1)
-    mapped = [s for s in skus if s["pid"] in (1, 2, 3, 4, 5, 6, 7, 8, 13, 15, 17, 18)]
-    block = "".join(f'    "{s["pid"]}": "{s["folder"]}"\n' for s in mapped)
-    sub(r'(  id_mapping:\n)((?:    "\d+": .*\n)+)', lambda m: m.group(1) + block, 1)
-    sub(r'(  confusable_pairs:\n    - \["7", "8"\]\n)', r'\1    - ["30", "31"]\n', 1)
-    sub(r'(  force_rules:\n(?:    "\d+": .*\n)+)', lambda m: m.group(1) + '    "30": ["ocr"]\n    "31": ["ocr"]\n', 1)
     header = ("# CONFIG DEMO - sinh bởi scripts/make_demo_dataset.py (đừng sửa tay, chạy lại script).\n"
               "# Backend mock, CPU, dữ liệu trong data_demo/. Chạy:\n"
               "#   python run.py --mode validate --config configs/config.demo.yaml "
               "--benchmark-dir data_demo/benchmark\n")
-    path = ROOT / "configs" / "config.demo.yaml"
+    path = path or ROOT / "configs" / "config.demo.yaml"
     path.write_text(header + t, encoding="utf-8")
     return path
 
@@ -667,6 +666,10 @@ def main() -> int:
     ap.add_argument("--out", default="data_demo")
     ap.add_argument("--check", action="store_true")
     a = ap.parse_args()
+    # Windows: stdout bị chuyển hướng dùng cp1252 -> in tiếng Việt sẽ lỗi.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
     out = (ROOT / a.out).resolve()
     if a.check:
         errs = check(out)

@@ -12,6 +12,7 @@ opencv-python-headless>=4.9
 PyYAML>=6.0
 pydantic>=2.6
 pydantic-settings>=2.2
+sqlmodel>=0.0.22
 Pillow>=10.0
 matplotlib>=3.8
 pandas>=2.2
@@ -44,7 +45,7 @@ pytest>=8.0
 pytest-cov>=5.0
 # =============================================================================
 # NOTE:
-# PyTorch is installed separately by setup.bat.
+# PyTorch is installed separately by bin/setup.bat.
 #
 # NVIDIA GPU available:
 #   PyTorch CUDA build

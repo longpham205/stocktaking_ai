@@ -21,7 +21,7 @@ PRODUCTS = [{"product_id": "1", "product_name": "A", "barcode": "8931000001372"}
 
 def _build(tmp: Path, *, det="mock_contour", ret="mock_visual_embedding", ref="none", build_index=False,
            with_index=True, with_products=True, with_gallery=True, ghost=False):
-    cfg = {"paths": {"metadata_dir": "metadata", "gallery_dir": "gallery"}, "catalog": {"products_filename": "products.json"},
+    cfg = {"paths": {"metadata_dir": "metadata", "gallery_dir": "gallery"}, "catalog": {"source": "sqlite", "db_path": "webdata/db/app.db"},
            "detection": {"backend": det, "rf_detr": {"weights_path": "weights/det.pt"}},
            "retrieval": {"backend": ret, "gallery_index_path": "cache/idx.faiss", "gallery_metadata_path": "cache/meta.json",
                          "build_gallery_index": build_index, "siglip2": {"weights_path": "weights/siglip"}},
@@ -29,8 +29,7 @@ def _build(tmp: Path, *, det="mock_contour", ret="mock_visual_embedding", ref="n
            "plugins": {"ocr": {"enabled": False}, "barcode": {"enabled": False}}}
     (tmp / "cfg.yaml").write_text(yaml.safe_dump(cfg), encoding="utf-8")
     if with_products:
-        (tmp / "metadata").mkdir()
-        (tmp / "metadata" / "products.json").write_text(json.dumps(PRODUCTS), encoding="utf-8")
+        _seed_catalog(tmp / "webdata" / "db" / "app.db")
     if with_gallery:
         (tmp / "gallery" / "p1").mkdir(parents=True)
         (tmp / "gallery" / "p1" / "a.jpg").write_bytes(b"x")
@@ -39,6 +38,20 @@ def _build(tmp: Path, *, det="mock_contour", ret="mock_visual_embedding", ref="n
         (tmp / "cache" / "idx.faiss").write_bytes(b"x" * 2048)
         ids = ["1", "2", "99"] if ghost else ["1", "2"]
         (tmp / "cache" / "meta.json").write_text(json.dumps({"items": [{"product_id": i} for i in ids]}), encoding="utf-8")
+
+
+def _seed_catalog(db_path: Path) -> None:
+    from src.catalog.db import Product, Session, create_all, make_engine
+
+    eng = make_engine(db_path)
+    try:
+        create_all(eng)
+        with Session(eng) as s:
+            for p in PRODUCTS:
+                s.add(Product(product_id=p["product_id"], product_name=p["product_name"], barcode=p["barcode"] or None))
+            s.commit()
+    finally:
+        eng.dispose()
 
 
 def _run(tmp: Path, *, modules=lambda n: True, busy=lambda p: False, port=8000):
@@ -99,11 +112,11 @@ def test_database_price_and_barcode_report(tmp_path):
     with db.tx() as c:
         c.execute("INSERT INTO users(username,password_hash,created_at) VALUES('a','h',?)", (utcnow(),))
         c.execute("INSERT INTO product_prices VALUES('1',1000,?)", (utcnow(),))
-        c.execute("INSERT INTO product_overrides VALUES('2','89310002222',?)", (utcnow(),))
+        c.execute("UPDATE product SET barcode='89310002222' WHERE product_id='2'")
     res = _run(tmp_path)
     lvl, _, detail = _get(res, "Giá sản phẩm")
     assert lvl == ce.WARN and "2/3" in detail
-    assert "2/3 SKU có barcode" in _get(res, "Barcode")[2]  # 1 từ products.json + 1 do admin nhập
+    assert "2/3 SKU có barcode" in _get(res, "Barcode")[2]  # barcode đọc từ bảng catalog `product`
     with db.tx() as c:
         c.execute("INSERT INTO product_prices VALUES('2',1,?)", (utcnow(),))
         c.execute("INSERT INTO product_prices VALUES('3',1,?)", (utcnow(),))
@@ -111,14 +124,14 @@ def test_database_price_and_barcode_report(tmp_path):
 
 
 def test_corrupt_database_is_failure(tmp_path):
-    _build(tmp_path)
+    _build(tmp_path, with_products=False)
     (tmp_path / "webdata" / "db").mkdir(parents=True)
     (tmp_path / "webdata" / "db" / "app.db").write_bytes(b"day khong phai sqlite" * 200)
     assert _get(_run(tmp_path), "Database web")[0] == ce.FAIL
 
 
 def test_unwritable_data_dir_is_failure(tmp_path):
-    _build(tmp_path)
+    _build(tmp_path, with_products=False)
     (tmp_path / "webdata").write_text("la mot file, khong phai thu muc", encoding="utf-8")
     assert _get(_run(tmp_path), "Thư mục dữ liệu web")[0] == ce.FAIL
 
@@ -143,7 +156,7 @@ def test_fake_mode_skips_pipeline_checks_but_keeps_web_checks(tmp_path):
                         port_busy=lambda p: False, fake=True)
     assert not [r for r in res if r[0] == ce.FAIL], res  # --fake: không đòi faiss/gallery/index
     assert "--fake" in _get(res, "Pipeline AI")[2]
-    assert _get(res, "Catalog")[0] == ce.OK  # catalog vẫn bắt buộc vì web đọc products.json
+    assert _get(res, "Catalog")[0] == ce.OK  # catalog (DB) vẫn bắt buộc với --fake vì web đọc nó
     res2 = ce.run_checks(Path("cfg.yaml"), Path("webdata"), 8000, root=tmp_path, has_module=lambda n: True,
                          port_busy=lambda p: True, fake=True)
     assert _get(res2, "Cổng")[0] == ce.FAIL  # cổng bận vẫn là lỗi

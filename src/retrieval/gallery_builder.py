@@ -7,7 +7,7 @@ This module is used by ``BuildPipeline`` only — runtime inference uses
 Responsibilities:
     - Scan product images from the gallery directory.
     - Resolve each gallery folder to its stable internal product_id via
-      ``data/metadata/product_ids.json`` (produced by MetadataBuilder).
+      ``CatalogRepository.folder_to_product_id()`` (src/catalog).
     - Generate embeddings using the configured EmbeddingBackend.
     - Build a FAISS inner-product index.
     - Save the FAISS index and vector-to-product metadata to disk.
@@ -37,7 +37,8 @@ required to resolve a FAISS vector back to a product:
 
 Important:
     - FAISS vector order and gallery_metadata.json order are identical.
-    - Every gallery folder must exist in product_ids.json.
+    - Every gallery folder must be mapped in the catalog.
+    - A fingerprint file is written next to the index (src/retrieval/fingerprint.py).
     - The build fails before embedding if the mappings are inconsistent.
 """
 
@@ -50,7 +51,10 @@ from pathlib import Path
 import faiss
 import numpy as np
 
+from src.catalog.factory import open_catalog_repository
+from src.catalog.repository import BaseCatalogRepository
 from src.core.config import AppConfig
+from src.retrieval.fingerprint import compute_fingerprint, write_fingerprint
 from src.core.logger import get_logger
 from src.core.utils import ensure_dir, list_image_files, load_image_bgr
 from src.retrieval.backends.base import EmbeddingBackend
@@ -61,22 +65,25 @@ logger = get_logger(__name__)
 class GalleryIndexBuilder:
     """Builds a FAISS index from the product gallery."""
 
-    def __init__(self, config: AppConfig, backend: EmbeddingBackend) -> None:
+    def __init__(
+        self, config: AppConfig, backend: EmbeddingBackend, catalog: BaseCatalogRepository | None = None
+    ) -> None:
         """Initializes the gallery index builder.
 
         Args:
             config: Fully validated application configuration.
             backend: Initialized embedding backend used to generate
                 gallery embeddings.
+            catalog: Nguồn ánh xạ thư mục -> product_id; None thì mở theo ``catalog.source``
+                lúc build (sau bước metadata/sync).
         """
+        self._app_config = config
+        self._catalog = catalog
         self._config = config.retrieval
         self._backend = backend
         self._gallery_dir = config.resolve_path(config.paths.gallery_dir)
         self._index_path = config.resolve_path(self._config.gallery_index_path)
         self._metadata_path = config.resolve_path(self._config.gallery_metadata_path)
-        self._product_ids_path = (
-            config.resolve_path(config.paths.metadata_dir) / config.catalog.product_ids_filename
-        )
         self._embedding_dim = self._config.embedding_dim
 
     # =========================================================================
@@ -90,7 +97,7 @@ class GalleryIndexBuilder:
             Tuple of (FAISS index, vector-to-product metadata).
 
         Raises:
-            FileNotFoundError: If the gallery or product_ids.json is missing.
+            FileNotFoundError: If the gallery or the catalog source is missing.
             ValueError: If gallery folders and product IDs are inconsistent.
             RuntimeError: If no embeddings could be generated, or vector
                 counts do not match expectations per product.
@@ -148,6 +155,8 @@ class GalleryIndexBuilder:
 
         self._save_index(index)
         self._save_metadata(metadata)
+        fp_path = write_fingerprint(self._app_config, compute_fingerprint(self._app_config, folder_to_product_id))
+        logger.info("Saved gallery fingerprint to '%s'.", fp_path)
 
         logger.info("Gallery index built successfully.")
         logger.info("FAISS vectors: %d | Metadata entries: %d", index.ntotal, len(metadata))
@@ -163,53 +172,21 @@ class GalleryIndexBuilder:
     # =========================================================================
 
     def _load_product_id_mapping(self) -> dict[str, str]:
-        """Loads the stable product ID mapping (folder name -> product_id).
-
-        Returns:
-            Mapping from gallery folder name to internal product_id (string).
+        """Ánh xạ thư mục gallery -> product_id lấy từ catalog repository (SKU đang hoạt động).
 
         Raises:
-            FileNotFoundError: If product_ids.json does not exist.
-            ValueError: If the mapping is invalid.
+            ValueError: Nếu catalog không có SKU nào gắn thư mục gallery.
         """
-        if not self._product_ids_path.is_file():
-            raise FileNotFoundError(
-                f"Product ID mapping does not exist: {self._product_ids_path}. "
-                "Run the metadata build step before building the gallery index."
-            )
-
-        try:
-            with self._product_ids_path.open("r", encoding="utf-8") as file_handle:
-                data = json.load(file_handle)
-        except json.JSONDecodeError as exc:
-            raise ValueError(f"Invalid JSON product ID mapping: {self._product_ids_path}") from exc
-
-        products = data.get("products") if isinstance(data, dict) else None
-        if not isinstance(products, dict):
-            raise ValueError("product_ids.json must contain a 'products' object.")
-
-        folder_to_product_id: dict[str, str] = {}
-        for internal_id, folder in products.items():
-            try:
-                numeric_id = int(internal_id)
-            except (TypeError, ValueError) as exc:
-                raise ValueError(f"Invalid internal product ID in product_ids.json: {internal_id!r}") from exc
-            if numeric_id <= 0 or not isinstance(folder, str) or not folder:
-                raise ValueError(f"Invalid product_ids.json entry: {internal_id!r} -> {folder!r}")
-
-            if folder in folder_to_product_id:
-                raise ValueError(
-                    f"Duplicate gallery folder mapping in product_ids.json: '{folder}' "
-                    f"is mapped to both ID {folder_to_product_id[folder]} and ID {internal_id}."
-                )
-            folder_to_product_id[folder] = str(numeric_id)
-
+        catalog = self._catalog if self._catalog is not None else open_catalog_repository(self._app_config)
+        folder_to_product_id = catalog.folder_to_product_id()
+        if not folder_to_product_id:
+            raise ValueError("Catalog không có SKU nào gắn thư mục gallery; không thể build index.")
         logger.info("Loaded %d stable product ID mapping(s).", len(folder_to_product_id))
         return folder_to_product_id
 
     @staticmethod
     def _validate_product_mapping(product_dirs: list[Path], folder_to_product_id: dict[str, str]) -> None:
-        """Validates gallery folders against product_ids.json (both directions)."""
+        """Validates gallery folders against the catalog folder mapping (both directions)."""
         gallery_folders = {path.name for path in product_dirs}
         mapped_folders = set(folder_to_product_id.keys())
 
@@ -218,7 +195,7 @@ class GalleryIndexBuilder:
             for folder in sorted(missing_from_mapping):
                 logger.error("Missing product ID mapping: '%s'", folder)
             raise ValueError(
-                "Gallery contains folder(s) not registered in product_ids.json. Build aborted."
+                "Gallery contains folder(s) not registered in the catalog. Build aborted."
             )
 
         missing_from_gallery = mapped_folders - gallery_folders

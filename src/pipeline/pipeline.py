@@ -36,6 +36,7 @@ from __future__ import annotations
 import datetime as _datetime
 from collections import OrderedDict
 
+from src.catalog.factory import open_catalog_repository
 from src.core.config import AppConfig
 from src.core.logger import get_logger
 from src.core.utils import timer
@@ -44,6 +45,7 @@ from src.decision.reranker import Reranker
 from src.detection.cropper import Cropper
 from src.detection.detector import Detector
 from src.models.models import (
+    BoundingBox,
     CropTrace,
     ImageData,
     InventoryItem,
@@ -74,16 +76,27 @@ class InventoryPipeline:
         self._overlap_resolver = OverlapResolver(config)
         self._refiner = Refiner(config)
         self._cropper = Cropper(config)
-        self._retriever = Retriever(config)
-        self._decision_engine = DecisionEngine(config)
+        # Một catalog repository dùng chung cho mọi thành phần (nguồn chọn bằng catalog.source).
+        self._catalog = open_catalog_repository(config)
+        self._retriever = Retriever(config, self._catalog)
+        self._decision_engine = DecisionEngine(config, self._catalog)
         self._plugin_manager = PluginManager(config)
-        self._reranker = Reranker(config, self._decision_engine, self._retriever.get_product)
+        self._reranker = Reranker(config, self._decision_engine, self._retriever.get_product, catalog=self._catalog)
         # Small LRU of override (DecisionEngine, Reranker) pairs keyed by (similarity_threshold,
         # min_confidence_accept), so a caller passing the same thresholds on every request does not
         # rebuild them each time. Not thread-safe: run() is expected to be called from one thread.
         self._override_cache: OrderedDict[tuple[float | None, float | None], tuple[DecisionEngine, Reranker]] = OrderedDict()
 
         logger.info("InventoryPipeline fully initialized; all components loaded once.")
+
+    def reload_catalog(self) -> str:
+        """Nạp lại catalog (sau khi admin sửa). Mọi thành phần truy vấn repository lúc dùng nên có hiệu lực ngay.
+
+        Returns:
+            ``version()`` mới của catalog.
+        """
+        self._catalog.reload()
+        return self._catalog.version()
 
     def run(
         self,
@@ -113,7 +126,7 @@ class InventoryPipeline:
         """
         with timer() as elapsed:
             decision_engine, reranker = self._resolve_decision_components(similarity_threshold, min_confidence_accept)
-            detection_result, overlap_result, _refinement_result, items = self._run_stages(
+            detection_result, overlap_result, _refinement_result, items, rejected = self._run_stages(
                 image_data, decision_engine=decision_engine, reranker=reranker
             )
 
@@ -126,6 +139,7 @@ class InventoryPipeline:
             timestamp=_datetime.datetime.now(_datetime.timezone.utc).isoformat(),
             has_overlap=bool(overlap_result.needs_refinement),
             detected_count=len(detection_result.detections),
+            rejected_bboxes=rejected,
         )
 
         logger.info(
@@ -152,7 +166,7 @@ class InventoryPipeline:
             Tuple of (InventoryResult, PipelineTrace).
         """
         with timer() as elapsed:
-            detection_result, overlap_result, refinement_result, items, crop_traces = self._run_stages(
+            detection_result, overlap_result, refinement_result, items, rejected, crop_traces = self._run_stages(
                 image_data, collect_trace=True
             )
 
@@ -165,6 +179,7 @@ class InventoryPipeline:
             timestamp=_datetime.datetime.now(_datetime.timezone.utc).isoformat(),
             has_overlap=bool(overlap_result.needs_refinement),
             detected_count=len(detection_result.detections),
+            rejected_bboxes=rejected,
         )
         trace = PipelineTrace(
             image_id=image_data.image_id,
@@ -206,8 +221,8 @@ class InventoryPipeline:
             update["min_confidence_accept"] = min_confidence_accept
         overridden_decision = self._config.decision.model_copy(update=update)
         overridden_config = self._config.model_copy(update={"decision": overridden_decision})
-        decision_engine = DecisionEngine(overridden_config)
-        reranker = Reranker(overridden_config, decision_engine, self._retriever.get_product)
+        decision_engine = DecisionEngine(overridden_config, self._catalog)
+        reranker = Reranker(overridden_config, decision_engine, self._retriever.get_product, catalog=self._catalog)
         self._override_cache[key] = (decision_engine, reranker)
         while len(self._override_cache) > 8:
             self._override_cache.popitem(last=False)
@@ -247,6 +262,7 @@ class InventoryPipeline:
         crops = self._cropper.crop(image_data, detection_result, refinement_result)
 
         items: list[InventoryItem] = []
+        rejected: list[BoundingBox] = []  # vùng bị loại: không vào items, chỉ để UI chỉ ra chỗ vật chưa nhận diện
         crop_traces: list[CropTrace] = []
 
         for crop in crops:
@@ -272,6 +288,7 @@ class InventoryPipeline:
                 )
 
             if final_decision.status == "rejected" or final_decision.product_id is None:
+                rejected.append(crop.source_bbox)
                 continue
 
             items.append(
@@ -288,8 +305,8 @@ class InventoryPipeline:
             )
 
         if collect_trace:
-            return detection_result, overlap_result, refinement_result, items, crop_traces
-        return detection_result, overlap_result, refinement_result, items
+            return detection_result, overlap_result, refinement_result, items, rejected, crop_traces
+        return detection_result, overlap_result, refinement_result, items, rejected
 
     def _refine(self, image_data: ImageData, detection_result, overlap_result) -> RefinementResult:
         """Runs segmentation refinement when the overlap stage requests it.

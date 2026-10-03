@@ -40,23 +40,9 @@ paths:
 
 # --- Product Catalog / Metadata ---
 catalog:
-  build_metadata: false
-  products_filename: "products.json"
-  product_ids_filename: "product_ids.json"
-  # External product ID -> product name mapping (IDs stored as strings)
-  id_mapping:
-    "1": "01_Xit_Chong_Nang_UV_Sunny"
-    "2": "02_But_Chi_Chan_May_BR641"
-    "3": "03_Phan_Ma_Hong_OR210"
-    "4": "04_Bong_Phan_Puff"
-    "5": "05_Phan_Mat_Palette_BE203"
-    "6": "06_Phan_Mat_Palette_PK300"
-    "7": "07_Hop_Ngoai_ABA"
-    "8": "08_Hop_Ngoai_ABC"
-    "13": "13_Sua_Rua_Mat_Tra_Xanh"
-    "15": "15_Dau_Goi_Hoa_Hong"
-    "17": "17_Xit_Khoang_Bac_Ha"
-    "18": "18_Tay_Trang_Dao"
+  # Nguồn catalog cho pipeline: sqlite (DB, mặc định) | snapshot (Colab)
+  source: "sqlite"
+  db_path: "data_demo/db/app.db"
 
 # --- Detection Module ---
 detection:
@@ -265,13 +251,6 @@ plugins:
       - 180
       - 270
 
-  force_rules:
-    "5": ["barcode", "color"]
-    "6": ["barcode", "color"]
-    "7": ["ocr"]
-    "8": ["ocr"]
-    "30": ["ocr"]
-    "31": ["ocr"]
 
 # --- Reranking / Evidence Fusion ---
 rerank:
@@ -299,9 +278,6 @@ rerank:
 
     min_switch_margin: 0.05
 
-  confusable_pairs:
-    - ["7", "8"]
-    - ["30", "31"]
   confusable_min_agreeing_plugins: 1
 
   barcode:
@@ -315,7 +291,6 @@ rerank:
   color:
     enabled: true
     weight: 0.20
-    references_path: "data_demo/metadata/product_colors.json"
     delta_e_strong: 6.0
     delta_e_weak: 20.0
     min_margin: 1.0

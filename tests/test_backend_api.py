@@ -13,7 +13,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from backend.catalog import JsonCatalog
+from backend.catalog import DbCatalog
 from backend.config import Settings
 from backend.inference import Detection, FakeExecutor, InferenceOutput
 from backend.server import PosServer
@@ -30,10 +30,32 @@ PRODUCTS = [
 STAFF_PW, ADMIN_PW = "staffpass123", "adminpass123"
 
 
+def _seed_catalog(db_path: Path) -> None:
+    """Catalog trong app.db (như sau migrate): PRODUCTS + cặp dễ nhầm 7/8 bắt buộc OCR + màu BE203."""
+    from src.catalog.db import ColorReference, Product, ProductEvidence, Session, create_all, make_engine
+
+    eng = make_engine(db_path)
+    try:
+        create_all(eng)
+        with Session(eng) as s:
+            if s.get(Product, "1") is not None:
+                return
+            for p in PRODUCTS:
+                s.add(Product(product_id=p["product_id"], product_name=p["product_name"], barcode=p["barcode"] or None,
+                              gallery_folder=f"f{p['product_id']}"))
+            s.flush()
+            for pid, typ, val in [("7", "force_evidence", ["ocr"]), ("7", "ocr_keywords", ["ABA"]), ("7", "confusable_with", ["8"]),
+                                  ("8", "force_evidence", ["ocr"]), ("8", "ocr_keywords", ["ABC"]), ("8", "confusable_with", ["7"]),
+                                  ("2", "color_code", "BR641")]:
+                s.add(ProductEvidence(product_id=pid, evidence_type=typ, value_json=json.dumps(val)))
+            s.add(ColorReference(color_code="BE203", r=199, g=161, b=148, hex="#C7A194", source="seed"))
+            s.commit()
+    finally:
+        eng.dispose()
+
+
 def _settings(tmp: Path, **over) -> Settings:
-    meta = tmp / "metadata"
-    meta.mkdir(parents=True, exist_ok=True)
-    (meta / "products.json").write_text(json.dumps(PRODUCTS), encoding="utf-8")
+    _seed_catalog(over.get("db_path", tmp / "db" / "app.db"))
     front = tmp / "frontend"
     front.mkdir(exist_ok=True)
     (front / "index.html").write_text("<html>POS</html>", encoding="utf-8")
@@ -43,7 +65,7 @@ def _settings(tmp: Path, **over) -> Settings:
                 job_timeout_seconds=60, idempotency_window_seconds=5, db_path=tmp / "db" / "app.db",
                 media_root=tmp / "media", media_url_ttl=600, media_retention_days=30, thumb_width=120,
                 allow_checkout_without_price=False, tz_offset_hours=7, pipeline_config=tmp / "cfg.yaml",
-                metadata_dir=meta, products_filename="products.json", frontend_dir=front,
+                catalog_db_path=tmp / "db" / "app.db", ocr_min_length=3, frontend_dir=front,
                 seed_prices_path=None, jwt_secret="test-secret-xyz", seed_staff_password=STAFF_PW,
                 seed_admin_password=ADMIN_PW)
     base.update(over)
@@ -99,7 +121,7 @@ class Client:
 @contextmanager
 def running(tmp: Path, executor=None, **over):
     settings = _settings(tmp, **over)
-    catalog = JsonCatalog(settings.metadata_dir / "products.json")
+    catalog = DbCatalog(settings.catalog_db_path)
     app = App(settings, catalog, executor or FakeExecutor([], fn=_dets_default))
     httpd = PosServer(("127.0.0.1", 0), app)
     t = threading.Thread(target=httpd.serve_forever, daemon=True)
@@ -425,11 +447,12 @@ def test_admin_products_update_validation_and_changelog(tmp_path):
         assert body["total"] == 6 and body["missing_price"] == 6
         assert a.call("PATCH", "/api/admin/products/2", {"price": 15000, "barcode": "89310000777"})[0] == 200
         assert a.call("PATCH", "/api/admin/products/3", {"barcode": "89310000777"})[1]["error"]["code"] == "BARCODE_DUPLICATE"
-        assert a.call("PATCH", "/api/admin/products/3", {"barcode": "8931000001372"})[0] == 409  # trùng barcode từ products.json
+        assert a.call("PATCH", "/api/admin/products/3", {"barcode": "8931000001372"})[0] == 409  # trùng barcode có sẵn trong catalog
         assert a.call("PATCH", "/api/admin/products/3", {"barcode": "a b!"})[0] == 422
         assert a.call("PATCH", "/api/admin/products/3", {"price": -5})[0] == 422
         assert a.call("PATCH", "/api/admin/products/3", {"price": 1.5})[0] == 422
-        assert a.call("PATCH", "/api/admin/products/3", {"name": "x"})[0] == 422  # chỉ sửa price/barcode
+        assert a.call("PATCH", "/api/admin/products/3", {"foo": "x"})[0] == 422  # chỉ sửa price/barcode/name
+        assert a.call("PATCH", "/api/admin/products/3", {"name": "  "})[0] == 422
         assert a.call("PATCH", "/api/admin/products/404", {"price": 1})[0] == 404
         # xoá giá về null, xoá barcode
         a.call("PATCH", "/api/admin/products/2", {"price": None, "barcode": ""})
@@ -560,7 +583,7 @@ def test_local_executor_maps_pipeline_result(tmp_path):
     try:
         for n in names:
             sys.modules[n] = types.ModuleType(n)
-        sys.modules["src.core.config"].load_config = lambda p: ("cfg", p)
+        sys.modules["src.core.config"].build_config = lambda p, overrides=None: ("cfg", p)
         sys.modules["src.inference.infer"].InferenceRunner = FakeRunner
         from backend.inference import LocalExecutor
         ex = LocalExecutor(tmp_path / "c.yaml")
@@ -636,12 +659,13 @@ def test_min_confidence_accept_setting_reaches_executor_and_is_validated(tmp_pat
 def test_db_is_backed_up_on_restart_and_rotated(tmp_path):
     def start():
         s = _settings(tmp_path)
-        App(s, JsonCatalog(s.metadata_dir / "products.json"), FakeExecutor([]), start_worker=False).close()
+        App(s, DbCatalog(s.catalog_db_path), FakeExecutor([]), start_worker=False).close()
     start()
     backups = tmp_path / "backups"
-    assert not backups.exists() or not list(backups.glob("app-*.db"))  # lần chạy đầu: DB mới tạo, chưa có gì để sao lưu
-    start()
+    # DB đã có catalog (migrate chạy trước web) -> sao lưu ngay từ lần khởi động đầu
     assert len(list(backups.glob("app-*.db"))) == 1
+    start()
+    assert len(list(backups.glob("app-*.db"))) == 2
     for _ in range(9):
         start()
     files = sorted(backups.glob("app-*.db"))
@@ -815,3 +839,324 @@ def test_overlap_and_unrecognized_can_coexist(tmp_path):
         w = _wait_job(c, _capture(c, order["id"])[1]["job_id"])["warnings"]
         assert {x["type"] for x in w} == {"overlap_detected", "unrecognized_objects"}
         assert next(x for x in w if x["type"] == "unrecognized_objects")["count"] == 2
+
+
+# --------------------------------------------------------------------------- Phase 1B giai đoạn C: catalog trong DB
+class _CountingExecutor(FakeExecutor):
+    def __init__(self):
+        super().__init__([], fn=_dets_default)
+        self.reloads = 0
+
+    def reload_catalog(self):
+        self.reloads += 1
+
+
+def test_barcode_and_name_live_in_catalog_and_reload_pipeline(tmp_path):
+    ex = _CountingExecutor()
+    with running(tmp_path, executor=ex) as (c, app):
+        a = _admin(c)
+        assert a.call("PATCH", "/api/admin/products/3", {"barcode": "89310000333"})[0] == 200
+        assert app.catalog.repo.get_product("3")["barcode"] == "89310000333"  # web đọc lại catalog ngay
+        assert ex.reloads == 1  # pipeline cũng được nạp lại
+        with app.db.read() as conn:
+            assert conn.execute("SELECT barcode FROM product WHERE product_id='3'").fetchone()[0] == "89310000333"
+            assert not conn.execute("SELECT 1 FROM sqlite_master WHERE name='product_overrides'").fetchone()
+        assert a.call("PATCH", "/api/admin/products/3", {"price": 5000})[0] == 200
+        assert ex.reloads == 1  # giá thuộc web, không nạp lại pipeline
+        st, body = a.call("PATCH", "/api/admin/products/3", {"name": "Phấn má hồng mới"})
+        assert st == 200 and body["name"] == "Phấn má hồng mới" and body["needs_naming"] is False
+        log = a.call("GET", "/api/admin/change-log?table=product&record=3")[1]["items"]
+        assert log[0]["field"] == "name"
+        assert a.call("POST", f"/api/admin/change-log/{log[0]['id']}/revert")[0] == 200
+        assert app.catalog.get("3")["name"] == "Phấn Má Hồng"
+
+
+def test_evidence_edit_requires_confirm_validates_and_is_symmetric(tmp_path):
+    ex = _CountingExecutor()
+    with running(tmp_path, executor=ex) as (c, app):
+        a = _admin(c)
+        st, ev = a.call("GET", "/api/admin/products/7/evidence")
+        assert st == 200 and ev["evidence"]["confusable_with"] == ["8"] and ev["confirm_text"]
+        assert a.call("PATCH", "/api/admin/products/3/evidence", {"ocr_keywords": ["OR210"]})[1]["error"]["code"] == "CONFIRM_REQUIRED"
+        # chuẩn hoá: chữ hoa, bỏ trùng
+        st, ev = a.call("PATCH", "/api/admin/products/3/evidence", {"ocr_keywords": ["or210", "OR210"], "confirm": True})
+        assert st == 200 and ev["evidence"]["ocr_keywords"] == ["OR210"]
+        assert app.catalog.repo.ocr_keywords("3") == ("OR210",) and ex.reloads == 1
+        # cặp dễ nhầm bắt buộc OCR không được trùng token
+        st, err = a.call("PATCH", "/api/admin/products/8/evidence", {"ocr_keywords": ["ABA"], "confirm": True})
+        assert st == 422 and err["error"]["code"] == "EVIDENCE_INVALID" and err["error"]["errors"]
+        assert a.call("PATCH", "/api/admin/products/3/evidence", {"ocr_keywords": ["AB"], "confirm": True})[0] == 422
+        assert a.call("PATCH", "/api/admin/products/3/evidence", {"force_evidence": ["sam2"], "confirm": True})[0] == 422
+        assert a.call("PATCH", "/api/admin/products/3/evidence", {"confusable_with": ["3"], "confirm": True})[0] == 422
+        assert a.call("PATCH", "/api/admin/products/3/evidence", {"confusable_with": ["99"], "confirm": True})[0] == 422
+        # thêm cặp 3<->12: ghi hai chiều; gỡ 7<->8: gỡ cả hai chiều
+        a.call("PATCH", "/api/admin/products/3/evidence", {"confusable_with": ["12"], "confirm": True})
+        assert app.catalog.repo.evidence("12", "confusable_with") == ("3",)
+        a.call("PATCH", "/api/admin/products/7/evidence", {"confusable_with": [], "force_evidence": [], "confirm": True})
+        assert frozenset({"7", "8"}) not in app.catalog.repo.confusable_pairs()
+        assert app.catalog.repo.evidence("8", "confusable_with") is None
+        # hoàn tác dòng gỡ cặp của SKU 7 -> cặp quay lại ở cả hai chiều
+        log = a.call("GET", "/api/admin/change-log?table=product_evidence&record=7")[1]["items"]
+        row = next(r for r in log if r["field"] == "confusable_with")
+        assert a.call("POST", f"/api/admin/change-log/{row['id']}/revert")[0] == 200
+        assert frozenset({"7", "8"}) in app.catalog.repo.confusable_pairs()
+        assert a.call("POST", f"/api/admin/change-log/{row['id']}/revert")[1]["error"]["code"] == "CHANGE_STALE"
+        assert c.call("GET", "/api/admin/products/7/evidence", token=None)[0] == 401
+
+
+def test_color_references_crud_flags_and_revert(tmp_path):
+    with running(tmp_path) as (c, app):
+        a = _admin(c)
+        items = a.call("GET", "/api/admin/colors")[1]["items"]
+        assert next(x for x in items if x["code"] == "BR641") == {"code": "BR641", "hex": None, "used_by": ["2"], "missing": True}
+        prod2 = a.call("GET", "/api/admin/products?search=chan%20may")[1]["items"][0]
+        assert prod2["missing_color_reference"] is True
+        assert a.call("PATCH", "/api/admin/colors/BR641", {"hex": "#5A3C2D"})[1]["error"]["code"] == "CONFIRM_REQUIRED"
+        assert a.call("PATCH", "/api/admin/colors/BR641", {"hex": "zz", "confirm": True})[0] == 422
+        st, col = a.call("PATCH", "/api/admin/colors/br641", {"hex": "5a3c2d", "confirm": True})
+        assert st == 200 and col["hex"] == "#5A3C2D" and col["r"] == 90 and not col["missing"]
+        assert app.catalog.repo.color_references()["BR641"] == (90, 60, 45)
+        assert a.call("GET", "/api/admin/products?search=chan%20may")[1]["items"][0]["missing_color_reference"] is False
+        log = a.call("GET", "/api/admin/change-log?table=color_reference")[1]["items"]
+        assert a.call("POST", f"/api/admin/change-log/{log[0]['id']}/revert")[0] == 200
+        assert "BR641" not in app.catalog.repo.color_references()
+
+
+def test_legacy_barcode_overrides_merged_on_start_and_db_must_be_shared(tmp_path):
+    import sqlite3
+    s = _settings(tmp_path)
+    conn = sqlite3.connect(str(s.db_path))
+    conn.execute("CREATE TABLE product_overrides(product_id TEXT PRIMARY KEY, barcode TEXT NOT NULL, updated_at TEXT NOT NULL)")
+    conn.execute("INSERT INTO product_overrides VALUES('3','89310000444','x')")
+    conn.commit()
+    conn.close()
+    app = App(s, DbCatalog(s.catalog_db_path), FakeExecutor([]), start_worker=False)
+    try:
+        assert app.catalog.get("3")["barcode"] == "89310000444"
+        with app.db.read() as c:
+            assert not c.execute("SELECT 1 FROM sqlite_master WHERE name='product_overrides'").fetchone()
+    finally:
+        app.close()
+    other = tmp_path / "other" / "app.db"
+    _seed_catalog(other)
+    import pytest
+    with pytest.raises(ValueError, match="chung một file"):
+        App(s, DbCatalog(other), FakeExecutor([]), start_worker=False)
+
+
+# --------------------------------------------------------------------------- ảnh kết quả + bbox trên hoá đơn
+def test_order_view_has_capture_image_and_boxes_linked_to_items(tmp_path):
+    with running(tmp_path) as (c, app):
+        c.login("staff", STAFF_PW)
+        _, order = c.call("POST", "/api/orders")
+        _, j = _capture(c, order["id"])
+        _wait_job(c, j["job_id"])
+        _, o = c.call("GET", f"/api/orders/{order['id']}")
+        assert len(o["captures"]) == 1
+        cap = o["captures"][0]
+        assert (cap["width"], cap["height"]) == (320, 240) and len(cap["boxes"]) == 4
+        items = {i["id"]: i for i in o["items"]}
+        acc7 = [b for b in cap["boxes"] if b["product_id"] == "7" and b["status"] == "accepted"]
+        assert len(acc7) == 2 and acc7[0]["item_id"] == acc7[1]["item_id"]  # 2 vật gộp chung 1 dòng
+        assert items[acc7[0]["item_id"]]["quantity"] == 2 and not items[acc7[0]["item_id"]]["flagged"]
+        unc = [b for b in cap["boxes"] if b["status"] == "uncertain"]
+        assert len(unc) == 1 and items[unc[0]["item_id"]]["flagged"]
+        assert all(b["item_id"] in items for b in cap["boxes"]) and all(len(b["bbox"]) == 4 for b in cap["boxes"])
+        img = urllib.request.urlopen(c.base + cap["image_url"])  # ảnh gốc qua URL ký
+        assert img.status == 200 and len(img.read()) > 500
+        # chụp thêm: accepted cùng SKU cộng dồn vào dòng cũ -> bbox lượt 2 trỏ cùng item_id
+        _, j2 = _capture(c, order["id"], key="k2")
+        _wait_job(c, j2["job_id"])
+        _, o2 = c.call("GET", f"/api/orders/{order['id']}")
+        assert len(o2["captures"]) == 2
+        b2 = [b for b in o2["captures"][1]["boxes"] if b["product_id"] == "7" and b["status"] == "accepted"]
+        assert b2[0]["item_id"] == acc7[0]["item_id"]
+
+
+def test_old_db_gets_detections_column(tmp_path):
+    import sqlite3
+    db = tmp_path / "old.db"
+    conn = sqlite3.connect(str(db))
+    conn.execute("CREATE TABLE captures(id INTEGER PRIMARY KEY, order_id INTEGER NOT NULL, status TEXT NOT NULL, "
+                 "item_count INTEGER NOT NULL DEFAULT 0, processing_time_ms REAL, image_path TEXT, error TEXT, created_at TEXT NOT NULL)")
+    conn.commit()
+    conn.close()
+    from backend.db import Database
+
+    Database(db)
+    conn = sqlite3.connect(str(db))
+    assert "detections_json" in {r[1] for r in conn.execute("PRAGMA table_info(captures)")}
+    conn.close()
+
+
+# --------------------------------------------------------------------------- thiết lập NÂNG CAO (pipeline)
+_DEMO_CFG = Path(__file__).resolve().parents[1] / "configs" / "config.demo.yaml"
+ADV_PW = "advpass12345"
+
+
+def test_advanced_config_view_and_apply_with_advanced_password(tmp_path):
+    ex = FakeExecutor([], fn=_dets_default)
+    with running(tmp_path, executor=ex, pipeline_config=_DEMO_CFG, seed_advanced_password=ADV_PW) as (c, app):
+        a = _admin(c)
+        st, cfg = a.call("GET", "/api/admin/config")
+        assert st == 200 and cfg["advanced_password_set"] and cfg["config_error"] is None
+        by = {i["key"]: i for i in cfg["items"]}
+        assert by["retrieval.backend"]["tier"] == "readonly" and by["retrieval.backend"]["value"] == "mock_visual_embedding"
+        thr = by["detection.confidence_threshold"]
+        assert thr["tier"] == "reload" and thr["value"] == thr["default"] and not thr["overridden"]
+        ch = {"detection.confidence_threshold": 0.6}
+        assert a.call("POST", "/api/admin/config/apply", {"changes": ch, "advanced_password": ADV_PW})[1]["error"]["code"] == "CONFIRM_REQUIRED"
+        assert a.call("POST", "/api/admin/config/apply", {"changes": ch, "advanced_password": STAFF_PW, "confirm": True})[1]["error"]["code"] == "ADVANCED_PASSWORD_INVALID"
+        ok = {"advanced_password": ADV_PW, "confirm": True}
+        assert a.call("POST", "/api/admin/config/apply", {"changes": {"retrieval.backend": "x"}, **ok})[0] == 422  # chỉ xem
+        assert a.call("POST", "/api/admin/config/apply", {"changes": {"detection.confidence_threshold": 2}, **ok})[0] == 422
+        assert a.call("POST", "/api/admin/config/apply", {"changes": {"plugins.ocr.enabled": "yes"}, **ok})[0] == 422
+        assert a.call("POST", "/api/admin/config/apply", {"changes": {"khong.co": 1}, **ok})[0] == 422
+        st, res = a.call("POST", "/api/admin/config/apply", {"changes": {**ch, "plugins.ocr.enabled": True}, **ok})
+        assert st == 200 and res["applied"] and ex.overrides == {"detection.confidence_threshold": 0.6, "plugins.ocr.enabled": True}
+        by = {i["key"]: i for i in res["items"]}
+        assert by["detection.confidence_threshold"]["value"] == 0.6 and by["detection.confidence_threshold"]["overridden"]
+        # nạp lỗi -> báo lỗi, DB + executor giữ thiết lập cũ
+        ex.fail_reload = True
+        st, err = a.call("POST", "/api/admin/config/apply", {"changes": {"retrieval.top_k": 7}, **ok})
+        assert st == 500 and err["error"]["code"] == "RELOAD_FAILED"
+        ex.fail_reload = False
+        assert "retrieval.top_k" not in app._config_overrides()
+        # đặt lại bằng giá trị gốc -> bỏ ghi đè
+        st, res = a.call("POST", "/api/admin/config/apply", {"changes": {"plugins.ocr.enabled": None}, **ok})
+        assert st == 200 and "plugins.ocr.enabled" not in app._config_overrides()
+        # hoàn tác cần mật khẩu nâng cao
+        log = a.call("GET", "/api/admin/change-log?table=config")[1]["items"]
+        row = next(r for r in log if r["field"] == "detection.confidence_threshold")
+        assert a.call("POST", f"/api/admin/change-log/{row['id']}/revert")[0] == 403
+        assert a.call("POST", f"/api/admin/change-log/{row['id']}/revert", {"advanced_password": ADV_PW})[0] == 200
+        assert app._config_overrides() == {} and ex.overrides == {}
+        # staff không được xem/sửa
+        c.login("staff", STAFF_PW)
+        assert c.call("GET", "/api/admin/config")[0] == 403
+
+
+def test_advanced_password_rate_limited_and_job_reports_reloading(tmp_path):
+    with running(tmp_path, pipeline_config=_DEMO_CFG, seed_advanced_password=ADV_PW) as (c, app):
+        a = _admin(c)
+        body = {"changes": {"retrieval.top_k": 6}, "advanced_password": "sai-mat-khau", "confirm": True}
+        codes = [a.call("POST", "/api/admin/config/apply", body)[0] for _ in range(4)]
+        assert codes[:3] == [403, 403, 403] and codes[3] == 429
+
+
+def test_advanced_password_missing_is_explicit(tmp_path):
+    with running(tmp_path, pipeline_config=_DEMO_CFG) as (c, app):
+        a = _admin(c)
+        st, err = a.call("POST", "/api/admin/config/apply", {"changes": {"retrieval.top_k": 6}, "advanced_password": "x", "confirm": True})
+        assert st == 409 and err["error"]["code"] == "ADVANCED_PASSWORD_NOT_SET"
+
+
+def test_local_executor_reload_pipeline_and_rollback():
+    """LocalExecutor thật trên config demo (backend mock, CPU): nạp lại với ghi đè; nạp lỗi -> quay về thiết lập cũ."""
+    import pytest
+
+    if not (Path(__file__).resolve().parents[1] / "data_demo" / "db" / "app.db").is_file():
+        pytest.skip("chưa có data_demo (catalog DB)")
+    from backend.inference import LocalExecutor
+
+    img = str(Path(__file__).resolve().parents[1] / "data_demo" / "query" / "query_01.jpg")
+    ex = LocalExecutor(_DEMO_CFG, {"retrieval.top_k": 3})
+    assert ex._runner._pipeline._config.retrieval.top_k == 3
+    ex.reload_pipeline({"retrieval.top_k": 6, "detection.confidence_threshold": 0.6})
+    cfg = ex._runner._pipeline._config
+    assert cfg.retrieval.top_k == 6 and cfg.detection.confidence_threshold == 0.6
+    with pytest.raises(ValueError):
+        ex.reload_pipeline({"decision.uncertain_band": "khong-phai-so"})
+    assert ex._runner._pipeline._config.retrieval.top_k == 6  # đã quay về thiết lập trước
+    assert ex.infer(img).detections is not None  # vẫn nhận diện được sau rollback
+
+
+# --------------------------------------------------------------------------- ảnh gallery, thử bằng chứng, kiểm định
+def _gallery_cfg(tmp: Path) -> Path:
+    """Config pipeline tối thiểu chỉ để web tìm thư mục gallery; SKU 7 (thư mục f7) có 2 ảnh lớn."""
+    g = tmp / "gal" / "f7"
+    g.mkdir(parents=True)
+    for i in range(2):
+        img = np.full((3000, 2000, 3), 40 * (i + 1), np.uint8)
+        cv2.imencode(".jpg", img)[1].tofile(str(g / f"{i}.jpg"))
+    cfg = tmp / "configs" / "cfg.yaml"
+    cfg.parent.mkdir(parents=True, exist_ok=True)
+    cfg.write_text("paths:\n  gallery_dir: gal\n", encoding="utf-8")
+    return cfg
+
+
+def test_gallery_images_signed_and_resized(tmp_path):
+    with running(tmp_path, pipeline_config=_gallery_cfg(tmp_path)) as (c, app):
+        a = _admin(c)
+        ev = a.call("GET", "/api/admin/products/7/evidence")[1]
+        assert len(ev["gallery"]) == 2 and a.call("GET", "/api/admin/products/8/evidence")[1]["gallery"] == []
+        r = urllib.request.urlopen(c.base + ev["gallery"][1])
+        img = cv2.imdecode(np.frombuffer(r.read(), np.uint8), cv2.IMREAD_COLOR)
+        assert r.status == 200 and max(img.shape[:2]) == 1024  # thu nhỏ từ 3000px
+        bad = ev["gallery"][0].replace("sig=", "sig=x")
+        try:
+            urllib.request.urlopen(c.base + bad)
+            raise AssertionError("chữ ký sai phải bị từ chối")
+        except urllib.error.HTTPError as e:
+            assert e.code == 403
+
+
+def test_evidence_test_reports_ocr_hits_color_and_barcode(tmp_path):
+    def fn(_p):
+        ev = {"ocr": {"text": "hop ngoai ABA 200g"}, "color": {"dominant_rgb": [198, 160, 150]},
+              "barcode": {"barcodes": [{"data": "8931000001372"}]}}
+        return InferenceOutput([Detection("7", (10, 10, 100, 120), "uncertain", ev)], 50.0, detected_count=2)
+    with running(tmp_path, executor=FakeExecutor([], fn=fn)) as (c, app):
+        a = _admin(c)
+        st, r = a.call("POST", "/api/admin/evidence-test", raw=_jpeg())
+        assert st == 200 and r["detected_count"] == 2
+        it = r["items"][0]
+        assert it["ocr_keyword_hits"] == ["7"] and it["color_nearest"]["code"] == "BE203"
+        assert it["color_hex"] == "#C6A096" and it["barcode_skus"] == ["1"] and set(it["plugins"]) == {"ocr", "color", "barcode"}
+        assert a.call("POST", "/api/admin/evidence-test", raw=b"khong phai anh" * 10)[0] == 400
+
+
+def test_ocr_keywords_normalized_like_reranker_and_non_latin_warning(tmp_path):
+    with running(tmp_path) as (c, app):
+        a = _admin(c)
+        st, ev = a.call("PATCH", "/api/admin/products/3/evidence", {"ocr_keywords": ["or-210", "フォルミング"], "confirm": True})
+        assert st == 200 and ev["evidence"]["ocr_keywords"] == ["OR210", "フォルミング"]
+        assert any("Latin" in w for w in ev["warnings"])
+
+
+def test_validation_job_blocks_captures_and_reports_result(tmp_path):
+    ex = FakeExecutor([], delay=0.6, fn=_dets_default)
+    with running(tmp_path, executor=ex, seed_advanced_password=ADV_PW) as (c, app):
+        a = _admin(c)
+        assert a.call("POST", "/api/admin/validation", {"advanced_password": ADV_PW})[1]["error"]["code"] == "CONFIRM_REQUIRED"
+        assert a.call("POST", "/api/admin/validation", {"confirm": True, "advanced_password": "sai"})[0] == 403
+        st, v = a.call("POST", "/api/admin/validation", {"confirm": True, "advanced_password": ADV_PW})
+        assert st == 200 and v["status"] == "running"
+        assert a.call("POST", "/api/admin/validation", {"confirm": True, "advanced_password": ADV_PW})[0] == 409
+        s = Client(c.base)
+        s.login("staff", STAFF_PW)
+        _, order = s.call("POST", "/api/orders")
+        st, err = _capture(s, order["id"])
+        assert st == 503 and err["error"]["code"] == "SYSTEM_BUSY"
+        t0 = time.time()
+        while a.call("GET", "/api/admin/validation")[1]["status"] == "running" and time.time() - t0 < 10:
+            time.sleep(0.05)
+        v = a.call("GET", "/api/admin/validation")[1]
+        assert v["status"] == "done" and v["result"] == {"f1": 0.5, "fusion_accuracy": 0.6}
+        assert _capture(s, order["id"])[0] == 202  # xong kiểm định -> chụp lại bình thường
+
+
+def test_capture_stores_rejected_boxes_without_item(tmp_path):
+    def fn(_p):
+        return InferenceOutput([Detection("7", (10, 10, 100, 120), "accepted")], 40.0, detected_count=3,
+                               rejected_bboxes=[(150, 20, 200, 90), (210, 30, 300, 200)])
+    with running(tmp_path, executor=FakeExecutor([], fn=fn)) as (c, app):
+        c.login("staff", STAFF_PW)
+        _, order = c.call("POST", "/api/orders")
+        _, j = _capture(c, order["id"])
+        body = _wait_job(c, j["job_id"])
+        assert any(w["type"] == "unrecognized_objects" and w["count"] == 2 for w in body["warnings"])
+        cap = c.call("GET", f"/api/orders/{order['id']}")[1]["captures"][0]
+        rej = [b for b in cap["boxes"] if b["status"] == "rejected"]
+        assert len(rej) == 2 and all(b["item_id"] is None and b["product_id"] is None for b in rej)
+        assert rej[0]["bbox"] == [150, 20, 200, 90]

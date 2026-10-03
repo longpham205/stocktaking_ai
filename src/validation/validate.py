@@ -34,10 +34,16 @@ _COLOR_FN = (0, 140, 255)  # Orange (BGR)
 class ValidationRunner:
     """Executes Validation Mode: COCO benchmark -> real pipeline -> VAL report."""
 
-    def __init__(self, config: AppConfig) -> None:
-        """Initializes ValidationRunner, pipeline, and evaluator."""
+    def __init__(self, config: AppConfig, pipeline: InventoryPipeline | None = None) -> None:
+        """Initializes ValidationRunner, pipeline, and evaluator.
+
+        Args:
+            config: Fully validated application configuration.
+            pipeline: Pipeline đã nạp sẵn để dùng lại (web: GPU 4GB không chứa nổi hai pipeline);
+                None thì tự dựng từ ``config``.
+        """
         self._config = config
-        self._pipeline = InventoryPipeline(config)
+        self._pipeline = pipeline if pipeline is not None else InventoryPipeline(config)
         self._evaluator = Evaluator(config)
         self._output_dir = config.resolve_path(config.paths.output_dir)
         self._output_dir.mkdir(parents=True, exist_ok=True)

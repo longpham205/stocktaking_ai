@@ -69,12 +69,7 @@ def _write_default_config_yaml(config_path: Path, project_root: Path) -> None:
             "plugin_weights_dir": "weights/plugins",
             "refinement_weights_dir": "weights/refinement",
         },
-        "catalog": {
-            "build_metadata": True,
-            "products_filename": "products.json",
-            "product_ids_filename": "product_ids.json",
-            "id_mapping": {"1": "prod_red_square", "2": "prod_blue_square"},
-        },
+        "catalog": {"source": "sqlite", "db_path": "data/db/app.db"},
         "detection": {
             "backend": "mock_contour",
             "weights_path": "weights/detector/model.pt",
@@ -147,7 +142,6 @@ def _write_default_config_yaml(config_path: Path, project_root: Path) -> None:
             "ocr": {"enabled": True, "language": "en", "device": "cpu", "min_text_length": 2, "confidence_boost": 0.08},
             "color": {"enabled": True, "n_clusters": 3, "confidence_boost": 0.03},
             "barcode": {"enabled": True, "confidence_boost": 0.20},
-            "force_rules": {"2": ["barcode"]},
         },
         "storage": {
             "save_json": True,
@@ -191,14 +185,45 @@ def test_config(tmp_path: Path) -> AppConfig:
 
     with open(config_path, "r", encoding="utf-8") as file_handle:
         raw = yaml.safe_load(file_handle)
-    return AppConfig(**raw)
+    config = AppConfig(**raw)
+    _seed_test_catalog(config)
+    return config
+
+
+def _seed_test_catalog(config: AppConfig) -> None:
+    """Catalog DB tối thiểu: "1" -> prod_red_square, "2" -> prod_blue_square (barcode, force barcode)."""
+    from src.catalog.db import CatalogMeta, Product, ProductEvidence, Session, create_all, make_engine
+
+    engine = make_engine(config.resolve_path(config.catalog.db_path))
+    try:
+        create_all(engine)
+        with Session(engine) as session:
+            session.add(Product(product_id="1", product_name="prod_red_square", gallery_folder="prod_red_square"))
+            session.add(Product(product_id="2", product_name="prod_blue_square", gallery_folder="prod_blue_square",
+                                barcode="1234567890"))
+            session.flush()
+            session.add(ProductEvidence(product_id="2", evidence_type="force_evidence", value_json='["barcode"]'))
+            session.add(CatalogMeta(key="next_product_id", value="3"))
+            session.commit()
+    finally:
+        engine.dispose()
+
+
+@pytest.fixture
+def test_catalog(test_config: AppConfig):
+    """Catalog trong bộ nhớ: SKU "1"–"9"; SKU "2" bắt buộc plugin barcode (force_evidence)."""
+    from src.catalog.repository import CatalogData, InMemoryCatalogRepository, ProductRecord
+
+    products = [ProductRecord(product_id=str(i), product_name=f"P{i}") for i in range(1, 10)]
+    evidence = {"2": {"force_evidence": ["barcode"]}}
+    return InMemoryCatalogRepository(CatalogData.build(products, evidence, {}))
 
 
 @pytest.fixture
 def gallery_config(test_config: AppConfig) -> AppConfig:
     """Extends `test_config` with a two-product gallery + built catalog/index.
 
-    Product IDs come from `catalog.id_mapping` in `test_config`:
+    Product IDs come from the catalog DB seeded by `test_config`:
     "1" -> prod_red_square, "2" -> prod_blue_square.
 
     Args:
@@ -206,7 +231,7 @@ def gallery_config(test_config: AppConfig) -> AppConfig:
 
     Returns:
         The same AppConfig, after populating its gallery, running
-        MetadataBuilder + GalleryIndexBuilder (via BuildPipeline).
+        sync_gallery + GalleryIndexBuilder (via BuildPipeline).
     """
     gallery_dir = test_config.resolve_path(test_config.paths.gallery_dir)
 
@@ -223,18 +248,5 @@ def gallery_config(test_config: AppConfig) -> AppConfig:
     cv2.imwrite(str(blue_dir / "01.png"), blue_image)
 
     BuildPipeline(test_config).run()
-
-    # Give product "2" (prod_blue_square) a fake catalog barcode, used by
-    # Reranker/BarcodePlugin-related tests.
-    products_path = (
-        test_config.resolve_path(test_config.paths.metadata_dir) / test_config.catalog.products_filename
-    )
-    with products_path.open("r", encoding="utf-8") as file_handle:
-        products = json.load(file_handle)
-    for product in products:
-        if product["product_id"] == "2":
-            product["barcode"] = "1234567890"
-    with products_path.open("w", encoding="utf-8") as file_handle:
-        json.dump(products, file_handle, ensure_ascii=False, indent=2)
 
     return test_config

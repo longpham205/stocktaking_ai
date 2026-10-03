@@ -233,6 +233,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--min-recall", type=float, default=None, help="chặn nếu recall(accepted+uncertain) thấp hơn")
     ap.add_argument("--min-precision", type=float, default=None, help="chặn nếu precision(accepted+uncertain) thấp hơn")
     args = ap.parse_args(argv)
+    # Windows: stdout bị chuyển hướng dùng cp1252 -> in tiếng Việt sẽ lỗi.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
 
     try:
         if bool(args.current) == bool(args.config):

@@ -38,7 +38,6 @@ coverage.xml
 *.cover
 *.log
 .hypothesis/
-debug/
 test.py
 
 # ==========================================
@@ -116,3 +115,10 @@ data/metadata/product_ids.json
 # ==========================================
 # 8. TEMPORARY FILES
 # ==========================================
+# Ghi chu phien lam viec + thu muc cho xoa (chi tren may)
+NOTES.md
+_trash/
+
+# Tai lieu lam viec noi bo (chi tren may)
+CLAUDE.md
+docs/dev/

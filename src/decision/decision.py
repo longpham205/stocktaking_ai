@@ -27,6 +27,8 @@ into from outside).
 
 from __future__ import annotations
 
+from src.catalog.factory import open_catalog_repository
+from src.catalog.repository import BaseCatalogRepository
 from src.core.config import AppConfig
 from src.core.logger import get_logger
 from src.core.utils import clip_coordinate, timer
@@ -46,17 +48,21 @@ REASON_FORCE = "force"
 class DecisionEngine:
     """Applies rule-based thresholds to resolve retrieval candidates."""
 
-    def __init__(self, config: AppConfig) -> None:
+    def __init__(self, config: AppConfig, catalog: BaseCatalogRepository | None = None) -> None:
         """Initializes the DecisionEngine with its threshold configuration.
 
         Args:
             config: Fully validated application configuration.
+            catalog: Catalog repository dùng chung (nguồn ``force_evidence``); None thì mở theo
+                ``catalog.source``. Truy vấn lúc dùng nên ``catalog.reload()`` có hiệu lực ngay.
         """
         self._config = config.decision
         self._plugins_enabled = config.plugins.enabled
-        self._force_rules: dict[str, frozenset[str]] = {
-            product_id: frozenset(plugin_names)
-            for product_id, plugin_names in config.plugins.force_rules.items()
+        self._catalog = catalog if catalog is not None else open_catalog_repository(config)
+        force_rules = {
+            pid: sorted(self._catalog.force_evidence(pid))
+            for pid in self._catalog.products()
+            if self._catalog.force_evidence(pid)
         }
         logger.info(
             "DecisionEngine initialized with similarity_threshold=%.2f "
@@ -67,10 +73,10 @@ class DecisionEngine:
             self._config.uncertain_band,
             self._config.ambiguous_top_n,
             self._config.ambiguous_margin,
-            len(self._force_rules),
+            len(force_rules),
         )
         
-        logger.info("DecisionEngine force_rules content: %s", dict(self._force_rules))
+        logger.info("DecisionEngine force_rules content: %s", force_rules)
 
     def evaluate_thresholds(self, similarity: float, detection_confidence: float) -> tuple[str, float]:
         """Applies the accept/uncertain/reject threshold formula.
@@ -131,7 +137,7 @@ class DecisionEngine:
         """
         forced: set[str] = set()
         for candidate in retrieval_result.candidates:
-            forced.update(self._force_rules.get(candidate.product_id, frozenset()))
+            forced.update(self._catalog.force_evidence(candidate.product_id))
         return frozenset(forced)
 
     def decide(self, retrieval_result: RetrievalResult) -> DecisionResult:

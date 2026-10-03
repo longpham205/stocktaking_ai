@@ -169,6 +169,10 @@ def main(argv: list[str] | None = None) -> int:
                     help="thêm tên khoá bỏ qua khi so --exact (lặp lại được), ví dụ --ignore crop_id")
     ap.add_argument("--all-deltas", action="store_true", help="in cả metric không đổi")
     args = ap.parse_args(argv)
+    # Windows: stdout bị chuyển hướng dùng cp1252 -> in tiếng Việt sẽ lỗi.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
     _EXTRA_IGNORE.clear()
     _EXTRA_IGNORE.update(k.lower() for k in args.ignore)
 

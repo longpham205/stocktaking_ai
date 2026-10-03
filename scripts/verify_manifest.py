@@ -17,7 +17,7 @@ import sys
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-MANIFEST_FILE = PROJECT_ROOT / "assets_manifest.json"
+MANIFEST_FILE = PROJECT_ROOT / "configs" / "assets_manifest.json"
 
 
 def sha256_of(path: Path, chunk_size: int = 1 << 20) -> str:

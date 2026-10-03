@@ -14,10 +14,10 @@ barcode decoding, or interact directly with Storage/UI (see
 
 Identity convention:
     Every "product_id" surfaced by this module (in RetrievalCandidate,
-    gallery_metadata.json entries, products.json entries) is the stable
+    gallery_metadata.json entries, catalog entries) is the stable
     **internal numeric ID as a string** (e.g. "1", "9", "20") — never the
-    gallery folder name. See src/catalog/metadata.py for how these IDs
-    are assigned.
+    gallery folder name. IDs come from the catalog DB (src/catalog,
+    CatalogRepository); they equal the COCO category_id and never change.
 
 Runtime flow:
 
@@ -36,6 +36,8 @@ import json
 import faiss
 import numpy as np
 
+from src.catalog.factory import open_catalog_repository
+from src.catalog.repository import BaseCatalogRepository
 from src.core.config import AppConfig
 from src.core.logger import get_logger
 from src.core.utils import timer
@@ -48,7 +50,7 @@ logger = get_logger(__name__)
 class Retriever:
     """Generates query embeddings and searches the pre-built gallery index."""
 
-    def __init__(self, config: AppConfig) -> None:
+    def __init__(self, config: AppConfig, catalog: BaseCatalogRepository | None = None) -> None:
         """Initializes the Retriever.
 
         Loads the configured embedding backend, the pre-built FAISS
@@ -57,6 +59,7 @@ class Retriever:
 
         Args:
             config: Fully validated application configuration.
+            catalog: Catalog repository dùng chung; None thì mở theo ``catalog.source``.
 
         Raises:
             FileNotFoundError: If the required FAISS index, gallery
@@ -67,13 +70,13 @@ class Retriever:
         self._config = config.retrieval
         self._index_path = config.resolve_path(self._config.gallery_index_path)
         self._metadata_path = config.resolve_path(self._config.gallery_metadata_path)
-        self._products_path = config.resolve_path(config.paths.metadata_dir) / config.catalog.products_filename
         self._embedding_dim = self._config.embedding_dim
 
         self._backend = self._load_backend()
         self._index = self._load_index()
         self._metadata = self._load_gallery_metadata()
-        self._products = self._load_products()
+        self._catalog = catalog if catalog is not None else open_catalog_repository(config)
+        logger.info("Loaded %d product(s) from catalog (source=%s).", len(self._catalog.products()), config.catalog.source)
 
         logger.info(
             "Retriever initialized with backend='%s' gallery_size=%d embedding_dim=%d",
@@ -193,44 +196,6 @@ class Retriever:
             )
         return metadata
 
-    def _load_products(self) -> dict[str, dict]:
-        """Loads the product catalog, keyed by internal product_id (string).
-
-        Returns:
-            Mapping of product_id -> product information dict.
-
-        Raises:
-            FileNotFoundError: If the product catalog does not exist.
-            ValueError: If the catalog JSON is invalid.
-        """
-        if not self._products_path.is_file():
-            raise FileNotFoundError(
-                f"Product catalog was not found: {self._products_path}. "
-                "Run the metadata build step before inference."
-            )
-
-        logger.info("Loading product catalog from '%s'.", self._products_path)
-        try:
-            with self._products_path.open("r", encoding="utf-8") as file_handle:
-                products = json.load(file_handle)
-        except json.JSONDecodeError as exc:
-            raise ValueError(f"Invalid product catalog JSON: {self._products_path}") from exc
-
-        if not isinstance(products, list):
-            raise ValueError("Product catalog must be a JSON list.")
-
-        product_map: dict[str, dict] = {}
-        for product in products:
-            if not isinstance(product, dict):
-                continue
-            product_id = product.get("product_id")
-            if product_id is None:
-                continue
-            product_map[str(product_id)] = product
-
-        logger.info("Loaded %d product(s) from catalog.", len(product_map))
-        return product_map
-
     def _get_product_name(self, product_id: str) -> str:
         """Resolves the display name for a product_id.
 
@@ -241,11 +206,11 @@ class Retriever:
             The product's display name, or the product_id itself if not
             found in the catalog (fail-soft, never raises).
         """
-        product = self._products.get(product_id)
+        product = self._catalog.products().get(product_id)
         if product is None:
             logger.warning("Product ID '%s' not found in catalog; using ID as display name.", product_id)
             return product_id
-        return str(product.get("product_name", product_id))
+        return product.product_name
 
     def get_product(self, product_id: str) -> dict | None:
         """Returns the full catalog entry for a product_id, if known.
@@ -259,7 +224,7 @@ class Retriever:
             Reranker to match plugin evidence (e.g. barcode) against
             catalog fields.
         """
-        return self._products.get(product_id)
+        return self._catalog.get_product(product_id)
 
     # ------------------------------------------------------------------
     # Retrieval

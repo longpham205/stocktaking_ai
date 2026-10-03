@@ -63,3 +63,19 @@ def test_pipeline_similarity_threshold_override(gallery_config, synthetic_image:
     strict_result = pipeline.run(image_data, similarity_threshold=0.999)
 
     assert strict_result.total_items <= default_result.total_items
+
+
+def test_pipeline_reports_rejected_boxes(gallery_config, synthetic_image: np.ndarray) -> None:
+    """Vùng bị loại không vào items nhưng có bbox trong rejected_bboxes (UI vẽ khung đỏ)."""
+    from src.models.models import BoundingBox
+
+    pipeline = InventoryPipeline(gallery_config)
+    image_data = ImageData(image_id="t9", source_path="mem.jpg", image_array=synthetic_image, width=300, height=300)
+    normal = pipeline.run(image_data)
+    assert len(normal.items) + len(normal.rejected_bboxes) <= normal.detected_count
+    strict = pipeline.run(image_data, similarity_threshold=0.999, min_confidence_accept=0.999)
+    assert strict.detected_count >= 1 and not [i for i in strict.items if i.status == "accepted"]
+    assert len(strict.items) + len(strict.rejected_bboxes) >= 1
+    assert all(isinstance(b, BoundingBox) for b in strict.rejected_bboxes)
+    traced, _ = pipeline.run_with_trace(image_data)
+    assert len(traced.rejected_bboxes) == len(normal.rejected_bboxes)

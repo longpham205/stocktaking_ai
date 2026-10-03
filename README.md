@@ -4,6 +4,8 @@
 
 > **Ghi chú phiên bản:** Tài liệu này mô tả hệ thống ở trạng thái v0.1.0 (extended). Các mục đánh dấu **[Kế hoạch]** là hạng mục chưa triển khai, dự kiến bổ sung ở các phiên bản sau.
 
+> **Hướng dẫn nhanh:** chạy web POS — [`docs/WEB.md`](docs/WEB.md) · chuẩn bị và xử lý sự cố ngày demo — [`docs/DEMO.md`](docs/DEMO.md) · dữ liệu và catalog — [`docs/04_DATA_AND_CATALOG.md`](docs/04_DATA_AND_CATALOG.md).
+
 ## Mục lục
 
 1. [Tổng quan](#1-tổng-quan)
@@ -122,37 +124,42 @@ Hai phương thức thực thi:
   - *Màu sắc:* trích xuất CIELAB, so khớp bằng CIEDE2000.
   - *Consensus & Guard:* bảo vệ kết quả retrieval tin cậy khỏi nhiễu plugin, kiểm tra chặt các cặp sản phẩm dễ nhầm.
 - **Bộ validation 9 giai đoạn:** đánh giá từng giai đoạn, từ detection đến phân loại SKU end-to-end.
+- **Web POS (`backend/` + `frontend/`):** thu ngân chụp rổ hàng bằng điện thoại, hệ thống lập hoá đơn, đánh dấu dòng cần xác nhận, thanh toán; trang quản trị sửa giá, barcode, bằng chứng nhận diện, thiết lập nâng cao và chạy kiểm định. Chỉ dùng thư viện chuẩn (`http.server` + `sqlite3`), một cổng 8000. Xem [`docs/WEB.md`](docs/WEB.md).
 - **Giao diện desktop (Tkinter):** hiển thị số lượng SKU, chỉnh ngưỡng động, kiểm tra ảnh và trace.
 
 ## 5. Cấu trúc dự án
 
 ```
 stocktaking_ai/
-├── .env
-├── .gitignore
 ├── README.md
 ├── requirements.txt
-├── setup.bat / setup.sh / setup.command
-├── run.py                       # CLI entry point (Build -> Infer / Validate / UI)
-├── assets_manifest.json
+├── run.py                       # Điểm vào pipeline (Build -> Infer / Validate / UI)
+├── launch.bat                   # Khởi động Web POS (Windows); Linux/macOS: bin/launch.sh
+├── bin/                         # setup.bat / setup.sh / setup_colab.sh / launch.sh
 ├── configs/
-│   └── config.yaml              # Cấu hình runtime chính
-├── data/
-│   ├── gallery/                 # Ảnh sản phẩm tham chiếu theo từng SKU
-│   ├── metadata/                # Catalog SKU, bản đồ màu, ánh xạ ID
-│   ├── benchmark/                # Dataset đánh giá định dạng COCO
-│   ├── query/                   # Ảnh bàn thu ngân đầu vào
-│   ├── outputs/                 # JSON, CSV, ảnh annotation
-│   └── cache/                   # FAISS index & metadata cache
-├── docs/
-├── notebooks/
-├── scripts/
-├── weights/                     # detector / refinement / retriever
-├── src/
+│   ├── config.yaml              # Cấu hình pipeline (dữ liệu thật)
+│   ├── config.demo.yaml         # Cấu hình demo CPU (sinh tự động, không sửa tay)
+│   ├── backend.yaml             # Cấu hình web
+│   └── assets_manifest.json     # Checksum weights + gallery + benchmark
+├── src/                         # Pipeline AI (không import backend/)
 │   ├── catalog/  core/  decision/  detection/  inference/
 │   ├── models/   pipeline/  plugins/  retrieval/
-│   ├── segmentation/  storage/  ui/  validation/
-└── tests/
+│   └── segmentation/  storage/  ui/  validation/
+├── backend/                     # API web POS (stdlib http.server + sqlite3)
+├── frontend/                    # Giao diện web (HTML/JS thuần)
+├── scripts/                     # Công cụ: kiểm môi trường, cổng kiểm chứng, snapshot, đặt lại mật khẩu
+├── debug/                       # Viewer từng giai đoạn của pipeline
+├── tests/                       # pytest + smoke giao diện
+├── notebooks/
+├── docs/                        # Đặc tả 01–04, WEB.md (web POS), DEMO.md (hướng dẫn ngày demo)
+├── data/                        # Dữ liệu thật (không commit)
+│   ├── gallery/                 # Ảnh tham chiếu theo từng SKU
+│   ├── benchmark/               # Dataset đánh giá định dạng COCO
+│   ├── db/app.db                # Catalog + dữ liệu web (SQLite)
+│   ├── cache/                   # FAISS index & metadata cache
+│   ├── query/  outputs/  metadata/
+├── data_demo/                   # Dữ liệu tổng hợp cho demo CPU (không commit)
+└── weights/                     # detector / refinement / retriever (không commit)
 ```
 
 ## 6. Yêu cầu hệ thống
@@ -168,7 +175,7 @@ stocktaking_ai/
 
 ### Thiết lập nhanh
 
-Chạy script tương ứng từ **thư mục gốc** của project: `setup.bat` (Windows), `./setup.sh` (Linux), `./setup.command` (macOS).
+Chạy script tương ứng: `bin\setup.bat` (Windows), `./bin/setup.sh` (Linux / macOS / WSL). Script tạo `venv/`, cài PyTorch + thư viện, tải và kiểm weights/data, chạy test; **không** tự mở giao diện. Máy không có GPU: script tự đặt `device: cpu` (đổi tay bằng `python scripts/set_device.py cpu|cuda`).
 
 ### Thiết lập thủ công
 
@@ -176,8 +183,8 @@ Chạy script tương ứng từ **thư mục gốc** của project: `setup.bat`
 git clone https://github.com/longpham205/stocktaking_ai
 cd stocktaking_ai
 
-python -m venv .venv
-source .venv/bin/activate        # Windows: .venv\Scripts\activate
+python -m venv venv
+source venv/bin/activate         # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 
 # Linux: thư viện hệ thống cho giải mã mã vạch
@@ -196,8 +203,8 @@ sudo apt-get install -y libzbar0
 
 ## 8. Đặc tả Dataset & Metadata
 
-- **Gallery (`data/gallery/`):** ảnh tham chiếu theo từng SKU, tên thư mục ánh xạ đến descriptor trong `configs/config.yaml`. **[Kế hoạch]** mỗi SKU có ảnh nhiều mặt (trước, sau, hai bên) để khớp tốt hơn với việc sản phẩm có thể đặt ở hướng bất kỳ trên bàn thu ngân.
-- **Chuẩn màu (`data/metadata/product_colors.json`):** màu canonical dạng RGB/CIELAB cho từng biến thể.
+- **Gallery (`data/gallery/`):** ảnh tham chiếu theo từng SKU; thư mục ánh xạ tới `product_id` qua catalog DB. SKU mới: bỏ ảnh vào `data/gallery_inbox/<tên>/` rồi chạy `python -m src.catalog.sync_gallery ...` (xem `docs/04_DATA_AND_CATALOG.md`). **[Kế hoạch]** mỗi SKU có ảnh nhiều mặt (trước, sau, hai bên) để khớp tốt hơn với việc sản phẩm có thể đặt ở hướng bất kỳ trên bàn thu ngân.
+- **Chuẩn màu (bảng `color_reference` trong catalog DB):** màu canonical dạng RGB + hex cho từng biến thể (Reranker tự đổi sang Lab). File `product_colors.json` chỉ còn là đầu vào một lần của migrate.
 
 ```json
 {
@@ -205,7 +212,7 @@ sudo apt-get install -y libzbar0
 }
 ```
 
-- **Catalog (`products.json`):** thông tin SKU và mã GTIN/barcode. **[Kế hoạch]** thêm trường giá để hỗ trợ tính tổng tiền khi thanh toán.
+- **Catalog (SQLite `data/db/app.db`, `catalog.source: sqlite`):** SKU, barcode, bằng chứng nhận diện (từ khoá OCR, mã màu, cặp dễ nhầm, plugin bắt buộc). Nạp lần đầu bằng `python -m src.catalog.migrate ...`; giá do web quản lý (bảng `product_prices`). Chi tiết: `docs/04_DATA_AND_CATALOG.md`.
 - **Benchmark (`data/benchmark/`):** annotation dạng COCO, `category_id` ánh xạ đến `product_id` nội bộ.
 
 ## 9. Schema cấu hình
@@ -214,13 +221,13 @@ Toàn bộ tham số runtime nằm trong `configs/config.yaml`:
 
 | Khối | Phạm vi |
 | --- | --- |
-| `catalog` | Ánh xạ SKU ID, biên dịch catalog |
+| `catalog` | Nguồn catalog: `source` (`sqlite`/`snapshot`), `db_path`/`snapshot_path` — dữ liệu SKU nằm trong DB, không trong config |
 | `detection` | Backend, confidence, IoU, tham số detector |
 | `refinement` | Điều kiện gọi SAM2, giới hạn hình học |
 | `cropping` | Padding box, độ phân giải tensor |
 | `retrieval` | Kích thước vector, tham số FAISS, Top-K |
 | `decision` | Ngưỡng accept / uncertain / reject |
-| `plugins` | Cấu hình OCR, Color, Barcode, rule override |
+| `plugins` | Cấu hình OCR, Color, Barcode (plugin bắt buộc theo SKU nằm trong catalog: `force_evidence`) |
 | `rerank` | Trọng số hợp nhất, ngưỡng ΔE, rule bảo vệ |
 | `storage` | Định dạng output, kiểu annotation |
 | `validation` | IoU đánh giá, bật/tắt stage, xuất báo cáo |
@@ -239,7 +246,13 @@ python run.py --mode validate --benchmark-dir data/benchmark/
 
 # 4. Giao diện desktop
 python run.py --mode ui
+
+# 5. Web POS (kiểm môi trường rồi khởi động server ở cổng 8000)
+.\launch.bat            # dữ liệu thật; Linux/macOS: ./bin/launch.sh
+.\launch.bat demo       # dữ liệu demo tổng hợp, chạy CPU
 ```
+
+Web POS cần catalog đã migrate vào `data/db/app.db`; chi tiết và cách dùng trên điện thoại ở [`docs/WEB.md`](docs/WEB.md). Các bước chuẩn bị và xử lý sự cố cho buổi demo: [`docs/DEMO.md`](docs/DEMO.md).
 
 Dùng như thư viện Python:
 
@@ -261,21 +274,23 @@ result, trace = pipeline.run_with_trace(image_data)   # chẩn đoán đầy đ�
 | Inference | Ảnh / thư mục ảnh | `result.json` (audit log), `result.csv` (số lượng theo SKU), `result.jpg` (ảnh annotation) |
 | Validation | Thư mục benchmark COCO | `report.json/csv`, `records.csv`, ảnh & biểu đồ chẩn đoán |
 | GUI | Tương tác người dùng | Bảng đếm thời gian thực, overlay, thanh chỉnh ngưỡng |
+| Web POS | Ảnh chụp từ điện thoại / tải lên | Hoá đơn (dòng sản phẩm, số lượng, giá), ảnh kèm khung nhận diện; lưu trong `data/db/app.db` |
 
 ## 12. Đánh giá hiệu năng
 
-Đo trên bộ test hiện có: 8 SKU cốt lõi (tối đa 16 SKU mở rộng), 31 cảnh, 293 instance.
+Đo trên bộ test hiện có: 8 SKU cốt lõi, 31 cảnh, 293 instance (`python run.py --mode validate`). Số đo ngày 2026-10-03, config hiện tại (ngưỡng detector 0.50, catalog trong DB, Reranker chỉ dùng bằng chứng khai báo). Baseline cổng kiểm chứng: `data/baseline/report.json`.
 
 | Giai đoạn | Metric | Giá trị |
 | --- | --- | --- |
-| Detection (RF-DETR FT) | Precision / Recall / mAP@50 | 0.970 / 0.940 / 0.990 |
-| Detection | F1 (class-agnostic, IoU ≥ 0.3) | 0.950 |
-| Visual Retrieval (SigLIP2) | Top-1 / Top-5 | 0.735 / 1.000 |
-| Decision Engine | Pre-fusion accuracy | 0.712 |
-| Evidence Fusion | Accuracy delta | +0.224 |
-| Post-fusion | Accuracy | 0.936 |
-| Product Counting | Count accuracy | 0.871 |
-| End-to-End | Precision / Recall / F1 | 0.913 / 0.966 / 0.939 |
+| Detection (RF-DETR FT) | Precision / Recall / F1 (class-agnostic, IoU ≥ 0.3) | 0.952 / 0.956 / 0.954 |
+| Visual Retrieval (SigLIP2) | Top-1 / Top-5 | 0.721 / 0.996 |
+| Decision Engine | Pre-fusion accuracy | 0.700 |
+| Evidence Fusion | Accuracy delta | +0.231 |
+| Post-fusion | Accuracy | 0.931 |
+| Product Counting | Count accuracy | 0.548 |
+| End-to-End | Precision / Recall / F1 | 0.891 / 0.894 / 0.893 |
+
+Số cũ trong các phiên bản trước của tài liệu (F1 0.939, post-fusion 0.936, count accuracy 0.871, mAP@50 0.990) đo ở một trạng thái weights/dữ liệu/code cũ hơn và **không tái hiện được** trên dữ liệu hiện tại; mAP@50 không được `validate` tính lại.
 
 **[Kế hoạch]** Sau khi mở rộng bộ dữ liệu ảnh bàn thu ngân (đa dạng hướng đặt, điều kiện ánh sáng), đo lại toàn bộ metric trên, kèm hai chỉ số mới: độ trễ end-to-end trên mỗi ảnh và tỷ lệ ca bị gắn cờ `ambiguous` cần thu ngân xác nhận.
 
@@ -294,8 +309,6 @@ result, trace = pipeline.run_with_trace(image_data)   # chẩn đoán đầy đ�
 - Gallery nhiều mặt (trước/sau/bên) và truy xuất bất biến hướng (augmentation xoay khi lập chỉ mục, hoặc truy vấn với nhiều bản xoay của crop).
 - Vùng quan tâm (ROI) và trừ nền cho camera cố định để loại nhiễu mặt bàn.
 - Lọc đối tượng không phải sản phẩm (tay, túi, hóa đơn).
-- Màn hình xác nhận cho thu ngân với các ca bị gắn cờ `ambiguous`.
-- Trường giá trong catalog và tính tổng tiền khi thanh toán.
 - Tự động trích xuất màu tham chiếu từ gallery bằng K-Means trong CIELAB.
 - Tinh chỉnh heuristic kích hoạt SAM2 cho sản phẩm xếp chồng.
 - Mở rộng OCR đa ngôn ngữ.

@@ -8,7 +8,6 @@ class directly, and must NEVER bypass `InventoryPipeline`.
 
 from __future__ import annotations
 
-import json
 import threading
 import tkinter as tk
 from collections import Counter
@@ -251,16 +250,15 @@ class StocktakingApp:
         self._root.protocol("WM_DELETE_WINDOW", self._on_main_window_close)
 
     def _load_product_id_mapping(self) -> dict[str, str]:
-        path = self._config.resolve_path(self._config.paths.metadata_dir) / self._config.catalog.product_ids_filename
-        if not path.is_file():
-            return {}
+        """product_id -> thư mục gallery, lấy từ catalog repository (chỉ để hiển thị ảnh tham chiếu)."""
+        from src.catalog.factory import open_catalog_repository
+
         try:
-            with path.open("r", encoding="utf-8") as file_handle:
-                data = json.load(file_handle)
-            products = data.get("products", {})
-            return {str(pid): str(folder) for pid, folder in products.items()}
-        except (json.JSONDecodeError, OSError):
+            catalog = open_catalog_repository(self._config)
+        except (FileNotFoundError, ValueError) as exc:
+            logger.warning("Không mở được catalog để hiển thị ảnh tham chiếu: %s", exc)
             return {}
+        return {pid: folder for folder, pid in catalog.folder_to_product_id().items()}
 
     def _resolve_product_folder(self, product_id: str) -> str | None:
         return self._product_id_map.get(str(product_id))

@@ -115,19 +115,24 @@ def run_checks(
 
     # ---- Catalog, gallery, index, weights
     paths = cfg.get("paths", {})
-    meta_dir = _under(root, paths.get("metadata_dir", "data/metadata"))
-    products_file = meta_dir / cfg.get("catalog", {}).get("products_filename", "products.json")
+    # Catalog (Phase 1B): web + pipeline đọc bảng catalog trong DB (catalog.source = sqlite). Bắt buộc kể cả --fake.
+    ccfg = cfg.get("catalog", {})
     catalog_ids: set[str] = set()
-    if not products_file.is_file():
-        add(FAIL, "Catalog sản phẩm", f"không thấy {products_file} — chạy `python run.py --mode validate --config ...` để build metadata")
+    cat_db: Path | None = None
+    if ccfg.get("source") != "sqlite" or not ccfg.get("db_path"):
+        add(FAIL, "Catalog sản phẩm", "config cần catalog.source: sqlite và catalog.db_path (web đọc catalog từ DB)")
     else:
+        cat_db = _under(root, ccfg["db_path"])
         try:
-            data = json.loads(products_file.read_text(encoding="utf-8"))
-            items = data if isinstance(data, list) else data.get("products", [])
-            catalog_ids = {str(i.get("product_id")) for i in items if i.get("product_id") is not None}
-            add(OK if catalog_ids else FAIL, "Catalog sản phẩm", f"{len(catalog_ids)} SKU ({products_file.name})" if catalog_ids else f"{products_file} rỗng")
-        except (ValueError, AttributeError) as exc:
-            add(FAIL, "Catalog sản phẩm", f"{products_file} hỏng: {exc}")
+            con = sqlite3.connect(f"file:{cat_db.as_posix()}?mode=ro", uri=True)
+            try:
+                catalog_ids = {str(r[0]) for r in con.execute("SELECT product_id FROM product WHERE is_active = 1")}
+            finally:
+                con.close()
+            add(OK if catalog_ids else FAIL, "Catalog sản phẩm",
+                f"{len(catalog_ids)} SKU ({cat_db.name})" if catalog_ids else f"{cat_db} chưa có SKU — chạy python -m src.catalog.migrate ...")
+        except sqlite3.Error as exc:
+            add(FAIL, "Catalog sản phẩm", f"không đọc được bảng product trong {cat_db}: {exc} — chạy python -m src.catalog.migrate ...")
 
     gallery_dir = _under(root, paths.get("gallery_dir", "data/gallery"))
     folders = [d for d in gallery_dir.iterdir() if d.is_dir()] if gallery_dir.is_dir() else []
@@ -194,18 +199,22 @@ def run_checks(
         try:
             conn = sqlite3.connect(f"file:{db_file}?mode=ro", uri=True, timeout=5)
             integrity = conn.execute("PRAGMA integrity_check").fetchone()[0]
-            users = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
-            priced = {r[0] for r in conn.execute("SELECT product_id FROM product_prices")}
-            barcodes = {r[0]: r[1] for r in conn.execute("SELECT product_id, barcode FROM product_overrides")}
+            # DB có thể chỉ mới có bảng catalog (migrate xong, web chưa chạy lần nào): bảng web sẽ được tạo lần chạy đầu.
+            web_ready = bool(conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='users'").fetchone())
+            users = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0] if web_ready else 0
+            priced = {r[0] for r in conn.execute("SELECT product_id FROM product_prices")} if web_ready else set()
             conn.close()
-            add(OK if integrity == "ok" else FAIL, "Database web", f"{db_file.name}: {users} tài khoản" if integrity == "ok" else f"không toàn vẹn: {integrity}")
+            detail = (f"{db_file.name}: {users} tài khoản" if web_ready else f"{db_file.name}: chưa có bảng web — sẽ tạo ở lần chạy đầu")
+            add(OK if integrity == "ok" else FAIL, "Database web", detail if integrity == "ok" else f"không toàn vẹn: {integrity}")
             if catalog_ids:
                 no_price = len(catalog_ids - priced)
                 add(OK if not no_price else WARN, "Giá sản phẩm",
                     "mọi SKU đã có giá" if not no_price else f"{no_price}/{len(catalog_ids)} SKU chưa có giá — thu ngân sẽ phải nhập giá tay (Admin → Sản phẩm → lọc 'Thiếu giá')")
-                data = json.loads(products_file.read_text(encoding="utf-8"))
-                items = data if isinstance(data, list) else data.get("products", [])
-                with_bc = {str(i["product_id"]) for i in items if i.get("barcode")} | {k for k, b in barcodes.items() if b}
+                bc = sqlite3.connect(f"file:{cat_db.as_posix()}?mode=ro", uri=True)
+                try:
+                    with_bc = {str(r[0]) for r in bc.execute("SELECT product_id FROM product WHERE barcode IS NOT NULL AND barcode <> ''")}
+                finally:
+                    bc.close()
                 add(OK, "Barcode", f"{len(with_bc & catalog_ids)}/{len(catalog_ids)} SKU có barcode (chỉ SKU có barcode mới quét được)")
         except sqlite3.Error as exc:
             add(FAIL, "Database web", f"không mở được {db_file}: {exc}")

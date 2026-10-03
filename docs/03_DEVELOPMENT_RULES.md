@@ -8,7 +8,7 @@
 
 # Purpose
 
-Mandatory code standards and module interaction principles for every file in `src/`.
+Mandatory code standards and module interaction principles for every file in `src/` (Rules 1–18). The web POS in `backend/` and `frontend/` follows Rule 19.
 
 Whenever code and this document disagree, **this document wins**.
 
@@ -96,13 +96,14 @@ This explicitly includes:
 
 - Evidence-fusion weights: `rerank.*`
 - Retrieval-consensus protection curve parameters
-- Confusable-pair lists
 - VAL per-stage metric selection
 - Thresholds
 - Model weights
 - Paths
 
 None of these values may be hard-coded as source-level constants, even during active tuning.
+
+**Product data is not configuration.** SKUs and recognition evidence (OCR keywords, colour codes, confusable pairs, forced plugins, colour references) live in the catalog database and are read through `CatalogRepository` — never in `config.yaml` and never as source constants (see Rule 19.7 and `04_DATA_AND_CATALOG.md`). The config only selects the catalog source (`catalog.source`).
 
 See **Rule 18**.
 
@@ -337,13 +338,13 @@ The following rules are absolute:
 
 The web POS (`backend/`, `frontend/`) is a thin layer **around** the pipeline and must never change how it works.
 
-1. **Single entry point.** `backend/` runs the pipeline only through `InferenceRunner` / `ValidationRunner`. It never calls `InventoryPipeline.run()`, never imports a concrete backend model (`Detector`, `Retriever`, RF-DETR/SAM2/SigLIP2) or plugin. Importing pure modules that touch no GPU (`AppConfig`) is allowed. When in doubt whether an import touches the GPU, treat it as forbidden.
+1. **Single entry point.** `backend/` runs the pipeline only through `InferenceRunner` / `ValidationRunner`. It never calls `InventoryPipeline.run()`, never imports a concrete backend model (`Detector`, `Retriever`, RF-DETR/SAM2/SigLIP2) or plugin. Importing pure modules that touch no GPU (`AppConfig`, `src.core.config.build_config`, `src.catalog.repository`, `src.catalog.validation`) is allowed. When in doubt whether an import touches the GPU, treat it as forbidden.
 2. **`src/` never imports `backend/`.** `src/` must keep running standalone (`run.py --mode infer/validate/ui`, notebooks, Colab).
 3. **Pass thresholds per call, do not mutate config.** Per-request behaviour (`similarity_threshold`, `min_confidence_accept`) goes through the `run_single` arguments, not by editing `AppConfig` at runtime.
 4. **Safe by default.** The backend is exposed through a public tunnel in demos: every endpoint except the health check and login needs a token; there are no default secrets (they are generated randomly and kept out of git); no auto-generated API docs endpoint; uploaded images are verified by decoding them (never trust `Content-Type`); request bodies and uploads have size limits; media URLs are signed and expire; one open shift per account.
 5. **Business data changes are logged.** Any admin edit of prices, barcodes or settings writes a `change_log` row with old/new value and the user.
 6. **Identifiers are stable.** `product_id` equals the benchmark `category_id` and is never renumbered, reused or edited through the UI.
-7. **`[Planned, Phase 1B]` Evidence is explicit.** The Reranker and every plugin use only evidence declared in the catalog (OCR keywords, colour code, barcode, confusable pairs). They must not infer evidence from a product name. *The current `Reranker` still derives some tokens from names; this rule takes effect when Phase 1B moves the catalog into the database.*
+7. **Evidence is explicit.** The Reranker and every plugin use only evidence declared in the catalog (OCR keywords, colour code, barcode, confusable pairs, forced plugins), read through `CatalogRepository`. They must not infer evidence from a product name or folder name; undeclared evidence scores 0. *(In force since Phase 1B / C8; see `docs/04_DATA_AND_CATALOG.md`.)*
 
 ---
 

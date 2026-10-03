@@ -180,6 +180,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--port", type=int, default=8000, help="cổng server để kiểm tra đang chạy (mặc định 8000)")
     ap.add_argument("--overwrite", action="store_true")
     args = ap.parse_args(argv)
+    # Windows: stdout bị chuyển hướng dùng cp1252 -> in tiếng Việt sẽ lỗi.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
     try:
         if args.command == "list":
             rows = list_snapshots(args.data_dir)

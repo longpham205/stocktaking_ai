@@ -33,6 +33,15 @@ class InferenceRunner:
         self._storage = StorageManager(config)
         logger.info("InferenceRunner initialized.")
 
+    @property
+    def pipeline(self) -> InventoryPipeline:
+        """Pipeline đã nạp (để dùng lại, ví dụ ValidationRunner chạy kiểm định từ web)."""
+        return self._pipeline
+
+    def reload_catalog(self) -> str:
+        """Nạp lại catalog của pipeline; trả ``version()`` mới."""
+        return self._pipeline.reload_catalog()
+
     def run_single(
         self,
         image_path: str,

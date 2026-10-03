@@ -172,7 +172,7 @@ def build_routes(app: App):
 
     @route("POST", r"admin/change-log/(\d+)/revert")
     def revert_change(req, s, lid):
-        return app.admin_revert_change(s, _int(lid))
+        return app.admin_revert_change(s, _int(lid), req.json())
 
     @route("GET", r"admin/products")
     def admin_products(req, s):
@@ -181,6 +181,42 @@ def build_routes(app: App):
     @route("PATCH", r"admin/products/([0-9A-Za-z_\-]+)")
     def admin_patch_product(req, s, pid):
         return app.admin_update_product(s, pid, req.json())
+
+    @route("GET", r"admin/products/([0-9A-Za-z_\-]+)/evidence")
+    def admin_product_evidence(req, s, pid):
+        return app.admin_product_evidence(s, pid)
+
+    @route("PATCH", r"admin/products/([0-9A-Za-z_\-]+)/evidence")
+    def admin_patch_evidence(req, s, pid):
+        return app.admin_update_evidence(s, pid, req.json())
+
+    @route("GET", r"admin/colors")
+    def admin_colors(req, s):
+        return {"items": app.admin_colors(s)}
+
+    @route("PATCH", r"admin/colors/([0-9A-Za-z_\-]+)")
+    def admin_patch_color(req, s, code):
+        return app.admin_update_color(s, code, req.json())
+
+    @route("GET", r"admin/config")
+    def admin_config(req, s):
+        return app.admin_config(s)
+
+    @route("POST", r"admin/config/apply")
+    def admin_apply_config(req, s):
+        return app.admin_apply_config(s, req.json())
+
+    @route("POST", r"admin/evidence-test")
+    def admin_evidence_test(req, s):
+        return app.admin_test_evidence(s, req.raw(app.s.max_upload_bytes))
+
+    @route("GET", r"admin/validation")
+    def admin_validation(req, s):
+        return app.admin_validation_status(s)
+
+    @route("POST", r"admin/validation")
+    def admin_start_validation(req, s):
+        return app.admin_start_validation(s, req.json())
 
     @route("GET", r"admin/orders")
     def admin_orders(req, s):
@@ -270,6 +306,9 @@ class Handler(BaseHTTPRequestHandler):
         m = re.match(r"^media/(.+)$", path)
         if m and self.command == "GET":
             return self._media(m.group(1), query)
+        m = re.match(r"^gallery/([0-9]{1,9})/([0-9]{1,4})$", path)
+        if m and self.command == "GET":
+            return self._gallery(m.group(1), int(m.group(2)), query)
         allowed = False
         for method, rx, public, fn in self.server.routes:
             hit = rx.match(path)
@@ -302,6 +341,17 @@ class Handler(BaseHTTPRequestHandler):
             raise ApiError(404, "NOT_FOUND", "Không thấy ảnh")
         self._send(200, target.read_bytes(), mimetypes.guess_type(target.name)[0] or "application/octet-stream",
                    {"Cache-Control": "private, max-age=300"})
+
+    def _gallery(self, pid: str, idx: int, query: dict) -> None:
+        """Ảnh gallery (đã thu nhỏ) qua URL ký ngắn hạn — dùng cho admin chấm màu tham chiếu."""
+        app: App = self.server.app
+        try:
+            exp, sig = int(query.get("exp", ["0"])[0]), query.get("sig", [""])[0]
+        except ValueError:
+            raise ApiError(403, "FORBIDDEN", "Liên kết ảnh không hợp lệ") from None
+        if not verify_media(app.s.jwt_secret, f"g/{pid}/{idx}", exp, sig):
+            raise ApiError(403, "FORBIDDEN", "Liên kết ảnh không hợp lệ hoặc đã hết hạn")
+        self._send(200, app.gallery_image(pid, idx), "image/jpeg", {"Cache-Control": "private, max-age=300"})
 
     def _static(self, path: str) -> None:
         if self.command not in ("GET", "HEAD"):

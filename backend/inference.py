@@ -29,6 +29,7 @@ class InferenceOutput:
     processing_time_ms: float
     has_overlap: bool = False  # pipeline báo ảnh có chồng lấp đáng kể (gợi ý chụp thêm)
     detected_count: int | None = None  # số vật detector tìm thấy (None = pipeline chưa báo cáo)
+    rejected_bboxes: list = field(default_factory=list)  # (x1,y1,x2,y2) vật phát hiện nhưng không nhận ra (khung đỏ)
 
 
 class Executor(Protocol):
@@ -39,16 +40,61 @@ class Executor(Protocol):
 class LocalExecutor:
     """Chạy pipeline trong cùng tiến trình qua `InferenceRunner` (nạp model một lần lúc khởi động)."""
 
-    def __init__(self, pipeline_config: Path) -> None:
+    def __init__(self, pipeline_config: Path, overrides: dict | None = None) -> None:
         if str(ROOT) not in sys.path:
             sys.path.insert(0, str(ROOT))
-        from src.core.config import load_config  # import chậm: cần môi trường AI đầy đủ
-        from src.inference.infer import InferenceRunner
-
-        self._runner = InferenceRunner(load_config(str(pipeline_config)))
+        self._pipeline_config = Path(pipeline_config)
+        self._overrides = dict(overrides or {})
+        self._runner = self._build_runner(self._overrides)
         # Tương thích cả trước và sau bản vá P1-2/P1-4: chỉ truyền tham số mà pipeline hỗ trợ.
         self._params = set(inspect.signature(self._runner.run_single).parameters)
         self._warned_min_conf = False
+
+    def _build_runner(self, overrides: dict):
+        from src.core.config import build_config  # import chậm: cần môi trường AI đầy đủ
+        from src.inference.infer import InferenceRunner
+
+        return InferenceRunner(build_config(self._pipeline_config, overrides))
+
+    @staticmethod
+    def _free_gpu() -> None:
+        import gc
+
+        gc.collect()
+        torch = sys.modules.get("torch")
+        if torch is not None and torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
+    def validate(self, benchmark_dir: str | None, output_dir: Path) -> dict:
+        """Kiểm định trên benchmark, DÙNG LẠI pipeline đang nạp (không nạp bản thứ hai lên GPU).
+        Gọi trên luồng suy luận. Báo cáo ghi vào ``output_dir`` (không đè outputs thường)."""
+        from src.core.config import build_config
+        from src.validation.validate import ValidationRunner
+
+        cfg = build_config(self._pipeline_config, {**self._overrides, "paths.output_dir": str(output_dir)})
+        bench = benchmark_dir or str(cfg.resolve_path(cfg.paths.benchmark_dir))
+        return ValidationRunner(cfg, pipeline=self._runner.pipeline).run(bench)
+
+    def reload_pipeline(self, overrides: dict) -> None:
+        """Nạp lại pipeline với thiết lập nâng cao mới. GPU 4GB không giữ được hai pipeline: gỡ cái cũ trước.
+        Nạp lỗi -> nạp lại thiết lập cũ (rollback) rồi báo lỗi. PHẢI gọi trên luồng suy luận (tuần tự)."""
+        old = self._overrides
+        self._runner = None
+        self._free_gpu()
+        try:
+            self._runner = self._build_runner(overrides)
+            self._overrides = dict(overrides)
+        except Exception:
+            log.exception("Nạp pipeline với thiết lập mới thất bại; quay về thiết lập cũ")
+            self._free_gpu()
+            self._runner = self._build_runner(old)
+            raise
+
+    def reload_catalog(self) -> None:
+        """Nạp lại catalog của pipeline sau khi admin sửa (barcode, bằng chứng, màu tham chiếu)."""
+        fn = getattr(self._runner, "reload_catalog", None)
+        if fn is not None:
+            fn()
 
     def infer(self, image_path: str, similarity_threshold: float | None = None,
               min_confidence_accept: float | None = None) -> InferenceOutput:
@@ -75,8 +121,9 @@ class LocalExecutor:
         ]
         ms = float(getattr(result, "processing_time_ms", 0.0)) or (time.perf_counter() - t0) * 1000
         detected = getattr(result, "detected_count", None)
+        rejected = [(b.x1, b.y1, b.x2, b.y2) for b in (getattr(result, "rejected_bboxes", None) or [])]
         return InferenceOutput(dets, ms, bool(getattr(result, "has_overlap", False)),
-                               int(detected) if isinstance(detected, (int, float)) else None)
+                               int(detected) if isinstance(detected, (int, float)) else None, rejected)
 
 
 class FakeExecutor:
@@ -85,6 +132,18 @@ class FakeExecutor:
     def __init__(self, product_ids: list[str], delay: float = 0.4,
                  fn: Callable[[str], InferenceOutput] | None = None) -> None:
         self._ids, self._delay, self._fn = product_ids, delay, fn
+        self.overrides: dict = {}
+        self.fail_reload = False  # test: giả lập nạp pipeline lỗi
+
+    def validate(self, benchmark_dir: str | None, output_dir: Path) -> dict:
+        time.sleep(self._delay)
+        return {"end_to_end": {"f1": 0.5, "precision": 0.5, "recall": 0.5},
+                "fusion": {"accuracy_after": 0.6}, "fake": True}
+
+    def reload_pipeline(self, overrides: dict) -> None:
+        if self.fail_reload:
+            raise RuntimeError("giả lập: không nạp được pipeline")
+        self.overrides = dict(overrides)
 
     def infer(self, image_path: str, similarity_threshold: float | None = None,
               min_confidence_accept: float | None = None) -> InferenceOutput:
@@ -109,4 +168,6 @@ class FakeExecutor:
         if n >= 4:  # thêm một dòng trùng SKU để thử luật gộp
             dets.append(Detection(dets[0].product_id, (5, 5, int(w * 0.2), int(h * 0.2)), "accepted"))
         extra = 2 if seed % 3 == 0 else 0  # giả lập vài vật detector thấy nhưng không nhận ra
-        return InferenceOutput(dets, 350.0 + seed % 200, has_overlap=n >= 5, detected_count=len(dets) + extra)
+        rejected = [(int(w * (0.72 + 0.12 * k)), int(h * 0.82), int(w * (0.82 + 0.12 * k)), int(h * 0.97)) for k in range(extra)]
+        return InferenceOutput(dets, 350.0 + seed % 200, has_overlap=n >= 5, detected_count=len(dets) + extra,
+                               rejected_bboxes=rejected)

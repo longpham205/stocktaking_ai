@@ -52,18 +52,46 @@ class PathsSection(BaseModel):
     refinement_weights_dir: str = "weights/refinement"
 
 
-class CatalogSection(BaseModel):
-    """Product catalog / metadata build configuration.
+def _reject_removed_keys(data: Any, removed: dict[str, str], section: str) -> Any:
+    """Khoá config đã gỡ (Phase 1B, C4) -> lỗi rõ thay vì bị pydantic bỏ qua âm thầm."""
+    if isinstance(data, dict):
+        found = [k for k in removed if k in data]
+        if found:
+            hints = "; ".join(f"{section}.{k}: {removed[k]}" for k in found)
+            raise ValueError(f"Khoá config không còn hỗ trợ — {hints}")
+    return data
 
-    ``id_mapping`` is the authoritative source of stable internal product
-    IDs (see MetadataBuilder): keys are numeric-string IDs, values are the
-    gallery folder name / product display name that ID is bound to.
+
+_CATALOG_MOVED = "catalog đã chuyển vào DB (python -m src.catalog.migrate ...); xoá khoá này khỏi config"
+
+
+class CatalogSection(BaseModel):
+    """Nguồn catalog sản phẩm của pipeline (src/catalog/factory.py).
+
+    ``sqlite``: đọc ``db_path`` (máy chính). ``snapshot``: đọc ``snapshot_path``
+    (Colab/Kaggle, xuất bằng ``scripts/export_catalog_snapshot.py``). Không tự chuyển nguồn khi lỗi.
     """
 
-    build_metadata: bool
-    products_filename: str
-    product_ids_filename: str
-    id_mapping: dict[str, str] = Field(default_factory=dict)
+    source: Literal["sqlite", "snapshot"]
+    db_path: str | None = None
+    snapshot_path: str | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _no_legacy_keys(cls, data: Any) -> Any:
+        return _reject_removed_keys(
+            data,
+            {k: _CATALOG_MOVED for k in ("id_mapping", "build_metadata", "products_filename", "product_ids_filename")},
+            "catalog",
+        )
+
+    @model_validator(mode="after")
+    def _check_source_path(self) -> "CatalogSection":
+        if self.source == "sqlite" and not self.db_path:
+            raise ValueError("catalog.source='sqlite' cần catalog.db_path.")
+        if self.source == "snapshot" and not self.snapshot_path:
+            raise ValueError("catalog.source='snapshot' cần catalog.snapshot_path.")
+        return self
 
 
 class RfDetrInferenceSection(BaseModel):
@@ -397,7 +425,11 @@ class PluginsSection(BaseModel):
     ocr: OcrPluginSection
     color: ColorPluginSection
     barcode: BarcodePluginSection
-    force_rules: dict[str, list[str]] = Field(default_factory=dict)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _no_legacy_keys(cls, data: Any) -> Any:
+        return _reject_removed_keys(data, {"force_rules": "dùng bằng chứng force_evidence trong catalog DB"}, "plugins")
 
 
 class RerankBarcodeSection(BaseModel):
@@ -419,12 +451,16 @@ class RerankColorSection(BaseModel):
 
     enabled: bool = True
     weight: float = Field(default=0.20, ge=0.0, le=1.0)
-    references_path: str = "data/metadata/product_colors.json"
     delta_e_strong: float = Field(default=5.0, gt=0.0)
     delta_e_weak: float = Field(default=20.0, gt=0.0)
     min_margin: float = Field(default=1.0, ge=0.0)
     margin_scale: float = Field(default=5.0, gt=0.0)
     l_weight: float = Field(default=0.1, gt=0.0, le=1.0)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _no_legacy_keys(cls, data: Any) -> Any:
+        return _reject_removed_keys(data, {"references_path": "màu tham chiếu nằm ở bảng color_reference trong catalog DB"}, "rerank.color")
 
 class RerankHybridWeightsSection(BaseModel):
     """Weights used to combine retrieval consensus signals in hybrid mode."""
@@ -492,8 +528,12 @@ class RerankSection(BaseModel):
     barcode: RerankBarcodeSection = Field(default_factory=RerankBarcodeSection)
     ocr: RerankOcrSection = Field(default_factory=RerankOcrSection)
     color: RerankColorSection = Field(default_factory=RerankColorSection)
-    confusable_pairs: list[list[str]] = Field(default_factory=list)
     confusable_min_agreeing_plugins: int = Field(default=2, ge=1)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _no_legacy_keys(cls, data: Any) -> Any:
+        return _reject_removed_keys(data, {"confusable_pairs": "dùng bằng chứng confusable_with trong catalog DB"}, "rerank")
 
 
 class StorageSection(BaseModel):
@@ -631,3 +671,33 @@ def reload_config(config_path: str | None = None) -> AppConfig:
     """Forces a fresh reload of the configuration, bypassing the cache."""
     load_config.cache_clear()
     return load_config(config_path)
+
+def read_raw_config(config_path: str | Path) -> dict[str, Any]:
+    """Đọc YAML thô (chưa validate) — dùng để hiển thị giá trị gốc."""
+    with open(Path(config_path).resolve(), "r", encoding="utf-8") as file_handle:
+        return yaml.safe_load(file_handle) or {}
+
+
+def build_config(config_path: str | Path, overrides: dict[str, Any] | None = None) -> AppConfig:
+    """Dựng AppConfig từ YAML + giá trị ghi đè dạng ``{"a.b.c": value}`` (không cache).
+
+    Dùng cho thiết lập nâng cao của web: YAML là giá trị gốc, ghi đè lưu trong DB. Khoá ghi đè phải
+    đã tồn tại trong YAML (tránh gõ sai đường dẫn mà bị bỏ qua âm thầm). Lỗi schema -> ValueError rõ ràng.
+    """
+    resolved_path = Path(config_path).resolve()
+    raw_data = read_raw_config(resolved_path)
+    for dotted, value in (overrides or {}).items():
+        node = raw_data
+        parts = dotted.split(".")
+        for part in parts[:-1]:
+            if not isinstance(node.get(part), dict):
+                raise ValueError(f"Khoá ghi đè không tồn tại trong {resolved_path.name}: {dotted}")
+            node = node[part]
+        if parts[-1] not in node:
+            raise ValueError(f"Khoá ghi đè không tồn tại trong {resolved_path.name}: {dotted}")
+        node[parts[-1]] = value
+    raw_data["project_root"] = str(resolved_path.parent.parent)
+    try:
+        return AppConfig(**raw_data)
+    except Exception as exc:  # noqa: BLE001
+        raise ValueError(f"Cấu hình không hợp lệ sau khi ghi đè: {exc}") from exc

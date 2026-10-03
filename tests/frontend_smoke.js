@@ -1,7 +1,7 @@
 // Smoke test giao diện: chạy app.js với DOM giả, gọi API THẬT của backend đang chạy.
 //   node tests/frontend_smoke.js <base_url> <staff_pw> <admin_pw> <photo.jpg>
 const fs = require('fs'), path = require('path');
-const [base, STAFF_PW, ADMIN_PW, PHOTO] = process.argv.slice(2);
+const [base, STAFF_PW, ADMIN_PW, PHOTO, ADV_PW] = process.argv.slice(2);
 const els = {}, handlers = {};
 const mk = (sel) => els[sel] || (els[sel] = { sel, innerHTML: '', textContent: '', className: '', value: '', checked: false, disabled: false, dataset: {},
   classList: { add() {}, remove() {} }, addEventListener() {}, click() {}, blur() {}, focus() {}, scrollIntoView() {}, closest() { return null; } });
@@ -10,7 +10,12 @@ global.document = { readyState: 'complete', activeElement: null,
   addEventListener: (t, f) => { (handlers[t] = handlers[t] || []).push(f); } };
 const store = {}; global.sessionStorage = { getItem: (k) => store[k] || null, setItem: (k, v) => { store[k] = v; }, removeItem: (k) => { delete store[k]; } };
 const realFetch = fetch; global.fetch = (u, o) => realFetch(base + u, o);
-global.confirm = () => true; global.prompt = () => 'newpass123'; global.print = () => {};
+global.confirm = () => { throw new Error('không được dùng confirm() của trình duyệt'); }; global.prompt = () => { throw new Error('không được dùng prompt() của trình duyệt'); };
+global.print = () => {};
+// Hộp thoại của app (thay confirm/prompt): mặc định tự bấm đồng ý; đặt autoDlg = false để tự điều khiển.
+let autoDlg = true;
+const dlgOpen = () => (els['#modal-root'] ? els['#modal-root'].innerHTML : '').includes('data-act="dlgOk"');
+setInterval(() => { if (autoDlg && dlgOpen()) { mk('#dlgPw').value = 'newpass123'; mk('#dlgPw2').value = 'newpass123'; global.__pos.A.dlgOk(); } }, 20).unref();
 require(path.join(__dirname, '..', 'frontend', 'app.js'));
 const P = global.__pos, S = P.S, A = P.A;
 let fails = 0; const ok = (c, m) => { console.log((c ? 'OK   ' : 'FAIL ') + m); if (!c) fails++; };
@@ -29,14 +34,40 @@ const click = (act, ds = {}) => { const el = { dataset: Object.assign({ act }, d
   fire('submit', { target: { id: 'loginForm', u: { value: 'staff' }, p: { value: STAFF_PW } }, preventDefault() {} }); await sleep(800);
   ok(S.screen === 'onboarding' && S.user.role === 'staff', 'staff lần đầu -> onboarding');
   ok(!html().includes('data-act="toAdmin"') , 'staff không thấy nút quản trị');
+  ok((await P.api('GET', '/api/me')).user.has_seen_onboarding === true, 'hướng dẫn được ghi nhận ngay khi hiện (chưa bấm Tiếp/Bỏ qua) -> lần sau không hiện lại');
   for (let i = 0; i < 4; i++) A.onbNext(); await sleep(300);
+  ok(/<input type="file" id="file" accept="image\/\*" class/.test(html()) && html().includes('id="fileCam" accept="image/*" capture="environment"'),
+    '"Chọn ảnh" không ép mở camera (không có capture); ô chụp bằng camera máy tách riêng');
+  ok(P.camFailText('insecure').includes('http://') && P.camFailText('denied').includes('quyền camera'), 'lý do không mở được camera nêu đúng nguyên nhân (http / chưa cấp quyền)');
   ok(S.screen === 'viewfinder' && html().includes('data-act="shoot"'), 'vào màn chụp; không có camera -> vẫn dựng được (fallback chọn ảnh)');
   // chụp bằng ảnh thật
   const buf = fs.readFileSync(PHOTO);
   const p = P.submitPhoto(new Blob([buf], { type: 'image/jpeg' }));
   await sleep(100); ok(S.screen === 'loading' && html().includes('Đang nhận diện'), 'màn loading (skeleton)');
   await p; await sleep(200);
+  { // admin đang áp dụng thiết lập nâng cao -> màn chờ báo rõ thay cho "lâu hơn bình thường"
+    const keep = S.job; S.job = { pos: 0, slow: true, reloading: true };
+    ok(P.vLoading().includes('đang nạp lại thiết lập') && !P.vLoading().includes('lâu hơn bình thường'), 'màn loading báo hệ thống đang nạp lại thiết lập');
+    S.job = { pos: 0, slow: true, reloading: false };
+    ok(!P.vLoading().includes('nạp lại') && P.vLoading().includes('lâu hơn bình thường'), 'màn loading bình thường không báo nạp lại');
+    S.job = keep;
+  }
   ok(S.screen === 'invoice' && S.order.items.length > 0, 'nhận diện xong -> hoá đơn (' + S.order.items.length + ' dòng, ' + S.order.item_count + ' sản phẩm)');
+  { // ảnh kết quả + bbox: xanh/vàng theo trạng thái dòng; chạm dòng/khung -> đánh dấu; chạm ảnh -> phóng to
+    const cap = (S.order.captures || [])[0];
+    ok(cap && cap.boxes.length >= 1 && html().includes('class="cap"') && html().includes('class="bx '), 'hoá đơn có ảnh vừa chụp + ' + (cap ? cap.boxes.length : 0) + ' khung bbox');
+    const ci = await realFetch(base + cap.image_url); ok(ci.status === 200, 'ảnh gốc lượt chụp tải được qua URL ký');
+    const unc = S.order.items.find((i) => i.flagged), acc = S.order.items.find((i) => !i.flagged);
+    ok(!unc || html().includes('bx unc'), 'dòng cần xác nhận -> khung vàng');
+    const rejN = cap.boxes.filter((b) => b.status === 'rejected').length;
+    ok(!rejN || (html().includes('bx rej') && html().includes('chưa nhận diện') && html().includes('data-act="openAdd"')), 'vật chưa nhận diện -> khung đỏ (' + rejN + '), chạm để thêm thủ công');
+    if (acc) { click('focusItem', { item: String(acc.id) }); ok(S.focusItem === acc.id && html().includes('bx ok hl') && html().includes('bx ') && html().includes(' dim'), 'chạm dòng -> khung của dòng đó sáng, khung khác mờ');
+      click('focusItem', { item: String(acc.id) }); ok(S.focusItem === null, 'chạm lại -> bỏ đánh dấu'); }
+    const b0 = cap.boxes[0]; click('focusBox', { item: String(b0.item_id) }); ok(S.focusItem === b0.item_id, 'chạm khung -> đánh dấu dòng tương ứng');
+    click('focusBox', { item: String(b0.item_id) });
+    click('zoomCap'); ok(els['#modal-root'].innerHTML.includes('zoombox') && els['#modal-root'].innerHTML.includes('1×'), 'chạm ảnh -> mở phóng to');
+    click('zoomStep', { d: '1' }); ok(S.zoom === 2 && els['#modal-root'].innerHTML.includes('width:200%'), 'phóng to 2×');
+    click('closeModal'); ok(!S.zoomOpen, 'đóng phóng to'); }
   { const id0 = S.order.id, n0 = S.order.items.length; S.order = null; const r = await P.resumeOrder();
     ok(r && r.id === id0 && r.items.length === n0, 'khôi phục đơn đang mở sau khi "tải lại trang" (đơn #' + id0 + ')');
     const raw = new Blob([buf]); ok((await P.prepareImage(raw)) === raw, 'prepareImage: không có canvas -> giữ nguyên ảnh (không làm hỏng luồng)'); }
@@ -112,6 +143,7 @@ const click = (act, ds = {}) => { const el = { dataset: Object.assign({ act }, d
   ok(S.admin.data.orders_today >= 1 && S.admin.data.revenue_today > 0, 'báo cáo tính đơn vừa thu: ' + S.admin.data.orders_today + ' đơn, ' + S.admin.data.revenue_today + 'đ');
   click('tab', { t: 'products' }); await sleep(600);
   ok(html().includes('data-act="saveProduct"') && html().includes('Thiếu giá ('), 'tab sản phẩm: bảng + bộ lọc thiếu giá');
+  ok(html().includes('thiếu màu tham chiếu') && html().includes('data-act="evidence"') && html().includes('Chưa đặt tên ('), 'tab sản phẩm: badge thiếu màu tham chiếu + nút bằng chứng + lọc chưa đặt tên');
   const target = S.admin.data.items.find((x) => !x.barcode);
   mk('[data-f="price"][data-pid="' + target.id + '"]').value = '15.500'; mk('[data-f="barcode"][data-pid="' + target.id + '"]').value = '';
   click('saveProduct', { pid: target.id }); await sleep(700);
@@ -121,9 +153,78 @@ const click = (act, ds = {}) => { const el = { dataset: Object.assign({ act }, d
   { const lg = await (await realFetch(base + '/api/admin/change-log?table=product&record=' + target.id, { headers: { Authorization: 'Bearer ' + S.token } })).json();
     A.history({ dataset: { pid: target.id } }); await sleep(500);
     ok(els['#modal-root'].innerHTML.includes('Hoàn tác') && els['#modal-root'].innerHTML.includes('15.500'), 'modal lịch sử thay đổi hiển thị giá cũ → mới');
+    { // hộp thoại xác nhận của app: "Không" -> không làm gì và trả lại modal đang mở
+      autoDlg = false; const before = els['#modal-root'].innerHTML;
+      click('revert', { id: String(lg.items[0].id), pid: target.id }); await sleep(100);
+      ok(dlgOpen() && els['#modal-root'].innerHTML.includes('Hoàn tác thay đổi này?'), 'hoàn tác -> hộp thoại xác nhận của app (không dùng confirm của trình duyệt)');
+      click('dlgCancel'); await sleep(300);
+      const still = await (await realFetch(base + '/api/admin/products?search=' + target.id, { headers: { Authorization: 'Bearer ' + S.token } })).json();
+      ok(els['#modal-root'].innerHTML === before && still.items.find((x) => x.id === target.id).price === 15500, 'bấm "Không" -> giữ nguyên giá, trả lại modal lịch sử');
+      A.resetPw({ dataset: { id: '0', name: 'thu-ngan' } }); await sleep(100);
+      const dh = els['#modal-root'].innerHTML;
+      ok(dh.includes('thu-ngan') && dh.includes('id="dlgPw" type="password"') && dh.includes('id="dlgPw2" type="password"'), 'đặt lại mật khẩu: hộp thoại riêng, ô mật khẩu ẩn ký tự, gõ hai lần');
+      mk('#dlgPw').value = 'ngan'; mk('#dlgPw2').value = 'ngan'; click('dlgOk');
+      ok(dlgOpen() && els['#dlgErr'].textContent.includes('8 ký tự'), 'mật khẩu ngắn -> báo lỗi, chưa gửi');
+      mk('#dlgPw').value = 'matkhau-moi-1'; mk('#dlgPw2').value = 'matkhau-moi-2'; click('dlgOk');
+      ok(dlgOpen() && els['#dlgErr'].textContent.includes('không khớp'), 'hai lần nhập khác nhau -> báo lỗi, chưa gửi');
+      click('dlgCancel'); await sleep(100); ok(els['#modal-root'].innerHTML === before, 'huỷ đặt lại mật khẩu -> không gửi gì');
+      autoDlg = true;
+    }
     click('revert', { id: String(lg.items[0].id), pid: target.id }); await sleep(800);
     const back = await (await realFetch(base + '/api/admin/products?search=' + target.id, { headers: { Authorization: 'Bearer ' + S.token } })).json();
     ok(back.items.find((x) => x.id === target.id).price === null, 'hoàn tác giá -> trở về "chưa có giá"'); }
+  { // bằng chứng nhận diện: phải tick xác nhận; lưu xong API trả đúng giá trị
+    A.evidence({ dataset: { pid: target.id } }); await sleep(500);
+    ok(els['#modal-root'].innerHTML.includes('Bằng chứng nhận diện') && els['#modal-root'].innerHTML.includes('Tôi hiểu'), 'modal bằng chứng nhận diện có ô xác nhận');
+    mk('#evOcr').value = 'testkw, TESTKW'; mk('#evColor').value = ''; mk('#evConf').value = ''; mk('#evHex').value = '';
+    mk('#evConfirm').checked = false; click('saveEvidence', { pid: target.id }); await sleep(400);
+    const H = { headers: { Authorization: 'Bearer ' + S.token } };
+    let ev = await (await realFetch(base + '/api/admin/products/' + target.id + '/evidence', H)).json();
+    ok(!(ev.evidence.ocr_keywords || []).includes('TESTKW'), 'chưa tick xác nhận -> không lưu bằng chứng');
+    mk('#evConfirm').checked = true; click('saveEvidence', { pid: target.id }); await sleep(700);
+    ev = await (await realFetch(base + '/api/admin/products/' + target.id + '/evidence', H)).json();
+    ok(JSON.stringify(ev.evidence.ocr_keywords) === '["TESTKW"]', 'lưu bằng chứng: từ khoá OCR được chuẩn hoá (chữ hoa, bỏ trùng)');
+    A.history({ dataset: { pid: target.id } }); await sleep(500);
+    ok(els['#modal-root'].innerHTML.includes('Từ khoá OCR'), 'lịch sử thay đổi có dòng bằng chứng'); }
+  { // gợi ý chuẩn hoá + dải ảnh gallery (data_demo có gallery) + thử bằng chứng
+    A.evidence({ dataset: { pid: target.id } }); await sleep(600);
+    const m = els['#modal-root'].innerHTML;
+    ok(m.includes('BE-203') && m.includes('BE203'), 'modal bằng chứng có gợi ý chuẩn hoá từ khoá');
+    ok(m.includes('data-act="pickColor"') && S.evGallery.length >= 1, 'modal bằng chứng có ' + S.evGallery.length + ' ảnh gallery để chấm màu');
+    const g = await realFetch(base + S.evGallery[0]); ok(g.status === 200 && (g.headers.get('content-type') || '').includes('jpeg'), 'ảnh gallery tải được qua URL ký');
+    mk('#evOcr').value = 'abc-12345'; A.pickColor({ dataset: { i: '0', pid: target.id } }); await sleep(300);
+    ok(els['#modal-root'].innerHTML.includes('Chạm vào vùng màu') && S.evPick.draft.ocr_keywords[0] === 'abc-12345', 'chấm màu: mở ảnh, giữ bản nháp đang gõ');
+    S.evPick.hex = '#123456'; click('pickUse'); await sleep(600);
+    ok(els['#modal-root'].innerHTML.includes('#123456') && els['#modal-root'].innerHTML.includes('abc-12345'), 'dùng màu đã chấm -> quay lại modal, điền hex, giữ từ khoá');
+    click('closeModal');
+    const tr = await (await realFetch(base + '/api/admin/evidence-test', { method: 'POST', headers: { Authorization: 'Bearer ' + S.token, 'Content-Type': 'image/jpeg' }, body: buf })).json();
+    ok(Array.isArray(tr.items) && tr.items.length >= 1, 'thử bằng chứng trả ' + (tr.items || []).length + ' vật'); }
+  if (ADV_PW) { // thiết lập nâng cao: chỉ xem / cần áp dụng; áp dụng cần mật khẩu nâng cao; hoàn tác
+    click('tab', { t: 'advanced' }); await sleep(600);
+    ok(html().includes('Nâng cao') && html().includes('cần áp dụng') && html().includes('chỉ xem'), 'tab Nâng cao: phân mức chỉ xem / cần áp dụng');
+    const items = S.admin.data.items, ti = items.findIndex((x) => x.key === 'retrieval.top_k');
+    items.forEach((it, i) => { if (it.tier === 'reload') { mk('#cfg' + i).value = String(it.value); mk('#cfg' + i).checked = it.value === true; } });
+    mk('#cfg' + ti).value = String(items[ti].value + 1);
+    click('cfgApply'); ok(els['#modal-root'].innerHTML.includes('Áp dụng thiết lập nâng cao') && els['#modal-root'].innerHTML.includes('Số ứng viên'), 'áp dụng -> hộp xác nhận liệt kê đúng 1 thay đổi');
+    mk('#advPw').value = 'sai-mat-khau'; mk('#cfgConfirm').checked = true; click('cfgConfirm'); await sleep(600);
+    let cfg = await (await realFetch(base + '/api/admin/config', { headers: { Authorization: 'Bearer ' + S.token } })).json();
+    ok(!cfg.items.find((x) => x.key === 'retrieval.top_k').overridden, 'sai mật khẩu nâng cao -> không áp dụng');
+    click('cfgApply'); mk('#advPw').value = ADV_PW; mk('#cfgConfirm').checked = true; click('cfgConfirm'); await sleep(900);
+    cfg = await (await realFetch(base + '/api/admin/config', { headers: { Authorization: 'Bearer ' + S.token } })).json();
+    const top = cfg.items.find((x) => x.key === 'retrieval.top_k');
+    ok(top.overridden && top.value === items[ti].value + 1, 'đúng mật khẩu nâng cao -> áp dụng, top_k = ' + top.value);
+    const lg = await (await realFetch(base + '/api/admin/change-log?table=config', { headers: { Authorization: 'Bearer ' + S.token } })).json();
+    await A.cfgHistory(); mk('#advPwH').value = ADV_PW; click('cfgRevert', { id: String(lg.items[0].id) }); await sleep(900);
+    cfg = await (await realFetch(base + '/api/admin/config', { headers: { Authorization: 'Bearer ' + S.token } })).json();
+    ok(!cfg.items.find((x) => x.key === 'retrieval.top_k').overridden, 'hoàn tác thiết lập nâng cao -> về giá trị gốc'); }
+  if (ADV_PW) { // kiểm định: chặn chụp trong lúc chạy, hiện kết quả so baseline
+    click('tab', { t: 'advanced' }); await sleep(600);
+    ok(html().includes('Kiểm định độ chính xác'), 'tab Nâng cao có khối kiểm định');
+    click('valStart'); mk('#valPw').value = ADV_PW; mk('#valConfirm').checked = true; click('valConfirm'); await sleep(300);
+    let v = await (await realFetch(base + '/api/admin/validation', { headers: { Authorization: 'Bearer ' + S.token } })).json();
+    ok(v.status === 'running' || v.status === 'done', 'bắt đầu kiểm định (' + v.status + ')');
+    for (let k = 0; k < 40 && v.status === 'running'; k++) { await sleep(250); v = await (await realFetch(base + '/api/admin/validation', { headers: { Authorization: 'Bearer ' + S.token } })).json(); }
+    ok(v.status === 'done' && v.result && v.result.f1 != null, 'kiểm định xong, F1 = ' + (v.result || {}).f1); }
   click('tab', { t: 'users' }); await sleep(500);
   mk('#nu').value = 'thungan2'; mk('#nn').value = 'Thu Ngan 2'; mk('#np').value = 'matkhau123'; mk('#nr').value = 'staff';
   click('createUser'); await sleep(700); ok(html().includes('thungan2'), 'admin thêm nhân viên mới');

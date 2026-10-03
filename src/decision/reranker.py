@@ -25,14 +25,14 @@ Barcode matching:
 from __future__ import annotations
 
 import difflib
-import json
 import re
-from pathlib import Path
 from typing import Any, Callable
 
 import cv2
 import numpy as np
 
+from src.catalog.factory import open_catalog_repository
+from src.catalog.repository import BaseCatalogRepository
 from src.core.config import AppConfig
 from src.core.logger import get_logger
 from src.core.utils import clip_coordinate, timer
@@ -56,7 +56,12 @@ class Reranker:
         decision_engine: DecisionEngine,
         product_lookup: Callable[[str], dict | None],
         color_reference_lookup: Callable[[str], list[float] | None] | None = None,
+        catalog: BaseCatalogRepository | None = None,
     ) -> None:
+        # Mọi bằng chứng (ocr_keywords, color_code, màu tham chiếu, cặp dễ nhầm) lấy từ catalog;
+        # KHÔNG suy diễn từ tên sản phẩm. Truy vấn lúc dùng, cache gắn với catalog.version().
+        self._catalog = catalog if catalog is not None else open_catalog_repository(config)
+        self._color_lab_cache: tuple[str, dict[str, list[float]]] | None = None
         self._decision_engine = decision_engine
         self._product_lookup = product_lookup
         self._color_reference_lookup = color_reference_lookup
@@ -96,18 +101,8 @@ class Reranker:
         self._color_min_margin = color.min_margin
         self._color_margin_scale = color.margin_scale
         self._color_l_weight = color.l_weight
-        self._color_reference_path = Path(color.references_path)
-        self._color_reference = self._load_color_reference(self._color_reference_path)
-
         # Confusable Pairs
-        self._confusable_pairs = [
-            frozenset(map(str, pair)) for pair in config.rerank.confusable_pairs
-        ]
         self._confusable_min_agree = config.rerank.confusable_min_agreeing_plugins
-
-        # Caches
-        self._product_tokens_cache: dict[str, list[str]] = {}
-        self._product_color_code_cache: dict[str, str | None] = {}
 
     # ----------------------------------------------------------------------
     # PUBLIC API
@@ -599,30 +594,10 @@ class Reranker:
         if len(normalized_ocr) < self._ocr_min_text_length:
             return 0.0
 
-        product = self._product_lookup(candidate.product_id)
-        reference_name = (
-            str(product.get("product_name", "")) if product else candidate.product_name
-        )
-        normalized_name = self._normalize_text(reference_name)
-
-        if not normalized_name:
+        catalog_tokens = list(self._catalog.ocr_keywords(candidate.product_id))
+        if not catalog_tokens:
             return 0.0
-
-        catalog_tokens = self._extract_catalog_tokens(reference_name)
-        if catalog_tokens:
-            token_strength = self._token_match_strength(normalized_ocr, catalog_tokens)
-            if token_strength > 0.0:
-                return token_strength
-
-        if normalized_ocr in normalized_name:
-            coverage = min(len(normalized_ocr) / max(len(normalized_name), 1), 1.0)
-            return float(np.clip(coverage, 0.0, 1.0))
-
-        ratio = difflib.SequenceMatcher(None, normalized_ocr, normalized_name).ratio()
-        if ratio < self._ocr_fuzzy_threshold:
-            return 0.0
-
-        return float(np.clip(ratio, 0.0, 1.0))
+        return self._token_match_strength(normalized_ocr, catalog_tokens)
 
     def _ocr_match_strength(
         self,
@@ -631,22 +606,6 @@ class Reranker:
     ) -> float:
         """Backward-compatible OCR match-strength helper."""
         return self._ocr_text_match_strength(candidate, ocr_text)
-
-    def _extract_catalog_tokens(self, product_name: str) -> list[str]:
-        """Extract discriminative alphanumeric catalog tokens."""
-        cached = self._product_tokens_cache.get(product_name)
-        if cached is not None:
-            return cached
-
-        tokens: list[str] = []
-        for token in re.findall(r"[A-Za-z0-9]+", product_name):
-            token = token.upper().strip()
-            if token and len(token) >= self._ocr_min_text_length:
-                tokens.append(token)
-
-        tokens = list(dict.fromkeys(tokens))
-        self._product_tokens_cache[product_name] = tokens
-        return tokens
 
     def _token_match_strength(self, ocr_text: str, catalog_tokens: list[str]) -> float:
         """Return OCR catalog-token match strength in [0, 1]."""
@@ -820,7 +779,7 @@ class Reranker:
     def _confusable_pair_for(self, product_id: str) -> frozenset[str] | None:
         """Return configured confusable pair containing product."""
         pid = str(product_id)
-        for pair in self._confusable_pairs:
+        for pair in self._catalog.confusable_pairs():
             if pid in pair:
                 return pair
         return None
@@ -873,7 +832,7 @@ class Reranker:
         count = 1  # OCR is eligible once plugins ran.
         product = self._product_lookup(product_id)
 
-        if barcode_matches and product and str(product.get("barcode", "")).strip():
+        if barcode_matches and product and str(product.get("barcode") or "").strip():
             count += 1
 
         if self._extract_product_color_code(product_id) is not None:
@@ -885,52 +844,20 @@ class Reranker:
     # COLOR MATCHING & CIEDE2000
     # ----------------------------------------------------------------------
 
-    def _load_color_reference(self, path: Path) -> dict[str, list[float]]:
-        """Load RGB references and convert them to OpenCV Lab."""
-        if not path.exists():
-            logger.warning(
-                "Color reference file not found: '%s'. Color reranking disabled.", path
-            )
-            return {}
-
-        try:
-            with path.open("r", encoding="utf-8") as f:
-                data = json.load(f)
-        except Exception as exc:
-            logger.warning("Failed to load color reference '%s': %s", path, exc)
-            return {}
-
-        if not isinstance(data, dict):
-            logger.warning("Invalid color reference format: expected JSON object.")
-            return {}
-
+    def _color_reference_labs(self) -> dict[str, list[float]]:
+        """Màu tham chiếu của catalog (RGB) đổi sang OpenCV 8-bit Lab; cache theo catalog.version()."""
+        version = self._catalog.version()
+        if self._color_lab_cache is not None and self._color_lab_cache[0] == version:
+            return self._color_lab_cache[1]
         result: dict[str, list[float]] = {}
-        for code, entry in data.items():
-            if not isinstance(entry, dict):
-                continue
-
-            rgb = entry.get("rgb")
-            if not isinstance(rgb, (list, tuple)) or len(rgb) != 3:
-                continue
-
-            try:
-                r, g, b = float(rgb[0]), float(rgb[1]), float(rgb[2])
-            except (TypeError, ValueError):
-                continue
-
-            if not all(np.isfinite(v) for v in (r, g, b)) or not all(
-                0.0 <= v <= 255.0 for v in (r, g, b)
-            ):
-                continue
-
+        for code, (r, g, b) in self._catalog.color_references().items():
             bgr = np.array([[[b, g, r]]], dtype=np.uint8)
             lab = cv2.cvtColor(bgr, cv2.COLOR_BGR2LAB)[0, 0]
             normalized_code = str(code).upper().strip()
-
             if normalized_code:
                 result[normalized_code] = [float(lab[0]), float(lab[1]), float(lab[2])]
-
-        logger.info("Loaded %d color references from '%s'.", len(result), path)
+        logger.info("Loaded %d color references from catalog (version %s).", len(result), version)
+        self._color_lab_cache = (version, result)
         return result
 
     @staticmethod
@@ -964,7 +891,7 @@ class Reranker:
         query_lab: list[float] | None,
     ) -> dict[str, float]:
         """Calculate query-color -> catalog-color CIEDE2000."""
-        if not self._color_enabled or query_lab is None or not self._color_reference:
+        if not self._color_enabled or query_lab is None or not self._color_reference_labs():
             return {}
 
         l_weight = float(self._color_l_weight)
@@ -1011,7 +938,7 @@ class Reranker:
         if not code:
             return None
 
-        reference = self._color_reference.get(code)
+        reference = self._color_reference_labs().get(code)
         if reference is not None:
             return reference
 
@@ -1034,71 +961,11 @@ class Reranker:
             return None
 
     def _extract_product_color_code(self, product_id: str) -> str | None:
-        """Extract color/variant code from product name."""
-        product_id = str(product_id)
-        if product_id in self._product_color_code_cache:
-            return self._product_color_code_cache[product_id]
-
-        product = self._product_lookup(product_id)
-        product_name = str(product.get("product_name", "")).strip() if product else ""
-
-        if not product_name:
-            self._product_color_code_cache[product_id] = None
+        """Mã màu/biến thể khai báo trong catalog (``color_code``), không suy diễn từ tên."""
+        code = self._catalog.color_code(str(product_id))
+        if not code:
             return None
-
-        code = self._extract_color_code_from_name(product_name, self._color_reference)
-        self._product_color_code_cache[product_id] = code
-
-        if code:
-            logger.debug(
-                "Product color code inferred: product_id='%s' name='%s' -> code='%s'",
-                product_id,
-                product_name,
-                code,
-            )
-
-        return code
-
-    @staticmethod
-    def _extract_color_code_from_name(
-        product_name: str,
-        known_codes: dict[str, list[float]] | None = None,
-    ) -> str | None:
-        """Infer color/variant identifier from product name."""
-        if not product_name:
-            return None
-
-        text = str(product_name).upper().strip()
-
-        # 1. Bracketed codes
-        bracket_groups = re.findall(r"[\(\（\[\【]([A-Z0-9_-]{2,20})[\)\）\]\】]", text)
-        for value in reversed(bracket_groups):
-            compact = re.sub(r"[^A-Z0-9]", "", value)
-            if re.fullmatch(r"[A-Z]{2,6}\d{2,6}", compact):
-                return compact
-
-        if known_codes:
-            for value in reversed(bracket_groups):
-                compact = re.sub(r"[^A-Z0-9]", "", value)
-                if compact in known_codes:
-                    return compact
-
-        # 2. Standard alphanumeric code
-        matches = re.findall(r"\b[A-Z]{2,6}\d{2,6}\b", text)
-        if matches:
-            if known_codes:
-                for match in reversed(matches):
-                    if match in known_codes:
-                        return match
-            return matches[-1]
-
-        # 3. Pure alphabetic variant code
-        if known_codes:
-            for match in reversed(re.findall(r"\b[A-Z]{3,6}\b", text)):
-                if match in known_codes:
-                    return match
-
-        return None
+        return str(code).upper().strip() or None
 
     def _build_color_context(self, distances: dict[str, float]) -> dict[str, float | bool]:
         """Build color comparison context."""
@@ -1299,7 +1166,7 @@ class Reranker:
         if not product:
             return 0.0
 
-        catalog_barcode = self._normalize_barcode(product.get("barcode", ""))
+        catalog_barcode = self._normalize_barcode(product.get("barcode") or "")
         return 1.0 if (catalog_barcode and catalog_barcode in barcode_matches) else 0.0
 
     # ----------------------------------------------------------------------

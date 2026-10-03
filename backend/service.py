@@ -1,4 +1,4 @@
-"""Logic nghiệp vụ POS: đăng nhập, đơn hàng, chụp + hàng đợi suy luận, thanh toán, quản trị.
+"""Logic nghiệp vụ POS: đăng nhập, đơn hàng, chụp + hàng đợi suy luận, thanh toán. Phần quản trị ở `admin.py` (AdminMixin).
 
 Tầng HTTP (`server.py`) chỉ định tuyến và dịch lỗi; mọi quy tắc nằm ở đây để kiểm thử không cần mạng.
 """
@@ -9,17 +9,16 @@ import concurrent.futures as cf
 import json
 import logging
 import queue
-import re
 import shutil
 import threading
 import time
-import unicodedata
 import uuid
-from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from .catalog import JsonCatalog
+from .admin import AdminMixin
+from .catalog import DbCatalog
+from .common import MAX_PRICE, MAX_QTY, ApiError, Session, _as_int, _err, _evidence_json, fold  # noqa: F401 (ApiError: server.py import từ đây)
 from .config import Settings
 from .db import Database, utcnow
 from .inference import Executor
@@ -29,81 +28,29 @@ from .security import (LoginLimiter, TokenError, hash_password, make_token, sign
 
 log = logging.getLogger("backend")
 
-MAX_QTY = 999
-MAX_PRICE = 100_000_000
-_BARCODE_RE = re.compile(r"^[0-9A-Za-z\-]{4,32}$")
-_USERNAME_RE = re.compile(r"^[a-zA-Z0-9_.\-]{3,32}$")
 _DUMMY_HASH = hash_password("dummy-password-for-timing")
 
 
-class ApiError(Exception):
-    def __init__(self, status: int, code: str, message: str = "", **extra) -> None:
-        super().__init__(message or code)
-        self.status, self.code, self.message, self.extra = status, code, message or code, extra
-
-
-def _err(status: int, code: str, message: str = "", **extra) -> ApiError:
-    return ApiError(status, code, message, **extra)
-
-
-@dataclass
-class Session:
-    user_id: int
-    role: str
-    shift_id: int
-    username: str
-    full_name: str
-
-    @property
-    def is_admin(self) -> bool:
-        return self.role == "admin"
-
-
-def fold(text: str) -> str:
-    """Bỏ dấu tiếng Việt + hạ chữ thường để tìm kiếm không phân biệt dấu."""
-    text = unicodedata.normalize("NFD", text.lower().replace("đ", "d"))
-    return "".join(c for c in text if unicodedata.category(c) != "Mn")
-
-
-def _as_int(value, name: str, lo: int = 0, hi: int = MAX_PRICE) -> int:
-    if isinstance(value, bool) or not isinstance(value, (int, float)) or int(value) != value:
-        raise _err(422, "VALIDATION_ERROR", f"'{name}' phải là số nguyên")
-    v = int(value)
-    if not lo <= v <= hi:
-        raise _err(422, "VALIDATION_ERROR", f"'{name}' phải trong khoảng {lo}..{hi}")
-    return v
-
-
-def _evidence_json(evidence: dict | None) -> str | None:
-    """Tuần tự hoá bằng chứng plugin an toàn: chấp nhận số numpy/đối tượng lạ, cắt nếu quá dài (không làm hỏng lượt chụp)."""
-    if not evidence:
-        return None
-
-    def default(o):
-        if hasattr(o, "tolist"):  # numpy: cả số đơn lẫn mảng (`.item()` lỗi với mảng nhiều phần tử)
-            return o.tolist()
-        if hasattr(o, "item"):
-            return o.item()
-        return str(o)
-    try:
-        text = json.dumps(evidence, default=default, ensure_ascii=False)
-    except (TypeError, ValueError):
-        return None
-    return text if len(text) <= 8000 else None
-
-
-class App:
-    def __init__(self, settings: Settings, catalog: JsonCatalog, executor: Executor, start_worker: bool = True) -> None:
+class App(AdminMixin):
+    def __init__(self, settings: Settings, catalog: DbCatalog, executor: Executor, start_worker: bool = True) -> None:
         self.s, self.catalog, self.executor = settings, catalog, executor
+        if Path(catalog.path).resolve() != Path(settings.db_path).resolve():
+            raise ValueError(f"Web và pipeline phải dùng chung một file DB: web={settings.db_path}, "
+                             f"catalog={catalog.path} (sửa catalog.db_path trong config pipeline hoặc --data-dir).")
         existed = settings.db_path.is_file() and settings.db_path.stat().st_size > 0
         self.db = Database(settings.db_path)
         if existed:
             self._backup_on_start()
+        self._merge_legacy_barcode_overrides()
         self.limiter = LoginLimiter(settings.max_failed_attempts, settings.lockout_seconds)
         self._queue: queue.Queue = queue.Queue(maxsize=settings.queue_max)
         self._jobs: dict[str, dict] = {}
         self._idem: dict[tuple, tuple[str, float]] = {}
         self._lock = threading.Lock()
+        self._reloading = False  # đang nạp lại pipeline (áp dụng thiết lập nâng cao)
+        self._validating = False  # đang kiểm định trên benchmark (chiếm luồng suy luận)
+        self._validation: dict = {"status": "idle"}
+        self._reload_lock = threading.Lock()
         # Một luồng suy luận duy nhất: giữ tuần tự GPU và cho phép đặt timeout cứng mà không chạy hai lượt song song.
         self._infer_pool = cf.ThreadPoolExecutor(max_workers=1, thread_name_prefix="infer")
         settings.media_root.mkdir(parents=True, exist_ok=True)
@@ -122,6 +69,10 @@ class App:
                 if not c.execute("SELECT 1 FROM users WHERE username=?", (username,)).fetchone():
                     c.execute("INSERT INTO users(username,password_hash,full_name,role,created_at) VALUES(?,?,?,?,?)",
                               (username, hash_password(pw), name, role, utcnow()))
+            if self.s.seed_advanced_password and not c.execute(
+                    "SELECT 1 FROM settings WHERE key='advanced_password_hash'").fetchone():
+                c.execute("INSERT INTO settings(key,value) VALUES('advanced_password_hash',?)",
+                          (json.dumps(hash_password(self.s.seed_advanced_password)),))
             if self.s.seed_prices_path and not c.execute("SELECT 1 FROM product_prices LIMIT 1").fetchone():
                 prices = json.loads(self.s.seed_prices_path.read_text(encoding="utf-8"))
                 n = 0
@@ -130,6 +81,38 @@ class App:
                         c.execute("INSERT INTO product_prices VALUES(?,?,?)", (pid, int(price), utcnow()))
                         n += 1
                 log.info("Đã nạp %d giá seed từ %s", n, self.s.seed_prices_path)
+
+    def _merge_legacy_barcode_overrides(self) -> None:
+        """Bảng cũ ``product_overrides`` (barcode admin đã sửa trước Phase 1B) -> ``product.barcode``, rồi xoá bảng.
+        Barcode trùng với SKU khác -> dừng khởi động, báo rõ (không tự chọn)."""
+        with self.db.tx() as c:
+            if not c.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='product_overrides'").fetchone():
+                return
+            rows = c.execute("SELECT product_id, barcode FROM product_overrides").fetchall()
+            moved = 0
+            for r in rows:
+                cur = c.execute("SELECT barcode FROM product WHERE product_id=?", (r["product_id"],)).fetchone()
+                if cur is None:
+                    log.warning("Bỏ barcode override của SKU %s: SKU không có trong catalog", r["product_id"])
+                    continue
+                new = r["barcode"] or None
+                if (cur["barcode"] or None) == new:
+                    continue
+                try:
+                    c.execute("UPDATE product SET barcode=?, updated_at=? WHERE product_id=?", (new, utcnow(), r["product_id"]))
+                except Exception as exc:  # sqlite3.IntegrityError: barcode đã thuộc SKU khác
+                    raise ValueError(f"Không gộp được barcode {new} của SKU {r['product_id']} vào catalog: {exc}") from exc
+                moved += 1
+            c.execute("DROP TABLE product_overrides")
+        log.info("Đã gộp %d barcode từ product_overrides vào catalog và xoá bảng cũ", moved)
+        self.catalog.reload()
+
+    def _after_catalog_change(self) -> None:
+        """Sau khi ghi catalog: nạp lại catalog của web và của pipeline (có hiệu lực ngay, không cần khởi động lại)."""
+        self.catalog.reload()
+        reload = getattr(self.executor, "reload_catalog", None)
+        if reload is not None:
+            reload()
 
     def _backup_on_start(self, keep: int = 7) -> None:
         """Sao lưu DB mỗi lần khởi động (giữ `keep` bản mới nhất) vào <data-dir>/backups. Lỗi sao lưu không chặn server."""
@@ -267,14 +250,18 @@ class App:
     def _prices(self, c) -> dict[str, int]:
         return {r["product_id"]: r["price"] for r in c.execute("SELECT product_id, price FROM product_prices")}
 
-    def _barcodes(self, c) -> dict[str, str]:
-        over = {r["product_id"]: r["barcode"] for r in c.execute("SELECT product_id, barcode FROM product_overrides")}
-        return {pid: over.get(pid, p["barcode"]) for pid, p in self.catalog.all().items()}
+    @staticmethod
+    def _barcodes(c) -> dict[str, str]:
+        """Barcode hiện tại đọc thẳng từ bảng catalog (trong giao dịch đang mở)."""
+        return {r["product_id"]: r["barcode"] or "" for r in c.execute("SELECT product_id, barcode FROM product")}
 
     def _product_view(self, pid: str, prices: dict, barcodes: dict) -> dict:
         p = self.catalog.get(pid)
-        return {"id": pid, "name": p["name"] if p else f"SKU {pid}", "barcode": barcodes.get(pid, ""),
-                "price": prices.get(pid)}
+        view = {"id": pid, "name": p["name"] if p else f"SKU {pid}", "barcode": barcodes.get(pid, ""),
+                "price": prices.get(pid), "needs_naming": bool(p and p["needs_naming"])}
+        code = self.catalog.repo.color_code(pid)
+        view["missing_color_reference"] = bool(code and code not in self.catalog.repo.color_references())
+        return view
 
     def list_products(self, search: str = "", barcode: str = "", limit: int = 50) -> list[dict]:
         with self.db.read() as c:
@@ -305,6 +292,23 @@ class App:
         exp = int(time.time()) + self.s.media_url_ttl
         return f"/api/media/{rel}?exp={exp}&sig={sign_media(self.s.jwt_secret, rel, exp)}"
 
+    def _capture_views(self, c, oid: int) -> list[dict]:
+        """Các lượt chụp thành công của đơn: URL ký của ảnh gốc + bbox từng vật (toạ độ pixel ảnh gốc)."""
+        out = []
+        root = Path(self.s.media_root).resolve()
+        for r in c.execute("SELECT id, created_at, image_path, detections_json FROM captures "
+                           "WHERE order_id=? AND status='success' AND detections_json IS NOT NULL ORDER BY id", (oid,)):
+            try:
+                rel = Path(r["image_path"]).resolve().relative_to(root).as_posix()
+            except (ValueError, OSError, TypeError):
+                continue
+            if not (root / rel).is_file():  # ảnh đã bị dọn theo hạn lưu trữ
+                continue
+            d = json.loads(r["detections_json"])
+            out.append({"id": r["id"], "created_at": r["created_at"], "image_url": self._thumb_url(rel),
+                        "width": d["w"], "height": d["h"], "boxes": d["boxes"]})
+        return out
+
     def _order_view(self, c, row) -> dict:
         paid = row["status"] == "paid"
         prices = self._prices(c)
@@ -326,7 +330,7 @@ class App:
                           "evidence": json.loads(it["evidence_json"]) if it["evidence_json"] else None})
         return {"id": row["id"], "status": row["status"], "created_at": row["created_at"], "paid_at": row["paid_at"],
                 "payment_method": row["payment_method"], "cash_given": row["cash_given"],
-                "change_given": row["change_given"], "items": items,
+                "change_given": row["change_given"], "items": items, "captures": self._capture_views(c, row["id"]),
                 "item_count": sum(i["quantity"] for i in items),
                 "total": row["total_amount"] if paid else total, "missing_price_count": missing,
                 "flagged_count": sum(1 for i in items if i["flagged"])}
@@ -363,15 +367,15 @@ class App:
             raise _err(409, "ORDER_NOT_OPEN", "Đơn hàng đã thanh toán hoặc đã huỷ")
         return row
 
-    def _merge_or_insert(self, c, oid: int, pid: str, qty: int, thumb: str | None = None, evidence: dict | None = None) -> None:
-        """Dòng đã xác nhận (không flagged) cùng SKU thì cộng dồn; ngược lại thêm dòng mới."""
+    def _merge_or_insert(self, c, oid: int, pid: str, qty: int, thumb: str | None = None, evidence: dict | None = None) -> int:
+        """Dòng đã xác nhận (không flagged) cùng SKU thì cộng dồn; ngược lại thêm dòng mới. Trả id dòng."""
         row = c.execute("SELECT id, quantity FROM order_items WHERE order_id=? AND product_id=? AND flagged=0 "
                         "AND manual_price IS NULL ORDER BY id LIMIT 1", (oid, pid)).fetchone()
         if row:
             c.execute("UPDATE order_items SET quantity=? WHERE id=?", (min(MAX_QTY, row["quantity"] + qty), row["id"]))
-        else:
-            c.execute("INSERT INTO order_items(order_id,product_id,quantity,thumb_path,evidence_json,created_at) "
-                      "VALUES(?,?,?,?,?,?)", (oid, pid, qty, thumb, _evidence_json(evidence), utcnow()))
+            return row["id"]
+        return c.execute("INSERT INTO order_items(order_id,product_id,quantity,thumb_path,evidence_json,created_at) "
+                         "VALUES(?,?,?,?,?,?)", (oid, pid, qty, thumb, _evidence_json(evidence), utcnow())).lastrowid
 
     def add_item(self, sess: Session, oid: int, body: dict) -> dict:
         pid = str(body.get("product_id", "")).strip()
@@ -494,6 +498,9 @@ class App:
         import cv2
         import numpy as np
 
+        if self._validating:  # kiểm định chiếm luồng suy luận nhiều phút: báo ngay thay vì để thu ngân chờ
+            raise _err(503, "SYSTEM_BUSY", "Hệ thống đang kiểm định độ chính xác, tạm thời chưa nhận diện được — thêm món thủ công hoặc thử lại sau")
+
         with self.db.read() as c:
             row = self._order_row(c, sess, oid)
         if row["status"] != "open":
@@ -533,7 +540,8 @@ class App:
                 raise _err(404, "NOT_FOUND", "Không thấy tác vụ")
             pos = sum(1 for j in self._jobs.values() if j["status"] == "queued" and j["created"] < job["created"])
             snap = dict(job)
-        out: dict = {"status": snap["status"], "position": pos if snap["status"] == "queued" else 0}
+        out: dict = {"status": snap["status"], "position": pos if snap["status"] == "queued" else 0,
+                     "system_reloading": self._reloading}  # admin đang áp dụng thiết lập nâng cao -> chờ lâu hơn
         if snap["status"] == "done":
             out["added"] = snap["added"]
             out["warnings"] = snap["warnings"]
@@ -586,6 +594,7 @@ class App:
         img = cv2.imread(job["path"])
         lines = merge_detections(out.detections)
         added = 0
+        boxes: list[dict] = []  # mỗi vật: bbox + dòng hoá đơn nó thuộc về (để vẽ ảnh kết quả, highlight hai chiều)
         with self.db.tx() as c:
             status = c.execute("SELECT status FROM orders WHERE id=?", (oid,)).fetchone()
             if not status or status["status"] != "open":
@@ -598,221 +607,30 @@ class App:
                     if save_thumbnail(img, ln["bbox"], self.s.media_root / rel, self.s.thumb_width):
                         thumb = rel
                 if ln["flagged"]:
-                    c.execute("INSERT INTO order_items(order_id,product_id,quantity,flagged,thumb_path,evidence_json,created_at) "
-                              "VALUES(?,?,?,1,?,?,?)", (oid, ln["product_id"], 1, thumb,
-                                                       _evidence_json(ln["evidence"]), utcnow()))
+                    item_id = c.execute("INSERT INTO order_items(order_id,product_id,quantity,flagged,thumb_path,evidence_json,created_at) "
+                                        "VALUES(?,?,?,1,?,?,?)", (oid, ln["product_id"], 1, thumb,
+                                                                 _evidence_json(ln["evidence"]), utcnow())).lastrowid
                 else:
-                    self._merge_or_insert(c, oid, ln["product_id"], ln["quantity"], thumb, ln["evidence"])
+                    item_id = self._merge_or_insert(c, oid, ln["product_id"], ln["quantity"], thumb, ln["evidence"])
+                for b in ln.get("bboxes") or [ln["bbox"]]:
+                    boxes.append({"item_id": item_id, "product_id": ln["product_id"],
+                                  "status": "uncertain" if ln["flagged"] else "accepted",
+                                  "bbox": [int(round(float(v))) for v in b]})
                 added += ln["quantity"]
-            c.execute("INSERT INTO captures(order_id,status,item_count,processing_time_ms,image_path,created_at) "
-                      "VALUES(?,?,?,?,?,?)", (oid, "success", added, elapsed_ms, job["path"], utcnow()))
+            for b in out.rejected_bboxes or []:  # vật phát hiện nhưng không nhận ra -> khung đỏ, không thuộc dòng nào
+                boxes.append({"item_id": None, "product_id": None, "status": "rejected",
+                              "bbox": [int(round(float(v))) for v in b]})
+            dets = None
+            if img is not None:
+                dets = json.dumps({"w": int(img.shape[1]), "h": int(img.shape[0]), "boxes": boxes}, ensure_ascii=False)
+            c.execute("INSERT INTO captures(order_id,status,item_count,processing_time_ms,image_path,detections_json,created_at) "
+                      "VALUES(?,?,?,?,?,?,?)", (oid, "success", added, elapsed_ms, job["path"], dets, utcnow()))
         job["added"], job["status"] = added, "done"
 
     def _record_capture(self, oid: int, status: str, n: int, ms: float, path: str, error: str | None) -> None:
         with self.db.tx() as c:
             c.execute("INSERT INTO captures(order_id,status,item_count,processing_time_ms,image_path,error,created_at) "
                       "VALUES(?,?,?,?,?,?,?)", (oid, status, n, ms, path, error, utcnow()))
-
-    # ------------------------------------------------------------------ quản trị: sản phẩm
-    def admin_products(self, sess: Session, search: str = "", flt: str = "", page: int = 1, size: int = 50) -> dict:
-        self._need_admin(sess)
-        with self.db.read() as c:
-            prices, barcodes = self._prices(c), self._barcodes(c)
-        q = fold(search.strip())
-        rows = []
-        for pid, p in self.catalog.all().items():
-            if q and q not in fold(p["name"]) and q not in pid and q not in barcodes.get(pid, ""):
-                continue
-            if flt == "missing_price" and pid in prices:
-                continue
-            if flt == "missing_barcode" and barcodes.get(pid):
-                continue
-            rows.append(self._product_view(pid, prices, barcodes))
-        page, size = max(1, page), max(1, min(200, size))
-        return {"total": len(rows), "page": page, "size": size, "items": rows[(page - 1) * size: page * size],
-                "missing_price": sum(1 for pid in self.catalog.all() if pid not in prices),
-                "missing_barcode": sum(1 for pid in self.catalog.all() if not barcodes.get(pid))}
-
-    def admin_update_product(self, sess: Session, pid: str, body: dict) -> dict:
-        self._need_admin(sess)
-        if not self.catalog.get(pid):
-            raise _err(404, "NOT_FOUND", "Không thấy sản phẩm")
-        if not ({"price", "barcode"} & set(body)):
-            raise _err(422, "VALIDATION_ERROR", "Chỉ sửa được 'price' và 'barcode'")
-        with self.db.tx() as c:
-            prices, barcodes = self._prices(c), self._barcodes(c)
-            now = utcnow()
-
-            def log_change(field: str, old, new) -> None:
-                c.execute("INSERT INTO change_log(table_name,record_id,field_name,old_value,new_value,changed_by,changed_at) "
-                          "VALUES('product',?,?,?,?,?,?)", (pid, field, None if old is None else str(old),
-                                                            None if new is None else str(new), sess.user_id, now))
-            if "price" in body:
-                new = None if body["price"] is None else _as_int(body["price"], "price")
-                if new != prices.get(pid):
-                    log_change("price", prices.get(pid), new)
-                    if new is None:
-                        c.execute("DELETE FROM product_prices WHERE product_id=?", (pid,))
-                    else:
-                        c.execute("INSERT INTO product_prices VALUES(?,?,?) ON CONFLICT(product_id) DO UPDATE SET "
-                                  "price=excluded.price, updated_at=excluded.updated_at", (pid, new, now))
-                    prices = self._prices(c)
-            if "barcode" in body:
-                new = str(body["barcode"] or "").strip()
-                if new and not _BARCODE_RE.match(new):
-                    raise _err(422, "VALIDATION_ERROR", "Barcode gồm 4–32 ký tự chữ, số hoặc dấu gạch ngang")
-                if new and any(b == new for k, b in barcodes.items() if k != pid):
-                    raise _err(409, "BARCODE_DUPLICATE", "Barcode đã thuộc sản phẩm khác")
-                if new != barcodes.get(pid, ""):
-                    log_change("barcode", barcodes.get(pid, ""), new)
-                    c.execute("INSERT INTO product_overrides VALUES(?,?,?) ON CONFLICT(product_id) DO UPDATE SET "
-                              "barcode=excluded.barcode, updated_at=excluded.updated_at", (pid, new, now))
-                    barcodes = self._barcodes(c)
-            return self._product_view(pid, prices, barcodes)
-
-    # ------------------------------------------------------------------ quản trị: báo cáo, nhân viên
-    def admin_reports(self, sess: Session, rng: str = "today") -> dict:
-        self._need_admin(sess)
-        if rng not in ("today", "7d", "30d"):
-            raise _err(422, "VALIDATION_ERROR", "range phải là today|7d|30d")
-        start = self._range_start("today")
-        with self.db.read() as c:
-            paid = c.execute("SELECT COUNT(*) n, COALESCE(SUM(total_amount),0) t FROM orders WHERE status='paid' AND created_at>=?", (start,)).fetchone()
-            cap = c.execute("SELECT COUNT(*) n, SUM(status='error') e, AVG(CASE WHEN status='success' THEN processing_time_ms END) a "
-                            "FROM captures WHERE created_at>=?", (start,)).fetchone()
-            active = c.execute("SELECT COUNT(*) FROM shifts WHERE ended_at IS NULL").fetchone()[0]
-            staff = c.execute("SELECT COUNT(*) FROM users WHERE is_active=1").fetchone()[0]
-            prices, barcodes = self._prices(c), self._barcodes(c)
-        n = cap["n"] or 0
-        extra = self._range_report(rng)
-        return {**extra, "orders_today": paid["n"], "revenue_today": paid["t"], "captures_today": n,
-                "error_rate": round((cap["e"] or 0) / n, 4) if n else 0.0,
-                "avg_processing_ms": round(cap["a"], 1) if cap["a"] else None,
-                "active_shifts": active, "active_staff": staff, "queue_size": self._queue.qsize(),
-                "products_total": len(self.catalog.all()),
-                "products_missing_price": sum(1 for p in self.catalog.all() if p not in prices),
-                "products_missing_barcode": sum(1 for p in self.catalog.all() if not barcodes.get(p))}
-
-    def _range_report(self, rng: str) -> dict:
-        """Doanh thu theo ngày (giờ địa phương, đủ cả ngày không có đơn) và top 5 sản phẩm bán chạy trong khoảng."""
-        start = self._range_start(rng)
-        off = timedelta(hours=self.s.tz_offset_hours)
-        n_days = {"today": 1, "7d": 7, "30d": 30}[rng]
-        with self.db.read() as c:
-            rows = c.execute("SELECT paid_at, total_amount FROM orders WHERE status='paid' AND paid_at>=?", (start,)).fetchall()
-            tops = c.execute("SELECT i.product_id pid, SUM(i.quantity) q, SUM(i.quantity*COALESCE(i.unit_price,0)) r "
-                             "FROM order_items i JOIN orders o ON o.id=i.order_id WHERE o.status='paid' AND o.paid_at>=? "
-                             "GROUP BY i.product_id ORDER BY q DESC, r DESC, i.product_id LIMIT 5", (start,)).fetchall()
-        today = (datetime.now(timezone.utc) + off).date()
-        daily = {(today - timedelta(days=k)).isoformat(): [0, 0] for k in range(n_days - 1, -1, -1)}
-        for r in rows:
-            day = (datetime.fromisoformat(r["paid_at"]) + off).date().isoformat()
-            if day in daily:
-                daily[day][0] += 1
-                daily[day][1] += r["total_amount"] or 0
-        return {"range": rng, "range_orders": sum(v[0] for v in daily.values()), "range_revenue": sum(v[1] for v in daily.values()),
-                "daily": [{"date": d, "orders": v[0], "revenue": v[1]} for d, v in daily.items()],
-                "top_products": [{"product_id": t["pid"], "name": (self.catalog.get(t["pid"]) or {}).get("name", f"SKU {t['pid']}"),
-                                  "quantity": t["q"], "revenue": t["r"]} for t in tops]}
-
-    # ------------------------------------------------------------------ quản trị: nhật ký thay đổi + hoàn tác
-    def admin_change_log(self, sess: Session, table: str = "", record: str = "", limit: int = 100) -> list[dict]:
-        self._need_admin(sess)
-        sql = ("SELECT l.*, u.username FROM change_log l LEFT JOIN users u ON u.id=l.changed_by WHERE 1=1")
-        args: list = []
-        if table:
-            sql += " AND l.table_name=?"
-            args.append(table)
-        if record:
-            sql += " AND l.record_id=?"
-            args.append(record)
-        sql += " ORDER BY l.id DESC LIMIT ?"
-        args.append(max(1, min(500, limit)))
-        with self.db.read() as c:
-            return [{"id": r["id"], "table": r["table_name"], "record_id": r["record_id"], "field": r["field_name"],
-                     "old": r["old_value"], "new": r["new_value"], "by": r["username"], "at": r["changed_at"],
-                     "name": (self.catalog.get(r["record_id"]) or {}).get("name") if r["table_name"] == "product" else None}
-                    for r in c.execute(sql, args)]
-
-    def admin_revert_change(self, sess: Session, lid: int) -> dict:
-        """Hoàn tác MỘT thay đổi (giá/barcode/cài đặt) bằng cách ghi lại giá trị cũ; việc hoàn tác cũng được ghi log.
-        Từ chối (409) nếu giá trị hiện tại không còn bằng giá trị mới của dòng log (đã bị đổi sau đó)."""
-        self._need_admin(sess)
-        with self.db.read() as c:
-            row = c.execute("SELECT * FROM change_log WHERE id=?", (lid,)).fetchone()
-            prices, barcodes = self._prices(c), self._barcodes(c)
-        if not row:
-            raise _err(404, "NOT_FOUND", "Không thấy dòng nhật ký")
-        table, field, rid = row["table_name"], row["field_name"], row["record_id"]
-        if table == "product" and field in ("price", "barcode"):
-            if not self.catalog.get(rid):
-                raise _err(404, "NOT_FOUND", "Sản phẩm không còn trong catalog")
-            if field == "price":
-                current = str(prices[rid]) if rid in prices else None
-                expected, target = row["new_value"], (None if row["old_value"] is None else int(row["old_value"]))
-            else:
-                current, expected, target = barcodes.get(rid, "") or "", row["new_value"] or "", row["old_value"] or ""
-            if current != expected:
-                raise _err(409, "CHANGE_STALE", "Giá trị đã được thay đổi sau lần sửa này, không thể hoàn tác")
-            self.admin_update_product(sess, rid, {field: target})
-            return {"ok": True, "reverted": {"table": table, "record_id": rid, "field": field}}
-        if table == "settings":
-            current, expected = self.public_settings().get(field), json.loads(row["new_value"])
-            if current != expected:
-                raise _err(409, "CHANGE_STALE", "Cài đặt đã được thay đổi sau lần sửa này, không thể hoàn tác")
-            self.update_settings(sess, {field: json.loads(row["old_value"])})
-            return {"ok": True, "reverted": {"table": table, "record_id": rid, "field": field}}
-        raise _err(422, "VALIDATION_ERROR", "Loại thay đổi này không hoàn tác được")
-
-    def admin_users(self, sess: Session) -> list[dict]:
-        self._need_admin(sess)
-        with self.db.read() as c:
-            return [{"id": r["id"], "username": r["username"], "full_name": r["full_name"], "role": r["role"],
-                     "is_active": bool(r["is_active"]),
-                     "online": bool(c.execute("SELECT 1 FROM shifts WHERE user_id=? AND ended_at IS NULL", (r["id"],)).fetchone())}
-                    for r in c.execute("SELECT * FROM users ORDER BY id")]
-
-    def admin_create_user(self, sess: Session, body: dict) -> dict:
-        self._need_admin(sess)
-        username = str(body.get("username", "")).strip().lower()
-        password, role = str(body.get("password", "")), body.get("role", "staff")
-        if not _USERNAME_RE.match(username):
-            raise _err(422, "VALIDATION_ERROR", "Tài khoản 3–32 ký tự (chữ, số, . _ -)")
-        if len(password) < 8:
-            raise _err(422, "VALIDATION_ERROR", "Mật khẩu tối thiểu 8 ký tự")
-        if role not in ("staff", "admin"):
-            raise _err(422, "VALIDATION_ERROR", "Vai trò phải là staff hoặc admin")
-        try:
-            with self.db.tx() as c:
-                uid = c.execute("INSERT INTO users(username,password_hash,full_name,role,created_at) VALUES(?,?,?,?,?)",
-                                (username, hash_password(password), str(body.get("full_name", ""))[:80], role, utcnow())).lastrowid
-        except Exception as exc:
-            if "UNIQUE" in str(exc):
-                raise _err(409, "USER_EXISTS", "Tài khoản đã tồn tại") from exc
-            raise
-        return next(u for u in self.admin_users(sess) if u["id"] == uid)
-
-    def admin_update_user(self, sess: Session, uid: int, body: dict) -> dict:
-        self._need_admin(sess)
-        with self.db.tx() as c:
-            if not c.execute("SELECT 1 FROM users WHERE id=?", (uid,)).fetchone():
-                raise _err(404, "NOT_FOUND", "Không thấy nhân viên")
-            if "password" in body:
-                if len(str(body["password"])) < 8:
-                    raise _err(422, "VALIDATION_ERROR", "Mật khẩu tối thiểu 8 ký tự")
-                c.execute("UPDATE users SET password_hash=? WHERE id=?", (hash_password(str(body["password"])), uid))
-                c.execute("UPDATE shifts SET ended_at=? WHERE user_id=? AND ended_at IS NULL", (utcnow(), uid))
-            if "full_name" in body:
-                c.execute("UPDATE users SET full_name=? WHERE id=?", (str(body["full_name"])[:80], uid))
-            if "is_active" in body:
-                if not isinstance(body["is_active"], bool):
-                    raise _err(422, "VALIDATION_ERROR", "is_active phải là true/false")
-                if uid == sess.user_id and not body["is_active"]:
-                    raise _err(409, "VALIDATION_ERROR", "Không thể tự khoá tài khoản của mình")
-                c.execute("UPDATE users SET is_active=? WHERE id=?", (int(body["is_active"]), uid))
-                if not body["is_active"]:
-                    c.execute("UPDATE shifts SET ended_at=? WHERE user_id=? AND ended_at IS NULL", (utcnow(), uid))
-        return next(u for u in self.admin_users(sess) if u["id"] == uid)
 
     # ------------------------------------------------------------------ vòng đời
     def close(self) -> None:

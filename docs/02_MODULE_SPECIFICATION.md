@@ -43,8 +43,13 @@ Only `InventoryPipeline` coordinates data flow between AI modules.
 # **1\. core/**
 **Files**: `config.py`, `logger.py`, `utils.py`
 **Responsibilities**: load/validate `configs/config.yaml` into typed Pydantic models; structured logging; generic filesystem/image helpers.
-**Public APIs**: `load_config() -> AppConfig`, `setup_logger(name) -> Logger`, `get_logger(name) -> Logger`
+**Public APIs**: `load_config(config_path=None) -> AppConfig` (cached), `reload_config(config_path=None) -> AppConfig`, `read_raw_config(config_path) -> dict`, `build_config(config_path, overrides=None) -> AppConfig` (uncached; applies `{"dotted.key": value}` overrides before validation — used by the web backend's advanced settings), `setup_logger(name) -> Logger`, `get_logger(name) -> Logger`
 **Forbidden**: no AI/ML inference logic, no UI logic.
+
+# **1b\. catalog/**
+**Files**: `db.py`, `repository.py`, `snapshot.py`, `factory.py`, `validation.py`, `migrate.py`, `reconcile.py`, `sync_gallery.py`, `checks.py`
+**Responsibilities**: the product catalog (SKUs, recognition evidence, colour references) stored in SQLite, and the read-only `CatalogRepository` through which every pipeline module reads it. The source is chosen by `catalog.source` (`sqlite` | `snapshot`) with no silent fallback. Full description: `docs/04_DATA_AND_CATALOG.md`.
+**Forbidden**: no model inference; pipeline modules never open the database directly — only through `CatalogRepository`.
 # **2\. models/**
 **Files**: `models.py`
 
@@ -122,7 +127,7 @@ Refiner.refine(image\_array: np.ndarray, detection\_result: DetectionResult, ove
 
 Runtime-only. **Public API**: `Retriever.retrieve(crop: CropImage) -> RetrievalResult`
 
-Loads a *pre-built* FAISS index \+ catalog; never builds or rebuilds either at runtime. `product_id` throughout this module (and everywhere else in the system) is always the stable internal numeric ID as a string — never a gallery folder name.
+Loads a *pre-built* FAISS index; product data comes from the shared `CatalogRepository` (see `docs/04_DATA_AND_CATALOG.md`). Never builds or rebuilds anything at runtime. `product_id` throughout this module (and everywhere else in the system) is always the stable internal numeric ID as a string — never a gallery folder name.
 
 **Forbidden**: detection, cropping, OCR, barcode decoding, direct Storage/UI interaction.
 
@@ -132,7 +137,7 @@ Loads a *pre-built* FAISS index \+ catalog; never builds or rebuilds either at r
 
 ## **6.3 gallery\_builder.py**
 
-Build-time only (invoked by `pipeline/build.py`). Never imported by runtime `Retriever`.
+Build-time only (invoked by `pipeline/build.py`). Never imported by runtime `Retriever`. Folder → `product_id` mapping comes from `CatalogRepository.folder_to_product_id()`; every build writes a fingerprint file next to the index (`src/retrieval/fingerprint.py`).
 
 # **7\. decision/**
 
@@ -142,7 +147,7 @@ Build-time only (invoked by `pipeline/build.py`). Never imported by runtime `Ret
 
 Also exposes `evaluate_thresholds(similarity: float, detection_confidence: float) -> tuple[str, float]` as a pure, side-effect-free method — the single formula for accept/uncertain/reject, reused (not duplicated) by `Reranker`.
 
-Sets `DecisionResult.needs_plugin` and `trigger_reasons` (subset of `{"uncertain", "ambiguous", "force"}`) and `forced_plugins` (resolved against every candidate in the Top-K via `plugins.force_rules`, not just the winner).
+Sets `DecisionResult.needs_plugin` and `trigger_reasons` (subset of `{"uncertain", "ambiguous", "force"}`) and `forced_plugins` (union of the catalog `force_evidence` of every candidate in the Top-K, not just the winner; queried from `CatalogRepository` at use time).
 
 **Forbidden**: no neural weight loading, no calls to Detector/Retriever/PluginManager/Reranker.
 
@@ -157,10 +162,10 @@ Reranker.rerank(retrieval\_result: RetrievalResult, plugin\_result: PluginResult
 Produces the FINAL `DecisionResult`. Re-scores every Top-K candidate (not just the original winner) using:
 
 * Exact barcode match against `product["barcode"]`.  
-* OCR text matched against catalog-derived alphanumeric tokens (multi-orientation: evaluates every OCR orientation candidate independently per retrieval candidate, keeps the strongest).  
-* Color match via CIEDE2000 distance (Lab space) against `data/metadata/product_colors.json`, gated by both an absolute distance threshold and a margin-over-second-best requirement.  
+* OCR text matched against the SKU's declared `ocr_keywords` only — never against the product name; no keywords means OCR score 0 (multi-orientation: evaluates every OCR orientation candidate independently per retrieval candidate, keeps the strongest).  
+* Color match via CIEDE2000 distance (Lab space) between the query colour and the `color_reference` (RGB, converted to OpenCV Lab inside the Reranker, cached by catalog `version()`) of the SKU's declared `color_code`, gated by both an absolute distance threshold and a margin-over-second-best requirement.  
 * **Retrieval-consensus protection**: scales how much any plugin may influence the outcome by how strongly the Top-K already agrees with itself (`rerank.retrieval_protection`); a switch away from the original Top-1 is reverted if the winning margin is below `min_switch_margin`.  
-* **Confusable-pair guard**: for pairs listed in `rerank.confusable_pairs`, downgrades an otherwise-accepted decision back to `uncertain` unless at least `confusable_min_agreeing_plugins` independent plugins provided positive matching evidence.
+* **Confusable-pair guard**: for pairs declared through catalog `confusable_with`, downgrades an otherwise-accepted decision back to `uncertain` unless at least `confusable_min_agreeing_plugins` independent plugins provided positive matching evidence.
 
 Reuses `DecisionEngine.evaluate_thresholds()` only — never re-invokes `decide()`. `DecisionEngine` itself never calls `PluginManager` or `Reranker`; only `InventoryPipeline` sequences `Decide -> Plugins -> Rerank`.
 
@@ -202,18 +207,20 @@ Detect \-\> Overlap \-\> Refine (if flagged) \-\> Crop \-\> \[per crop: Retrieve
 
 `run()` skips trace bookkeeping for hot-path performance; VAL exclusively uses `run_with_trace()` so validation always measures the real production pipeline.
 
+`InventoryPipeline.reload_catalog() -> str` re-reads the catalog (after an admin edit) without reloading any model and returns the new catalog `version()`.
+
 **Per-call threshold overrides.** `similarity_threshold` and `min_confidence_accept` (both optional, `None` = configured default) override the matching `decision.*` values for one call only. Because `DecisionEngine`/`Reranker` hold no model weights, a temporary pair is built from an overridden config copy; pairs are cached in a small LRU (8 entries) keyed by the two override values, so a caller that passes the same thresholds on every request does not rebuild them. The cache is not thread-safe: call `run()` from one thread (the web backend does).
 
 **`InventoryResult.has_overlap`** is `OverlapResult.needs_refinement` for the processed image. It is true only when the number of overlapping pairs reaches `overlap.min_overlapping_pairs`, so light overlap does not set it. Consumers (e.g. the POS UI) use it to suggest re-capturing; it does not change the result items. Both `run()` and `run_with_trace()` set it.
 
-**`InventoryResult.detected_count`** is the number of regions the detector found, before the decision step. Items whose decision is `rejected` are dropped from `items`, so `detected_count - len(items)` is how many detected objects could not be recognised; the POS UI shows this so the cashier knows something was seen but not identified (e.g. a product missing from the gallery, or a blurry crop).
+**`InventoryResult.detected_count`** is the number of regions the detector found, before the decision step. Items whose decision is `rejected` are dropped from `items`, so `detected_count - len(items)` is how many detected objects could not be recognised; the POS UI shows this so the cashier knows something was seen but not identified (e.g. a product missing from the gallery, or a blurry crop). `rejected_bboxes` (added later) lists the source-image boxes of regions whose final decision was `rejected`, so a UI can show where unrecognised objects are; `items` is unchanged.
 
 
 **Forbidden**: no concrete model implementations, no file I/O, no UI.
 
 # **10\. pipeline/build.py (BuildPipeline, offline)**
 
-Orchestrates `MetadataBuilder` (→ `products.json`, `product_ids.json`) and `GalleryIndexBuilder` (→ FAISS index \+ gallery metadata). Runtime `Retriever` never rebuilds either. Independent from `InventoryPipeline`.
+Orchestrates `sync_gallery` (catalog source `sqlite`: new gallery folders → new SKUs with `needs_naming`, image counts updated; nothing is ever deleted) and `GalleryIndexBuilder` (→ FAISS index \+ gallery metadata \+ fingerprint), rebuilding the index **only when the fingerprint changed** (`retrieval.build_gallery_index`). Runtime `Retriever` never rebuilds either. Independent from `InventoryPipeline`. Catalog details: `docs/04_DATA_AND_CATALOG.md`.
 
 # **11\. storage/results.py (StorageManager)**
 
@@ -233,9 +240,13 @@ The optional threshold overrides are cheap: `DecisionEngine`/ `Reranker` hold no
 
 `persist=False` skips `StorageManager.save_all`, so nothing is written. Callers that keep their own records (the web backend) use it; otherwise every call would overwrite the shared output files. The default (`True`) keeps the original behaviour. `run_batch` always persists.
 
+`InferenceRunner.pipeline` exposes the loaded `InventoryPipeline` so a caller can reuse it (see §13.1) instead of loading the models twice; `InferenceRunner.reload_catalog()` forwards to `InventoryPipeline.reload_catalog()`.
+
 # **13\. validation/**
 
 ## **13.1 validate.py (ValidationRunner)**
+
+`ValidationRunner(config, pipeline=None)`: when `pipeline` is given, that already-loaded `InventoryPipeline` is reused (the web backend does this — a 4 GB GPU cannot hold two pipelines); otherwise a new one is built.
 
 Loads COCO ground truth (`category_id` \== numeric `product_id`), calls `InventoryPipeline.run_with_trace()` per benchmark image, forwards everything to `Evaluator`. Writes `report.json/csv`, `records.csv` (flat per-crop table, includes one row per fully-missed GT object), `summary.txt` (with full per-stage latency breakdown), color-coded annotated images (green=correct, red=wrong, dashed orange=missed), and a per-stage metrics bar chart.
 
@@ -250,6 +261,10 @@ Standalone registry of pure metric formulas (`precision`, `recall`, `f1`, `mrr`,
 # **14\. ui/app.py**
 
 **Forbidden**: never imports Detector/Retriever/any model class directly; communicates only via `InferenceRunner`/`ValidationRunner`.
+
+# **15\. Web POS (`backend/`, `frontend/`) — outside `src/`**
+
+Not a pipeline module. `backend/` (stdlib `http.server` + `sqlite3`) runs the pipeline only through `InferenceRunner`/`ValidationRunner` and reads the catalog through `SqliteCatalogRepository`; `src/` never imports `backend/`. Rules: `03_DEVELOPMENT_RULES.md` §19. Usage: `docs/WEB.md`.
 
 # **Dependency Rules Summary**
 

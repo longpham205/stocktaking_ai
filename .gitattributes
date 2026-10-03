@@ -1,0 +1,2 @@
+# Script bash phải giữ LF (core.autocrlf=true sẽ đổi sang CRLF và làm hỏng bash)
+*.sh text eol=lf

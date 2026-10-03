@@ -1,5 +1,7 @@
-"""Stocktaking AI - Windows E2E setup helper.
+"""Stocktaking AI - one-time setup (called by bin/setup.bat and bin/setup.sh).
 
+Creates venv/, installs PyTorch + requirements, sets device to cpu when there is no GPU,
+downloads and verifies weights/data, runs pytest. Does not start the UI or the web server.
 """
 
 from __future__ import annotations
@@ -16,7 +18,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 VENV_DIR = PROJECT_ROOT / "venv"
 DOWNLOAD_DIR = PROJECT_ROOT / "downloads"
 CONFIG_FILE = PROJECT_ROOT / "configs" / "config.yaml"
-MANIFEST_FILE = PROJECT_ROOT / "assets_manifest.json"
+MANIFEST_FILE = PROJECT_ROOT / "configs" / "assets_manifest.json"
 REQUIREMENTS_FILE = PROJECT_ROOT / "requirements.txt"
 RUN_FILE = PROJECT_ROOT / "run.py"
 VERIFY_SCRIPT = PROJECT_ROOT / "scripts" / "verify_manifest.py"
@@ -58,7 +60,8 @@ def run(
 
 
 def get_system_python() -> str:
-    python = shutil.which("python")
+    # bin/setup.sh runs this file with the venv's interpreter; "python" may not exist on Linux/macOS.
+    python = shutil.which("python") or sys.executable
     if not python:
         fail(
             "Python not found. Install Python 3.11 or 3.12 first "
@@ -106,17 +109,19 @@ def ensure_project_files() -> None:
 
 
 def get_venv_python() -> Path:
-    return VENV_DIR / "Scripts" / "python.exe"
+    if os.name == "nt":
+        return VENV_DIR / "Scripts" / "python.exe"
+    return VENV_DIR / "bin" / "python"
 
 
 def ensure_venv(system_python: str) -> Path:
     venv_python = get_venv_python()
 
     if not VENV_DIR.exists():
-        log("Creating virtual environment in .venv ...")
+        log("Creating virtual environment in venv ...")
         run([system_python, "-m", "venv", str(VENV_DIR)])
     else:
-        log("Virtual environment .venv already exists, reusing it.")
+        log("Virtual environment venv already exists, reusing it.")
 
     if not venv_python.is_file():
         fail(f"Could not find virtual environment Python: {venv_python}")
@@ -214,28 +219,21 @@ def verify_torch(venv_python: Path, has_gpu: bool) -> None:
 
 
 def patch_config_for_cpu(has_gpu: bool) -> None:
+    """No GPU -> set every `device:` key to cpu (scripts/set_device.py). With a GPU the config is left as is."""
     if not CONFIG_FILE.is_file():
         fail(f"{CONFIG_FILE.relative_to(PROJECT_ROOT)} not found.")
 
-    original = CONFIG_FILE.with_name(CONFIG_FILE.name + ".orig")
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import set_device  # stdlib-only, safe before dependencies are installed
 
     if not has_gpu:
-        if not original.exists():
-            shutil.copy2(CONFIG_FILE, original)
-            log(f"Backed up {CONFIG_FILE.relative_to(PROJECT_ROOT)}")
-
-        text = CONFIG_FILE.read_text(encoding="utf-8")
-        updated = text.replace('device: "cuda"', 'device: "cpu"')
-
-        if updated != text:
-            CONFIG_FILE.write_text(updated, encoding="utf-8")
-            log('No GPU: changed device: "cuda" to device: "cpu"')
-        else:
-            log('No GPU: no device: "cuda" entry found.')
-
-    elif original.exists():
-        log("GPU present: restoring original config.")
-        shutil.copy2(original, CONFIG_FILE)
+        try:
+            changed = set_device.apply_device("cpu", CONFIG_FILE)
+        except RuntimeError as exc:
+            fail(str(exc))
+        log(f"No GPU: {changed} device key(s) switched to cpu.")
+    elif any(value == "cpu" for _, value in set_device.read_devices(CONFIG_FILE)):
+        warn("GPU detected but the config still uses cpu. To switch: python scripts/set_device.py cuda")
 
 
 def ensure_gdown(venv_python: Path) -> None:
@@ -257,7 +255,7 @@ def validate_file_id(file_id: str, name: str) -> None:
     if not file_id or file_id.startswith("<PASTE_"):
         fail(
             f"{name} is not configured. "
-            "Edit WEIGHTS_FILE_ID and DATA_FILE_ID in scripts/setup_e2e.py."
+            "Edit WEIGHTS_FILE_ID and DATA_FILE_ID in scripts/setup.py."
         )
 
 
@@ -392,10 +390,11 @@ def main() -> int:
 
     ensure_project_files()
 
-    warn(
-        "Native Windows mode: Linux apt packages are not installed. "
-        "If pyzbar/barcode support fails, install a compatible ZBar DLL."
-    )
+    if os.name == "nt":
+        warn(
+            "Native Windows mode: Linux apt packages are not installed. "
+            "If pyzbar/barcode support fails, install a compatible ZBar DLL."
+        )
 
     venv_python = ensure_venv(system_python)
 
@@ -426,14 +425,14 @@ def main() -> int:
     )
 
     if test_result.returncode != 0:
-        fail(
-            "Some tests failed. Check the output above before continuing to UI."
-        )
-
-    log("All checks passed. Launching UI ...")
-    run([venv_python, RUN_FILE, "--mode", "ui"])
+        fail("Some tests failed. Check the output above.")
 
     log("Setup completed successfully.")
+    print(
+        "\nNext steps:\n"
+        "  Web POS : launch.bat   (Linux/macOS: ./bin/launch.sh) - see docs/WEB.md\n"
+        "  Pipeline: python run.py --mode validate | infer | ui"
+    )
     return 0
 
 

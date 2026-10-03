@@ -29,11 +29,13 @@ CREATE TABLE IF NOT EXISTS order_items(
 CREATE INDEX IF NOT EXISTS ix_items_order ON order_items(order_id);
 CREATE TABLE IF NOT EXISTS captures(
   id INTEGER PRIMARY KEY, order_id INTEGER NOT NULL REFERENCES orders(id), status TEXT NOT NULL,
-  item_count INTEGER NOT NULL DEFAULT 0, processing_time_ms REAL, image_path TEXT, error TEXT, created_at TEXT NOT NULL);
+  item_count INTEGER NOT NULL DEFAULT 0, processing_time_ms REAL, image_path TEXT, error TEXT, created_at TEXT NOT NULL,
+  detections_json TEXT);
 CREATE TABLE IF NOT EXISTS product_prices(product_id TEXT PRIMARY KEY, price INTEGER NOT NULL, updated_at TEXT NOT NULL);
-CREATE TABLE IF NOT EXISTS product_overrides(product_id TEXT PRIMARY KEY, barcode TEXT NOT NULL, updated_at TEXT NOT NULL);
-CREATE UNIQUE INDEX IF NOT EXISTS ux_override_barcode ON product_overrides(barcode) WHERE barcode <> '';
+-- Barcode nằm ở bảng catalog `product` (src/catalog/db.py); bảng cũ product_overrides được gộp + xoá khi khởi động.
 CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT NOT NULL);
+-- Ghi đè thiết lập NÂNG CAO của pipeline (backend/config_registry.py); YAML giữ giá trị gốc.
+CREATE TABLE IF NOT EXISTS config_overrides(key TEXT PRIMARY KEY, value_json TEXT NOT NULL, updated_by TEXT, updated_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS change_log(
   id INTEGER PRIMARY KEY, table_name TEXT NOT NULL, record_id TEXT NOT NULL, field_name TEXT NOT NULL,
   old_value TEXT, new_value TEXT, changed_by INTEGER, changed_at TEXT NOT NULL);
@@ -52,6 +54,10 @@ class Database:
         try:
             conn.execute("PRAGMA journal_mode=WAL")  # ngoài giao dịch
             conn.executescript(SCHEMA)
+            # Nâng cấp DB cũ: cột thêm sau (bbox từng vật của lượt chụp, để vẽ ảnh kết quả trên hoá đơn).
+            cols = {r[1] for r in conn.execute("PRAGMA table_info(captures)")}
+            if "detections_json" not in cols:
+                conn.execute("ALTER TABLE captures ADD COLUMN detections_json TEXT")
         finally:
             conn.close()
 

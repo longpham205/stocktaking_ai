@@ -37,9 +37,9 @@ def _make_retrieval_result(
     return RetrievalResult(crop_id="crop_1", candidates=candidates, detection_confidence=detection_confidence)
 
 
-def test_decision_accepts_high_similarity(test_config) -> None:
+def test_decision_accepts_high_similarity(test_config, test_catalog) -> None:
     """High similarity + high detection confidence should yield 'accepted'."""
-    engine = DecisionEngine(test_config)
+    engine = DecisionEngine(test_config, test_catalog)
     result = engine.decide(_make_retrieval_result([0.95], detection_confidence=0.9))
 
     assert result.status == STATUS_ACCEPTED
@@ -48,9 +48,9 @@ def test_decision_accepts_high_similarity(test_config) -> None:
     assert result.trigger_reasons == frozenset()
 
 
-def test_decision_rejects_low_similarity(test_config) -> None:
+def test_decision_rejects_low_similarity(test_config, test_catalog) -> None:
     """Very low similarity should yield 'rejected' with no product resolved."""
-    engine = DecisionEngine(test_config)
+    engine = DecisionEngine(test_config, test_catalog)
     result = engine.decide(_make_retrieval_result([0.1]))
 
     assert result.status == STATUS_REJECTED
@@ -58,9 +58,9 @@ def test_decision_rejects_low_similarity(test_config) -> None:
     assert result.needs_plugin is False
 
 
-def test_decision_uncertain_band_requests_plugin(test_config) -> None:
+def test_decision_uncertain_band_requests_plugin(test_config, test_catalog) -> None:
     """Similarity within the uncertain band should request plugin evidence."""
-    engine = DecisionEngine(test_config)
+    engine = DecisionEngine(test_config, test_catalog)
     # threshold=0.55, uncertain_band=0.15 -> uncertain range is [0.40, 0.55)
     result = engine.decide(_make_retrieval_result([0.45]))
 
@@ -69,9 +69,9 @@ def test_decision_uncertain_band_requests_plugin(test_config) -> None:
     assert REASON_UNCERTAIN in result.trigger_reasons
 
 
-def test_decision_handles_no_candidates(test_config) -> None:
+def test_decision_handles_no_candidates(test_config, test_catalog) -> None:
     """An empty RetrievalResult must resolve to 'rejected' without crashing."""
-    engine = DecisionEngine(test_config)
+    engine = DecisionEngine(test_config, test_catalog)
     empty_result = RetrievalResult(crop_id="crop_x", candidates=[], detection_confidence=0.5)
 
     result = engine.decide(empty_result)
@@ -80,9 +80,9 @@ def test_decision_handles_no_candidates(test_config) -> None:
     assert result.product_id is None
 
 
-def test_decision_ambiguous_top_n_triggers_plugin(test_config) -> None:
+def test_decision_ambiguous_top_n_triggers_plugin(test_config, test_catalog) -> None:
     """Top-3 candidates within ambiguous_margin of each other should trigger 'ambiguous'."""
-    engine = DecisionEngine(test_config)
+    engine = DecisionEngine(test_config, test_catalog)
     # ambiguous_margin=0.05; all three well above accept threshold individually,
     # but too close together to separate confidently.
     result = engine.decide(_make_retrieval_result([0.95, 0.93, 0.92]))
@@ -91,17 +91,17 @@ def test_decision_ambiguous_top_n_triggers_plugin(test_config) -> None:
     assert result.needs_plugin is True
 
 
-def test_decision_not_ambiguous_when_well_separated(test_config) -> None:
+def test_decision_not_ambiguous_when_well_separated(test_config, test_catalog) -> None:
     """A clear winner (large spread) must not be flagged as ambiguous."""
-    engine = DecisionEngine(test_config)
+    engine = DecisionEngine(test_config, test_catalog)
     result = engine.decide(_make_retrieval_result([0.95, 0.50, 0.10]))
 
     assert REASON_AMBIGUOUS not in result.trigger_reasons
 
 
-def test_decision_force_rule_triggers_regardless_of_similarity(test_config) -> None:
+def test_decision_force_rule_triggers_regardless_of_similarity(test_config, test_catalog) -> None:
     """A Top-K candidate matching force_rules must trigger 'force', even if accepted."""
-    engine = DecisionEngine(test_config)
+    engine = DecisionEngine(test_config, test_catalog)
     # test_config.plugins.force_rules = {"2": ["barcode"]}; product "2" is rank 2
     # here, not the winner, but must still trigger force per Top-K-wide policy.
     result = engine.decide(_make_retrieval_result([0.95, 0.93], product_ids=["1", "2"]))
@@ -111,18 +111,18 @@ def test_decision_force_rule_triggers_regardless_of_similarity(test_config) -> N
     assert result.needs_plugin is True
 
 
-def test_decision_no_force_when_product_absent_from_topk(test_config) -> None:
+def test_decision_no_force_when_product_absent_from_topk(test_config, test_catalog) -> None:
     """force_rules must not trigger if the listed product_id is absent from Top-K."""
-    engine = DecisionEngine(test_config)
+    engine = DecisionEngine(test_config, test_catalog)
     result = engine.decide(_make_retrieval_result([0.95], product_ids=["999"]))
 
     assert REASON_FORCE not in result.trigger_reasons
     assert result.forced_plugins == frozenset()
 
 
-def test_evaluate_thresholds_is_pure_and_reusable(test_config) -> None:
+def test_evaluate_thresholds_is_pure_and_reusable(test_config, test_catalog) -> None:
     """evaluate_thresholds must be callable independently, e.g. by Reranker."""
-    engine = DecisionEngine(test_config)
+    engine = DecisionEngine(test_config, test_catalog)
     status, confidence = engine.evaluate_thresholds(similarity=0.95, detection_confidence=0.9)
 
     assert status == STATUS_ACCEPTED

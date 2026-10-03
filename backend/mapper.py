@@ -3,6 +3,7 @@
 - item `accepted` cùng `product_id` -> gộp một dòng (quantity = số item);
 - mỗi item `uncertain` -> GIỮ RIÊNG (không gộp, kể cả trùng SKU với dòng đã gộp);
 - một SKU có thể có nhiều dòng; frontend không được giả định một SKU một dòng.
+- `bboxes`: bbox của MỌI vật thuộc dòng (để vẽ ảnh kết quả); `bbox` = vật đầu tiên (cắt thumbnail).
 """
 
 from __future__ import annotations
@@ -19,14 +20,15 @@ def merge_detections(dets: list[Detection]) -> list[dict]:
         if d.status == "accepted":
             if d.product_id in accepted:
                 accepted[d.product_id]["quantity"] += 1
+                accepted[d.product_id]["bboxes"].append(d.bbox)
             else:
                 line = {"product_id": d.product_id, "quantity": 1, "flagged": False,
-                        "bbox": d.bbox, "evidence": d.plugin_evidence}
+                        "bbox": d.bbox, "bboxes": [d.bbox], "evidence": d.plugin_evidence}
                 accepted[d.product_id] = line
                 lines.append(line)
         elif d.status == "uncertain":
             lines.append({"product_id": d.product_id, "quantity": 1, "flagged": True,
-                          "bbox": d.bbox, "evidence": d.plugin_evidence})
+                          "bbox": d.bbox, "bboxes": [d.bbox], "evidence": d.plugin_evidence})
     return lines
 
 

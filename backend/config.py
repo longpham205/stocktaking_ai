@@ -19,7 +19,7 @@ DEFAULTS: dict[str, Any] = {
     "pos": {"allow_checkout_without_price": False, "timezone_offset_hours": 7},
 }
 
-_ENV_KEYS = ("JWT_SECRET", "SEED_STAFF_PASSWORD", "SEED_ADMIN_PASSWORD")
+_ENV_KEYS = ("JWT_SECRET", "SEED_STAFF_PASSWORD", "SEED_ADMIN_PASSWORD", "SEED_ADVANCED_PASSWORD")
 
 
 def _deep_merge(base: dict, extra: dict) -> dict:
@@ -56,9 +56,11 @@ def ensure_env(env_path: Path, announce: bool = True) -> dict[str, str]:
         if announce:
             print("=" * 64)
             print(f"Đã tạo bí mật mới trong {env_path.name} (chỉ hiện MỘT LẦN):")
-            for k in ("SEED_STAFF_PASSWORD", "SEED_ADMIN_PASSWORD"):
+            labels = {"SEED_STAFF_PASSWORD": "staff", "SEED_ADMIN_PASSWORD": "admin",
+                      "SEED_ADVANCED_PASSWORD": "mật khẩu NÂNG CAO (admin dùng khi áp dụng thiết lập nâng cao)"}
+            for k, label in labels.items():
                 if k in created:
-                    print(f"  {'staff' if 'STAFF' in k else 'admin'} / {created[k]}")
+                    print(f"  {label} / {created[k]}")
             print("=" * 64)
     for k, v in values.items():
         os.environ.setdefault(k, v)
@@ -85,13 +87,14 @@ class Settings:
     allow_checkout_without_price: bool
     tz_offset_hours: float
     pipeline_config: Path
-    metadata_dir: Path
-    products_filename: str
+    catalog_db_path: Path
+    ocr_min_length: int
     frontend_dir: Path
     seed_prices_path: Path | None
     jwt_secret: str = field(repr=False, default="")
     seed_staff_password: str = field(repr=False, default="")
     seed_admin_password: str = field(repr=False, default="")
+    seed_advanced_password: str = field(repr=False, default="")
 
 
 def load_settings(
@@ -116,8 +119,10 @@ def load_settings(
     if not pcfg_path.is_file():
         raise FileNotFoundError(f"Không thấy config pipeline: {pcfg_path}")
     pipe = yaml.safe_load(pcfg_path.read_text(encoding="utf-8")) or {}
-    meta_dir = ROOT / pipe.get("paths", {}).get("metadata_dir", "data/metadata")
-    products_filename = pipe.get("catalog", {}).get("products_filename", "products.json")
+    pcat = pipe.get("catalog") or {}
+    if pcat.get("source") != "sqlite" or not pcat.get("db_path"):
+        raise ValueError(f"Web cần catalog SQLite: {pcfg_path} phải có catalog.source: sqlite và catalog.db_path.")
+    ocr_min_length = int(((pipe.get("plugins") or {}).get("ocr") or {}).get("min_text_length", 3))
 
     def under(p: str | Path) -> Path:
         p = Path(p)
@@ -149,9 +154,9 @@ def load_settings(
         thumb_width=int(cfg["media"]["thumb_width"]),
         allow_checkout_without_price=bool(cfg["pos"]["allow_checkout_without_price"]),
         tz_offset_hours=float(cfg["pos"]["timezone_offset_hours"]),
-        pipeline_config=pcfg_path, metadata_dir=meta_dir, products_filename=products_filename,
+        pipeline_config=pcfg_path, catalog_db_path=under(pcat["db_path"]), ocr_min_length=ocr_min_length,
         frontend_dir=ROOT / "frontend",
         seed_prices_path=seed_prices if seed_prices.is_file() else None,
         jwt_secret=env["JWT_SECRET"], seed_staff_password=env["SEED_STAFF_PASSWORD"],
-        seed_admin_password=env["SEED_ADMIN_PASSWORD"],
+        seed_admin_password=env["SEED_ADMIN_PASSWORD"], seed_advanced_password=env["SEED_ADVANCED_PASSWORD"],
     )

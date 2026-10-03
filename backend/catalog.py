@@ -1,43 +1,45 @@
-"""Nguồn catalog CHỈ ĐỌC cho web (MVP: đọc products.json qua interface mỏng).
+"""Catalog sản phẩm cho web: đọc bảng catalog trong app.db qua ``CatalogRepository`` của ``src.catalog``.
 
-Đây là điểm sẽ thay bằng `CatalogRepository` (SQLite) ở Phase 1B mà không sửa nơi gọi. Web không bao giờ
-sửa `products.json`; giá và barcode do admin chỉnh nằm trong DB của web (`product_prices`, `product_overrides`).
-`product_id` là chuẩn và bất biến (= category_id của nhãn benchmark) — không đổi số, không lấp khoảng trống.
+Web và pipeline dùng CHUNG một file app.db (catalog + bảng web). Ghi catalog (barcode, tên, bằng chứng,
+màu tham chiếu) do ``backend/service.py`` làm bằng SQL trong cùng giao dịch với ``change_log``;
+sau khi ghi gọi ``reload()``.
 """
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
+from src.catalog.repository import SqliteCatalogRepository
 
-class JsonCatalog:
-    def __init__(self, products_path: Path) -> None:
-        self.path = Path(products_path)
-        self._products: dict[str, dict] = {}
-        self.reload()
+
+class DbCatalog:
+    def __init__(self, db_path: Path) -> None:
+        self.path = Path(db_path)
+        self.repo = SqliteCatalogRepository(self.path)
+        self._view: dict[str, dict] = {}
+        self._build_view()
+
+    def _build_view(self) -> None:
+        view = {
+            pid: {"id": pid, "name": p.product_name, "barcode": p.barcode or "",
+                  "needs_naming": p.needs_naming, "is_active": p.is_active}
+            for pid, p in self.repo.products().items()
+        }
+        if not any(v["is_active"] for v in view.values()):
+            raise ValueError(f"Catalog rỗng: {self.path} (chạy python -m src.catalog.migrate ...).")
+        self._view = view
 
     def reload(self) -> None:
-        if not self.path.is_file():
-            raise FileNotFoundError(f"Không thấy catalog: {self.path} (chạy build pipeline trước).")
-        data = json.loads(self.path.read_text(encoding="utf-8"))
-        items = data if isinstance(data, list) else data.get("products", [])
-        products: dict[str, dict] = {}
-        for it in items:
-            pid = str(it.get("product_id", "")).strip()
-            if not pid:
-                continue
-            products[pid] = {
-                "id": pid,
-                "name": str(it.get("product_name") or f"SKU {pid}"),
-                "barcode": str(it.get("barcode") or ""),
-            }
-        if not products:
-            raise ValueError(f"Catalog rỗng: {self.path}")
-        self._products = dict(sorted(products.items(), key=lambda kv: (len(kv[0]), kv[0])))
+        self.repo.reload()
+        self._build_view()
+
+    def version(self) -> str:
+        return self.repo.version()
 
     def all(self) -> dict[str, dict]:
-        return self._products
+        """SKU đang bán (dùng cho tìm kiếm, thêm món, quản trị)."""
+        return {pid: v for pid, v in self._view.items() if v["is_active"]}
 
     def get(self, product_id: str) -> dict | None:
-        return self._products.get(str(product_id))
+        """Mọi SKU kể cả ngừng bán (đơn cũ vẫn hiển thị được tên)."""
+        return self._view.get(str(product_id))

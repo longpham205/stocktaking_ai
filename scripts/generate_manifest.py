@@ -16,16 +16,15 @@ import json
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-OUTPUT_FILE = PROJECT_ROOT / "assets_manifest.json"
+OUTPUT_FILE = PROJECT_ROOT / "configs" / "assets_manifest.json"
 
 # Which directories/files belong to each group. Edit if the layout changes.
 GROUPS = {
     "weights": [PROJECT_ROOT / "weights"],
     "data": [
+        # Only source assets. Derived files (data/cache FAISS index, data/metadata, data/db) change
+        # whenever a SKU is added or the index is rebuilt, so they must not be pinned here.
         PROJECT_ROOT / "data" / "gallery",
-        PROJECT_ROOT / "data" / "metadata",
-        PROJECT_ROOT / "data" / "cache" / "gallery_index.faiss",
-        PROJECT_ROOT / "data" / "cache" / "gallery_metadata.json",
         PROJECT_ROOT / "data" / "benchmark",
     ],
 }
