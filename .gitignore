@@ -9,14 +9,14 @@ __pycache__/
 env/
 venv/
 .venv/
-build/
 develop-eggs/
-dist/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
+/backend/build/
+/backend/dist/
+/backend/lib/
+/backend/lib64/
 parts/
 sdist/
 var/
@@ -30,6 +30,8 @@ share/python-wheels/
 # 2. TESTING & DEBUGGING
 # ==========================================
 .pytest_cache/
+.ruff_cache/
+.mypy_cache/
 .coverage
 htmlcov/
 .tox/
@@ -70,47 +72,60 @@ desktop.ini
 *.tgz
 
 # ==========================================
-# 6. MODEL WEIGHTS
+# 6. MODEL WEIGHTS (backend/weights)
 # ==========================================
-weights/**/*.pth
-weights/**/*.pt
-weights/**/*.safetensors
-weights/**/*.bin
-weights/**/*.msgpack
-weights/**/*.h5
-weights/**/*.onnx
-weights/retriever/siglip2/*.json
-weights/retriever/siglip2/*.jinja
-!weights/**/.gitkeep
+backend/weights/**/*.pth
+backend/weights/**/*.pt
+backend/weights/**/*.safetensors
+backend/weights/**/*.bin
+backend/weights/**/*.msgpack
+backend/weights/**/*.h5
+backend/weights/**/*.onnx
+backend/weights/retriever/siglip2/*.json
+backend/weights/retriever/siglip2/*.jinja
+!backend/weights/**/.gitkeep
 
 # ==========================================
-# 7. DATA, CACHE, OUTPUTS & METADATA
+# 7. DATA, CACHE, OUTPUTS & METADATA (backend/data, backend/data_demo)
 # ==========================================
 
 # Ignore everything inside data
-data/*
-data_demo/*
+backend/data/*
+backend/data_demo/*
 
 # Allow only required directory placeholders
-data/gallery/
-!data/gallery/.gitkeep
+!backend/data/gallery/
+backend/data/gallery/*
+!backend/data/gallery/.gitkeep
 
-data/query/
-!data/query/.gitkeep
+!backend/data/query/
+backend/data/query/*
+!backend/data/query/.gitkeep
 
-data/outputs/
-!data/outputs/.gitkeep
+!backend/data/outputs/
+backend/data/outputs/*
+!backend/data/outputs/.gitkeep
 
-data/cache/
-!data/cache/.gitkeep
+!backend/data/cache/
+backend/data/cache/*
+!backend/data/cache/.gitkeep
 
-# Allow metadata directory and ONLY product_colors.json
-!data/metadata/
-!data/metadata/product_colors.json
+# Allow metadata directory, its hand-written files only
+!backend/data/metadata/
+backend/data/metadata/products.json
+backend/data/metadata/product_ids.json
 
-# Ignore generated metadata
-data/metadata/products.json
-data/metadata/product_ids.json
+*.db
+*.db-wal
+*.db-shm
+
+# ==========================================
+# 7b. FRONTEND (Node / Vite)
+# ==========================================
+node_modules/
+frontend/dist/
+frontend/coverage/
+*.tsbuildinfo
 
 # ==========================================
 # 8. TEMPORARY FILES
