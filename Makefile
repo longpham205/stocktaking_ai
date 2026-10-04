@@ -2,7 +2,7 @@
 # On Windows run it from Git Bash (the recipes are POSIX shell).
 .PHONY: help setup docker-up docker-up-gpu docker-up-prod docker-up-data docker-down logs \
         migrate migration dev-api test lint format type-check check-env clean reset-password \
-        reset-advanced-password
+        reset-advanced-password smoke
 
 COMPOSE      := docker compose
 COMPOSE_GPU  := $(COMPOSE) -f docker-compose.yml -f docker-compose.gpu.yml
@@ -60,8 +60,13 @@ migration: docker-up-data  ## autogenerate a revision from the models: make migr
 	  n=$$(printf '%04d' $$(( $$(ls migrations/versions/*.py 2>/dev/null | wc -l) + 1 ))) && \
 	  uv run alembic revision --autogenerate --rev-id $$n -m "$(MSG)"
 
+# One API process, always (`--workers 1` in docker compose and the Dockerfile): the model, the
+# recognition queue, the login limiter and the idempotency keys live in that process's memory.
 dev-api: migrate ## API with reload on :8000, on the host (reads .env)
 	cd backend && uv run uvicorn entrypoints.api:app --reload --port 8000
+
+smoke:           ## end-to-end check of the running API over HTTP; needs SMOKE_ADMIN(_PW), SMOKE_STAFF(_PW) [PHOTO=...]
+	cd backend && uv run python scripts/smoke_api.py $(or $(PHOTO),data_demo/query/query_01.jpg)
 
 test: docker-up-data  ## backend suite; the API tests use their own database (stocktaking_test)
 	cd backend && uv run pytest -q

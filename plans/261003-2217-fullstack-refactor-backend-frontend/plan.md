@@ -27,7 +27,7 @@ stocktaking_ai/
 | 1 | Backend skeleton: core, create_app, entrypoints, Docker, Makefile, compose | [phase-01](phase-01-backend-skeleton-core-docker-makefile.md) | **done** (2026-10-04) |
 | 2 | DB: models + Alembic + catalog repo theo `DATABASE_URL` | [phase-02](phase-02-database-models-alembic-catalog.md) | **done** (2026-10-04; repository + đường ghi catalog chuyển sang phase 3) |
 | 3 | Backend modules (auth, catalog, orders, captures, recognition, admin…) | [phase-03](phase-03-backend-modules-port-legacy-api.md) | done (2026-10-04) |
-| 4 | Recognition worker in-process + job state trong DB | [phase-04](phase-04-inference-worker-and-job-queue.md) | pending |
+| 4 | Recognition worker in-process + job state trong DB | [phase-04](phase-04-inference-worker-and-job-queue.md) | done (2026-10-04, mostly within phase 3) |
 | 5 | Frontend scaffold + shared (api, auth, i18n, ui) | [phase-05](phase-05-frontend-scaffold-and-shared-layer.md) | pending |
 | 6 | Frontend features: POS flow + Admin | [phase-06](phase-06-frontend-features-pos-and-admin.md) | pending |
 | 7 | Data migration, scripts, tests, docs, cleanup | [phase-07](phase-07-migration-scripts-tests-docs.md) | pending |
