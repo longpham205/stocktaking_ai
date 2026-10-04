@@ -1,6 +1,6 @@
 # Phase 06 — Frontend features (POS + Admin)
 
-**Priority:** P1 · **Status:** in progress (6a POS, 6b-1 admin cơ bản: done 2026-10-04; 6b-2 sản phẩm + nâng cao: pending) · Nguồn hành vi: `src_legacy/frontend/app.js`, `docs/WEB.md`
+**Priority:** P1 · **Status:** done (2026-10-04: 6a POS, 6b-1, 6b-2); còn thử tay trên điện thoại thật qua HTTPS · Nguồn hành vi: `src_legacy/frontend/app.js`, `docs/WEB.md`
 
 ## POS (staff, mobile-first)
 - [ ] onboarding (một lần, `POST me/onboarding-seen`)
@@ -47,3 +47,17 @@ Checklist parity đủ; vitest cho mỗi feature (stub API); smoke thủ công t
 ## Chạy thật 6b-1 (2026-10-04, sau khi Docker bật lại)
 - `make docker-up`, đăng nhập `e2e_admin` ở http://localhost:5173: vào thẳng `/admin/reports` (KPI thật, biểu đồ 7 cột, thẻ SKU thiếu giá đỏ, top 5), `/admin/orders` (7 đơn hôm nay), `/admin/users` (2 tài khoản, đang trong ca). Chưa bấm thử khoá/đặt lại mật khẩu và lưu cài đặt trong trình duyệt (người dùng đang tự thao tác trên cùng khung; các thao tác đó có test vitest + test API).
 - Lỗi thấy khi chạy thật, đã sửa ở backend: cột "Thu ngân" trống với tài khoản chưa có họ tên -> `history`/`admin/orders` trả tên tài khoản thay thế (`orders/repository.py`, có test).
+
+## Kết quả 6b-2 — admin: sản phẩm, nâng cao (2026-10-04)
+- `features/admin-products/`: `products-page.tsx` (tìm chờ 350 ms, 4 bộ lọc có số đếm, phân trang, sửa tên/barcode/giá từng dòng — tên chỉ gửi khi đổi, nhãn "chưa đặt tên"/"thiếu màu tham chiếu"), `evidence-dialog.tsx` (từ khoá OCR, mã màu có gợi ý + cảnh báo thiếu tham chiếu, hex hoặc chấm màu 9×9 trên ảnh gallery, plugin bắt buộc, cặp dễ nhầm, ô xác nhận bắt buộc; lưu màu tham chiếu trước rồi bằng chứng; hiện cảnh báo của server), `product-history-dialog.tsx` (gộp nhật ký `product` + `product_evidence`, hoàn tác có hỏi), `evidence-test-dialog.tsx`, `api.ts`, `lib.ts`.
+- `features/admin-advanced/advanced-page.tsx`: thiết lập theo nhóm (🔒 chỉ xem / 🟡 cần áp dụng, min–max, "đã sửa · gốc", ↺ về gốc), banner (cấu hình lưu không hợp lệ, chưa có mật khẩu nâng cao, đang nạp lại), hộp thoại áp dụng (từng thay đổi cũ → mới, mật khẩu nâng cao, ô xác nhận), lịch sử + hoàn tác bằng mật khẩu nâng cao, kiểm định (trạng thái, F1 + fusion so baseline theo điểm, bắt đầu cần mật khẩu + xác nhận, tự làm mới 5 s khi đang chạy).
+- Test: 47 vitest (14 mới: hàm thuần 4, sản phẩm 4, nâng cao + kiểm định 6); chạy lại 3 lần ổn định. `pnpm typecheck`, `pnpm build` đạt. Không thêm thư viện.
+- Chạy thật trên Docker (`PIPELINE_CONFIG=configs/config.demo.yaml` để gallery khớp catalog demo), đăng nhập `e2e_admin`: 50 SKU + bộ lọc; hộp thoại bằng chứng SKU 1 tải 6 ảnh gallery qua URL ký, chấm màu trên ảnh thật ra hex; sửa giá 174.000 -> 123.456 rồi hoàn tác qua lịch sử; thử bằng chứng với ảnh canvas (3 vật); nâng cao: áp dụng Top-K 5 -> 6 bằng mật khẩu nâng cao, hoàn tác qua lịch sử, chạy kiểm định (đang chạy -> xong, so baseline).
+- Lỗi tìm ra khi viết test, đã sửa: xoá trắng ô số ở màn Nâng cao thì ô hiện lại giá trị cũ (gõ "7" thành "57") -> ô số giữ nguyên văn bản đang gõ.
+
+## Khác bản cũ (6b-2)
+- Nút "Lưu bằng chứng", "Áp dụng", "Bắt đầu" bị khoá cho tới khi tích ô xác nhận (bản cũ cho bấm rồi báo lỗi).
+- Bấm Huỷ ở hộp thoại áp dụng giữ nguyên các giá trị đang gõ.
+
+## Phase 6: hoàn tất về code
+Còn "smoke thủ công trên điện thoại qua HTTPS forward" (camera trực tiếp, cảm biến nghiêng, máy quét, in): việc của người dùng.

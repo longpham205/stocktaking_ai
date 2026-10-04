@@ -37,13 +37,3 @@ export function RouteNotFound() {
     </div>
   );
 }
-
-/** A screen that arrives in phase 6: the route exists, so navigation and guards can be checked now. */
-export function ComingSoon({ title }: { title: string }) {
-  return (
-    <div className="space-y-2 py-16 text-center">
-      <h1 className="text-xl font-semibold">{title}</h1>
-      <p className="text-sm text-muted-foreground">Màn hình này đang được xây dựng.</p>
-    </div>
-  );
-}
