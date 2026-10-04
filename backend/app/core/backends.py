@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.core.config import CoreSettings
+from app.modules.auth.service import AuthService
 from app.modules.recognition.ports import RecognizerPort
 
 Closer = Callable[[], Awaitable[None]]
@@ -18,5 +19,6 @@ class Backends:
     settings: CoreSettings
     engine: AsyncEngine
     recognizer: RecognizerPort | None = None
+    auth: AuthService | None = None
     # run in reverse order at shutdown
     closers: list[Closer] = field(default_factory=list)

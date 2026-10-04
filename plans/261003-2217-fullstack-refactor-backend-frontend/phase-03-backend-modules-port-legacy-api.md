@@ -1,6 +1,6 @@
 # Phase 03 — Backend modules (port API legacy)
 
-**Priority:** P0 · **Status:** pending · Context: design.md §2 mapping; nguồn: `src_legacy/backend/{service,admin,security}.py`
+**Priority:** P0 · **Status:** in progress (3a auth: done 2026-10-04) · Context: design.md §2 mapping; nguồn: `src_legacy/backend/{service,admin,security}.py`
 
 ## Thứ tự module (mỗi module: ports → config → repository → service → schemas → deps → router → tests)
 1. `auth`: login (mở shift, đóng shift cũ = đá máy cũ), logout, `GET /me`, onboarding-seen; scrypt giữ format hash cũ; JWT `{uid,sid,role,exp}` qua pyjwt; `CurrentUser` kiểm shift còn mở; `RequireAdmin`; limiter 5 lần/5 phút theo (username, IP) in-memory → 429 `RATE_LIMITED` + `retry_after`.
@@ -20,3 +20,30 @@
 
 ## Done khi
 Bộ test API port từ `test_backend_api.py` (httpx ASGITransport + FakeRecognizer) xanh, phủ đủ ~37 route.
+
+## Chia PR (mỗi module một PR, theo thứ tự phụ thuộc)
+| PR | Module | Trạng thái |
+|---|---|---|
+| 3a | `auth` (+ `entrypoints/reset_password.py`) | **done** (2026-10-04) |
+| 3b | `pos_settings`, `catalog` (đọc + giá) | pending |
+| 3c | `orders` | pending |
+| 3d | `captures` (bộ nhận diện giả) | pending |
+| 3e | `audit`, phần ghi của `catalog`, `users`, `reports`, `engine_config`, `validation` | pending |
+
+## Quyết định cho phần ghi catalog (PR 3e)
+Engine cung cấp hàm ghi nhận kết nối từ bên gọi và KHÔNG commit (cùng kiểu `set_meta` đang có); module quản trị
+mở một giao dịch đồng bộ (psycopg, chạy trong luồng phụ), gọi hàm đó rồi ghi `change_log` trên cùng kết nối.
+Vẫn một đường ghi qua engine, và catalog + nhật ký nằm trong cùng một giao dịch như bản cũ.
+
+## Kết quả 3a
+- Route: `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/me`, `POST /api/me/onboarding-seen`; dependency `current_user`, `require_admin` cho các module sau.
+- Giữ hành vi cũ: một ca mở mỗi tài khoản (đăng nhập nơi khác đá phiên cũ -> `SESSION_INVALID`), logout idempotent, thông báo giống nhau cho sai mật khẩu / tài khoản không tồn tại / tài khoản bị khoá, khoá tạm theo (tài khoản, IP) -> 429 `RATE_LIMITED` + `retry_after`, hash scrypt đúng format cũ.
+- `make lint`, `make type-check` (48 file): đạt. `make test`: 241 passed, 25 skipped (16 test auth mới: 12 qua HTTP trên Postgres, 1 khởi động, 3 đơn vị).
+
+## Khác với bản cũ / kế hoạch (3a)
+- Token là JWT HS256 (pyjwt) thay token HMAC tự chế: token cũ không còn hợp lệ, người dùng đăng nhập lại.
+- Lỗi theo `design.md`: `{"detail", "code", ...}` thay `{"error": {"code", "message"}}`; lỗi kiểm dữ liệu của FastAPI cũng về dạng này (422 `VALIDATION_ERROR` + `errors`).
+- `GET /api/me` chưa trả `settings`: thêm ở PR 3b cùng module `pos_settings`.
+- Không seed tài khoản lúc khởi động (theo "Quy ước" ở trên): tạo/đặt lại bằng `make reset-password USER_NAME=admin ROLE=admin` (mật khẩu ngẫu nhiên, in một lần).
+- Thiếu `JWT_SECRET` thì API dừng ngay lúc khởi động với thông báo rõ; `make setup` điền các bí mật còn thiếu vào `.env` đã có (không ghi đè giá trị đã có); `make docker-up*` chạy `setup` trước.
+- Mật khẩu được kiểm trong luồng phụ (`asyncio.to_thread`) vì scrypt cố ý chậm.

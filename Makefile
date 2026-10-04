@@ -1,7 +1,7 @@
 # Stocktaking AI: every day-to-day command. Run from the repo root.
 # On Windows run it from Git Bash (the recipes are POSIX shell).
 .PHONY: help setup docker-up docker-up-gpu docker-up-prod docker-up-data docker-down logs \
-        migrate migration dev-api test lint format type-check check-env clean
+        migrate migration dev-api test lint format type-check check-env clean reset-password
 
 COMPOSE      := docker compose
 COMPOSE_GPU  := $(COMPOSE) -f docker-compose.yml -f docker-compose.gpu.yml
@@ -13,7 +13,15 @@ S            ?= api
 help:            ## list the targets
 	@grep -E '^[a-zA-Z_-]+:.*##' $(MAKEFILE_LIST) | sed -E 's/:.*## /\t/' | expand -t 18
 
-setup: .env      ## create .env with generated secrets, check docker and uv
+setup: .env      ## create .env, fill any missing secret in it, check docker and uv
+	@for key in MEDIA_URL_SECRET JWT_SECRET; do \
+	  if ! grep -q "^$$key=..*" .env; then \
+	    secret=$$(openssl rand -hex 32); \
+	    if grep -q "^$$key=" .env; then sed -i.bak "s|^$$key=.*|$$key=$$secret|" .env && rm -f .env.bak; \
+	    else printf '%s=%s\n' "$$key" "$$secret" >> .env; fi; \
+	    echo ".env: generated $$key"; \
+	  fi; \
+	done
 	@docker --version >/dev/null 2>&1 || (echo "docker not found: install Docker Desktop" && exit 1)
 	@docker compose version >/dev/null 2>&1 || (echo "docker compose not found" && exit 1)
 	@uv --version >/dev/null 2>&1 || (echo "uv not found: https://docs.astral.sh/uv/" && exit 1)
@@ -21,17 +29,16 @@ setup: .env      ## create .env with generated secrets, check docker and uv
 
 .env:
 	@cp .env.example .env
-	@secret=$$(openssl rand -hex 32) && sed -i.bak "s|^MEDIA_URL_SECRET=.*|MEDIA_URL_SECRET=$$secret|" .env && rm -f .env.bak
-	@echo ".env created from .env.example (MEDIA_URL_SECRET generated)"
+	@echo ".env created from .env.example"
 
-docker-up:       ## build and start postgres, migrate, api -> http://localhost:8000/healthz
+docker-up: setup ## build and start postgres, migrate, api -> http://localhost:8000/healthz
 	$(COMPOSE) up --build -d --wait
 	@echo "api: http://localhost:8000/healthz   docs (dev): http://localhost:8000/docs"
 
-docker-up-gpu:   ## same, with the real pipeline on an NVIDIA GPU (large image)
+docker-up-gpu: setup  ## same, with the real pipeline on an NVIDIA GPU (large image)
 	$(COMPOSE_GPU) up --build -d --wait
 
-docker-up-prod:  ## same, without reload or source mounts
+docker-up-prod: setup  ## same, without reload or source mounts
 	$(COMPOSE_PROD) up --build -d --wait
 
 docker-up-data:  ## only postgres (published on :5437), for dev-api, migrate and test on the host
@@ -66,6 +73,10 @@ format:          ## apply ruff's fixes and formatting to the web app
 
 type-check:      ## mypy (strict) on app/, entrypoints/, migrations/
 	cd backend && uv run mypy
+
+reset-password: migrate  ## new random password for an account, created if missing: make reset-password USER_NAME=admin ROLE=admin
+	@test -n "$(USER_NAME)" || (echo 'usage: make reset-password USER_NAME=admin [ROLE=admin]' && exit 1)
+	cd backend && uv run python -m entrypoints.reset_password $(USER_NAME) $(if $(ROLE),--create --role $(ROLE),)
 
 check-env:       ## what this machine has: tools, .env, the engine's device keys
 	@docker --version; docker compose version; uv --version

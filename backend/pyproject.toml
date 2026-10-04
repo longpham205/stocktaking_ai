@@ -32,6 +32,7 @@ dependencies = [
     # the engine reads its catalog through a synchronous connection
     "psycopg[binary]>=3.2",
     "alembic>=1.14",
+    "pyjwt>=2.9",
 ]
 
 [project.optional-dependencies]

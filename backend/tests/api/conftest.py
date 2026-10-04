@@ -29,8 +29,13 @@ from sqlalchemy.ext.asyncio import create_async_engine  # noqa: E402
 
 from app.core.config import CoreSettings  # noqa: E402
 from app.main import create_app  # noqa: E402
+from app.modules.auth.config import AuthSettings  # noqa: E402
+from app.modules.auth.passwords import hash_password  # noqa: E402
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
+# every web table, for TRUNCATE between tests (the engine's catalog tables have their own fixture)
+WEB_TABLES = "change_log, captures, order_items, orders, shifts, users, product_prices, settings, config_overrides"
+STAFF_PASSWORD, ADMIN_PASSWORD = "staff-pass-123", "admin-pass-456"
 
 
 def alembic_config(url: str) -> Config:
@@ -67,6 +72,14 @@ def settings(**overrides: Any) -> CoreSettings:
     return CoreSettings(_env_file=None, **{**values, **overrides})  # type: ignore[call-arg]
 
 
+def auth_settings(**overrides: Any) -> AuthSettings:
+    values: dict[str, Any] = {
+        "jwt_secret": "test-jwt-secret-0123456789abcdef-0123456789",
+        "login_max_failed_attempts": 3,
+    }
+    return AuthSettings(_env_file=None, **{**values, **overrides})  # type: ignore[call-arg]
+
+
 @pytest.fixture(scope="session")
 def migrated_database_url() -> str:
     """A fresh test database built by the migrations themselves, down and up once, so a broken
@@ -82,9 +95,56 @@ def migrated_database_url() -> str:
 @pytest.fixture
 async def api_app() -> AsyncIterator[FastAPI]:
     """The app with its lifespan run (httpx's ASGI transport does not run it), no database needed."""
-    app = create_app(settings())
+    app = create_app(settings(), auth_settings=auth_settings())
     async with app.router.lifespan_context(app):
         yield app
+
+
+@pytest.fixture
+async def database_url(migrated_database_url: str) -> str:
+    """The migrated test database with every web table emptied."""
+    engine = create_async_engine(migrated_database_url)
+    async with engine.begin() as conn:
+        await conn.execute(text(f"TRUNCATE {WEB_TABLES} RESTART IDENTITY CASCADE"))
+    await engine.dispose()
+    return migrated_database_url
+
+
+async def start_app(database_url: str, **auth_overrides: Any) -> FastAPI:
+    """An app on the test database, not yet started: enter `app.router.lifespan_context(app)`."""
+    return create_app(settings(database_url=database_url), auth_settings=auth_settings(**auth_overrides))
+
+
+async def seed_accounts(app: FastAPI) -> None:
+    """The two accounts the legacy web seeded: `staff` and `admin`, with the test passwords."""
+    repo = app.state.backends.auth.repo
+    await repo.create_user("staff", hash_password(STAFF_PASSWORD), "staff", "Thu ngân demo")
+    await repo.create_user("admin", hash_password(ADMIN_PASSWORD), "admin", "Quản trị")
+
+
+@pytest.fixture
+async def db_app(database_url: str) -> AsyncIterator[FastAPI]:
+    """The app on an emptied test database, with the `staff` and `admin` accounts."""
+    app = await start_app(database_url)
+    async with app.router.lifespan_context(app):
+        await seed_accounts(app)
+        yield app
+
+
+def http(app: FastAPI, token: str | None = None) -> httpx.AsyncClient:
+    headers = {"Authorization": f"Bearer {token}"} if token else {}
+    return httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test", headers=headers)
+
+
+async def login(app: FastAPI, username: str, password: str) -> httpx.Response:
+    async with http(app) as client:
+        return await client.post("/api/auth/login", json={"username": username, "password": password})
+
+
+async def token_for(app: FastAPI, username: str, password: str) -> str:
+    response = await login(app, username, password)
+    assert response.status_code == 200, response.text
+    return str(response.json()["token"])
 
 
 @pytest.fixture
