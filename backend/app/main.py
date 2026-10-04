@@ -23,6 +23,9 @@ from app.modules.auth.service import AuthService
 from app.modules.catalog.repository import CatalogRepository
 from app.modules.catalog.router import router as catalog_router
 from app.modules.catalog.service import CatalogService
+from app.modules.orders.repository import OrdersRepository
+from app.modules.orders.router import router as orders_router
+from app.modules.orders.service import OrdersService
 from app.modules.pos_settings.config import PosSettings, get_pos_settings
 from app.modules.pos_settings.repository import SettingsRepository
 from app.modules.pos_settings.router import router as settings_router
@@ -58,6 +61,7 @@ def _build(
     built.auth = AuthService(AuthRepository(engine), auth_settings)
     built.pos_settings = SettingsService(SettingsRepository(engine), pos_settings)
     built.catalog = CatalogService(CatalogRepository(engine))
+    built.orders = OrdersService(OrdersRepository(engine), built.catalog, built.pos_settings, settings)
     built.recognizer = recognizer or build_recognizer(settings)
     return built
 
@@ -122,5 +126,6 @@ def create_app(
     app.include_router(auth_router, prefix="/api")
     app.include_router(settings_router, prefix="/api")
     app.include_router(catalog_router, prefix="/api")
+    app.include_router(orders_router, prefix="/api")
     app.add_middleware(RequestLog)
     return app

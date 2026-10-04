@@ -1,6 +1,6 @@
 # Phase 03 — Backend modules (port API legacy)
 
-**Priority:** P0 · **Status:** in progress (3a auth, 3b settings + catalog đọc: done 2026-10-04) · Context: design.md §2 mapping; nguồn: `src_legacy/backend/{service,admin,security}.py`
+**Priority:** P0 · **Status:** in progress (3a auth, 3b settings + catalog đọc, 3c orders: done 2026-10-04) · Context: design.md §2 mapping; nguồn: `src_legacy/backend/{service,admin,security}.py`
 
 ## Thứ tự module (mỗi module: ports → config → repository → service → schemas → deps → router → tests)
 1. `auth`: login (mở shift, đóng shift cũ = đá máy cũ), logout, `GET /me`, onboarding-seen; scrypt giữ format hash cũ; JWT `{uid,sid,role,exp}` qua pyjwt; `CurrentUser` kiểm shift còn mở; `RequireAdmin`; limiter 5 lần/5 phút theo (username, IP) in-memory → 429 `RATE_LIMITED` + `retry_after`.
@@ -26,7 +26,7 @@ Bộ test API port từ `test_backend_api.py` (httpx ASGITransport + FakeRecogni
 |---|---|---|
 | 3a | `auth` (+ `entrypoints/reset_password.py`) | **done** (2026-10-04) |
 | 3b | `pos_settings`, `catalog` (đọc + giá) | **done** (2026-10-04) |
-| 3c | `orders` | pending |
+| 3c | `orders` | **done** (2026-10-04) |
 | 3d | `captures` (bộ nhận diện giả) | pending |
 | 3e | `audit`, phần ghi của `catalog`, `users`, `reports`, `engine_config`, `validation` | pending |
 
@@ -59,3 +59,15 @@ Vẫn một đường ghi qua engine, và catalog + nhật ký nằm trong cùng
 - `barcode` chỉ gồm khoảng trắng được coi là không lọc (bản cũ khớp với mọi SKU không có barcode).
 - Mặc định `allow_checkout_without_price` lấy từ biến môi trường `ALLOW_CHECKOUT_WITHOUT_PRICE` (`PosSettings`), thay `pos.allow_checkout_without_price` trong `configs/backend.yaml`.
 - Chưa làm trong 3b (cần `change_log`, thuộc 3e): `PATCH /api/admin/settings`, mật khẩu nâng cao, ghi giá. Test tự chèn dòng vào `settings` / `product_prices`.
+
+## Kết quả 3c
+- Route: `POST /api/orders`, `GET /api/orders/open`, `GET /api/orders/{id}`, `POST /api/orders/{id}/items`, `PATCH|DELETE /api/orders/{id}/items/{item_id}`, `POST /api/orders/{id}/checkout`, `POST /api/orders/{id}/void`, `GET /api/history?range=`, `GET /api/admin/orders?range=` (admin).
+- Giữ hành vi cũ: dùng lại đơn mở rỗng (gắn sang ca mới), khôi phục đơn mở sau khi đăng nhập lại, gộp dòng cùng SKU đã xác nhận (trần 999), đổi SKU của dòng thì bỏ cờ + bỏ giá tay + gộp, giá tay, 409 `PRICE_MISSING_BLOCKED` (+ `missing`) trừ khi `allow_checkout_without_price`, đóng băng đơn giá khi thanh toán, cộng `total_collected` của ca, 409 `ORDER_NOT_OPEN`, đơn của người khác trả 404, huỷ đơn đã thanh toán chỉ admin (trừ lại tiền của ca đã thu), lịch sử theo ngày của cửa hàng (`TIMEZONE_OFFSET_HOURS`).
+- `make lint`, `make type-check` (66 file): đạt. `make test`: 260 passed, 25 skipped (11 test đơn hàng mới).
+
+## Khác với bản cũ / kế hoạch (3c)
+- Mỗi thao tác đổi đơn khoá dòng `orders` (`SELECT ... FOR UPDATE`) trong giao dịch: hai yêu cầu cùng lúc trên một đơn (bấm Thanh toán hai lần) chạy lần lượt, lần sau nhận `ORDER_NOT_OPEN`. Bản cũ dựa vào khoá ghi của SQLite.
+- Repository cung cấp đơn vị công việc (`read()` / `write()` trả `OrdersUnit` trên một kết nối); luật nghiệp vụ ở service ghép các câu lệnh trong một giao dịch. Giá và tên sản phẩm đọc qua `CatalogService.lookup` trên kết nối khác (không cùng giao dịch với đơn).
+- Kiểm dữ liệu vào bằng pydantic (`StrictInt`): số lượng/giá phải là số nguyên JSON (bản cũ nhận cả `2.0`); id đơn không phải số trả 422 thay 404.
+- `admin/orders` làm luôn ở đây (cùng truy vấn với `history`), không đợi 3e.
+- `captures` trong đơn luôn là `[]` và chưa có route `/api/media/...`: phần của 3d. `thumbnail_url` đã ký sẵn khi dòng có `thumb_path`. Dòng bị gắn cờ trong test được chèn thẳng vào DB.

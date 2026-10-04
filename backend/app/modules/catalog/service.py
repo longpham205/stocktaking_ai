@@ -1,6 +1,7 @@
 """Product search for the POS screen: by name without Vietnamese accents, by id, or by barcode."""
 
 import unicodedata
+from collections.abc import Iterable
 
 from app.modules.catalog.ports import Product
 from app.modules.catalog.repository import CatalogRepository
@@ -22,6 +23,10 @@ def _catalog_order(product: Product) -> tuple[int, str]:
 class CatalogService:
     def __init__(self, repo: CatalogRepository):
         self.repo = repo
+
+    async def lookup(self, product_ids: Iterable[str]) -> dict[str, Product]:
+        """Products by id, including the ones no longer on sale. An unknown id is absent."""
+        return await self.repo.products_by_id(product_ids)
 
     async def search(self, search: str = "", barcode: str = "") -> list[Product]:
         """Products on sale, at most `SEARCH_LIMIT`. A barcode must match exactly and wins over
