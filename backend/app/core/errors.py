@@ -5,6 +5,7 @@ Vietnamese text the legacy web showed."""
 from typing import Any
 
 from fastapi import Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 
@@ -40,6 +41,17 @@ class Invalid(AppError):
 class Unavailable(AppError):
     status_code = 503
     code = "UNAVAILABLE"
+
+
+async def validation_error_handler(_: Request, exc: Exception) -> JSONResponse:
+    """A body or query FastAPI rejected, in the same shape as every other error. `errors` keeps
+    where and why, for a developer; the user sees `detail`."""
+    assert isinstance(exc, RequestValidationError)
+    errors = [{"loc": list(e["loc"]), "msg": e["msg"]} for e in exc.errors()]
+    return JSONResponse(
+        {"detail": "Dữ liệu gửi lên không hợp lệ", "code": Invalid.code, "errors": errors},
+        status_code=Invalid.status_code,
+    )
 
 
 async def app_error_handler(_: Request, exc: Exception) -> JSONResponse:

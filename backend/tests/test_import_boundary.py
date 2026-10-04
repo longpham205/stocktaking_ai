@@ -15,6 +15,7 @@ _PROBE = """
 import asyncio, json, os, sys
 os.environ["RECOGNIZER"] = "fake"
 os.environ["APP_ENV"] = "test"
+os.environ["JWT_SECRET"] = "import-boundary-probe-secret-0123456789abcdef"
 from app.main import create_app
 
 async def main():

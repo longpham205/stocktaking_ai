@@ -7,14 +7,19 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import APIRouter, Depends, FastAPI
+from fastapi.exceptions import RequestValidationError
 from sqlalchemy import text
 
 from app.core.backends import Backends
 from app.core.config import CoreSettings, get_settings
 from app.core.db import make_engine, sync_database_url
 from app.core.deps import backends
-from app.core.errors import AppError, Unavailable, app_error_handler
+from app.core.errors import AppError, Unavailable, app_error_handler, validation_error_handler
 from app.core.logging import RequestLog, configure_logging
+from app.modules.auth.config import AuthSettings, get_auth_settings
+from app.modules.auth.repository import AuthRepository
+from app.modules.auth.router import router as auth_router
+from app.modules.auth.service import AuthService
 from app.modules.recognition.ports import RecognizerPort
 
 logger = logging.getLogger("app.main")
@@ -31,10 +36,14 @@ def build_recognizer(settings: CoreSettings) -> RecognizerPort:
     return LocalRecognizer(settings.pipeline_config, sync_database_url(settings.database_url))
 
 
-def _build(settings: CoreSettings, recognizer: RecognizerPort | None) -> Backends:
+def _build(settings: CoreSettings, recognizer: RecognizerPort | None, auth_settings: AuthSettings) -> Backends:
     engine = make_engine(settings.database_url, settings.db_pool_size, settings.db_max_overflow)
     built = Backends(settings=settings, engine=engine)
     built.closers.append(engine.dispose)
+    if not auth_settings.jwt_secret:
+        # nobody could log in: stop at startup instead of failing every login with a 500
+        raise RuntimeError("JWT_SECRET is not set: run `make setup` (it fills the secrets in .env)")
+    built.auth = AuthService(AuthRepository(engine), auth_settings)
     built.recognizer = recognizer or build_recognizer(settings)
     return built
 
@@ -54,14 +63,19 @@ async def health(b: Backends = Depends(backends)) -> dict[str, str]:
     return {"status": "ready", "recognizer": b.recognizer.name if b.recognizer else "none"}
 
 
-def create_app(settings: CoreSettings | None = None, recognizer: RecognizerPort | None = None) -> FastAPI:
+def create_app(
+    settings: CoreSettings | None = None,
+    recognizer: RecognizerPort | None = None,
+    auth_settings: AuthSettings | None = None,
+) -> FastAPI:
     settings = settings or get_settings()
+    auth_settings = auth_settings or get_auth_settings()
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         configure_logging(settings.log_level, settings.log_format)
         # the schema is Alembic's (`make migrate`, compose's `migrate` job), never created here
-        built = _build(settings, recognizer)
+        built = _build(settings, recognizer, auth_settings)
         app.state.backends = built
         logger.info("ready", extra={"env": settings.app_env, "recognizer": settings.recognizer})
         yield
@@ -81,6 +95,7 @@ def create_app(settings: CoreSettings | None = None, recognizer: RecognizerPort 
         openapi_url="/openapi.json" if dev else None,
     )
     app.add_exception_handler(AppError, app_error_handler)
+    app.add_exception_handler(RequestValidationError, validation_error_handler)
 
     @app.get("/healthz", include_in_schema=False)
     async def healthz() -> dict[str, str]:
@@ -88,5 +103,6 @@ def create_app(settings: CoreSettings | None = None, recognizer: RecognizerPort 
         return {"status": "ok"}
 
     app.include_router(api, prefix="/api")
+    app.include_router(auth_router, prefix="/api")
     app.add_middleware(RequestLog)
     return app
