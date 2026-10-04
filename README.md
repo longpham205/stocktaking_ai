@@ -2,11 +2,11 @@
 
 > Hệ thống AI nhận diện và đếm từng sản phẩm đặt trên **bàn thu ngân** từ một ảnh chụp duy nhất — kết hợp truy xuất hình ảnh với bằng chứng từ OCR, màu sắc và mã vạch để phân biệt các biến thể sản phẩm có bao bì gần như giống hệt nhau.
 
-> **⚠️ Đang refactor (branch `refactor/fullstack-layout`):** repo đang chuyển sang `backend/` (FastAPI + engine ML) và `frontend/` (React), xem [plan](plans/261003-2217-fullstack-refactor-backend-frontend/plan.md). Engine ML nay ở `backend/engine/` (trước là `src/`), chạy từ `backend/`: `uv sync` rồi `uv run python -m engine --mode validate --config configs/config.demo.yaml --benchmark-dir data_demo/benchmark`. Web POS cũ đóng băng trong [`src_legacy/`](src_legacy/README.md). Các lệnh `python -m backend` / `launch.bat` bên dưới thuộc bản cũ, sẽ được viết lại ở phase 7.
+> **Kiến trúc:** `backend/` (FastAPI + Postgres + engine nhận diện ở `backend/engine/`) và `frontend/` (Vite + React), chạy bằng `make` và Docker Compose. Web POS thế hệ đầu (stdlib `http.server` + SQLite) đóng băng trong [`src_legacy/`](src_legacy/README.md), chỉ để đối chiếu.
 
-> **Ghi chú phiên bản:** Tài liệu này mô tả hệ thống ở trạng thái v0.1.0 (extended). Các mục đánh dấu **[Kế hoạch]** là hạng mục chưa triển khai, dự kiến bổ sung ở các phiên bản sau.
+> **Hướng dẫn nhanh:** chạy web POS — [`docs/WEB.md`](docs/WEB.md) · kiến trúc và sơ đồ — [`docs/system-architecture.md`](docs/system-architecture.md) · ngày demo — [`docs/DEMO.md`](docs/DEMO.md) · dữ liệu và catalog — [`docs/04_DATA_AND_CATALOG.md`](docs/04_DATA_AND_CATALOG.md) · luật phát triển — [`docs/03_DEVELOPMENT_RULES.md`](docs/03_DEVELOPMENT_RULES.md).
 
-> **Hướng dẫn nhanh:** chạy web POS — [`docs/WEB.md`](docs/WEB.md) · chuẩn bị và xử lý sự cố ngày demo — [`docs/DEMO.md`](docs/DEMO.md) · dữ liệu và catalog — [`docs/04_DATA_AND_CATALOG.md`](docs/04_DATA_AND_CATALOG.md).
+> Các mục đánh dấu **[Kế hoạch]** là hạng mục chưa triển khai.
 
 ## Mục lục
 
@@ -126,71 +126,69 @@ Hai phương thức thực thi:
   - *Màu sắc:* trích xuất CIELAB, so khớp bằng CIEDE2000.
   - *Consensus & Guard:* bảo vệ kết quả retrieval tin cậy khỏi nhiễu plugin, kiểm tra chặt các cặp sản phẩm dễ nhầm.
 - **Bộ validation 9 giai đoạn:** đánh giá từng giai đoạn, từ detection đến phân loại SKU end-to-end.
-- **Web POS (`backend/` + `frontend/`):** thu ngân chụp rổ hàng bằng điện thoại, hệ thống lập hoá đơn, đánh dấu dòng cần xác nhận, thanh toán; trang quản trị sửa giá, barcode, bằng chứng nhận diện, thiết lập nâng cao và chạy kiểm định. Chỉ dùng thư viện chuẩn (`http.server` + `sqlite3`), một cổng 8000. Xem [`docs/WEB.md`](docs/WEB.md).
-- **Giao diện desktop (Tkinter):** hiển thị số lượng SKU, chỉnh ngưỡng động, kiểm tra ảnh và trace.
+- **Web POS (`backend/app/` + `frontend/`):** thu ngân chụp rổ hàng bằng điện thoại, hệ thống lập hoá đơn, đánh dấu dòng cần xác nhận, thanh toán; trang quản trị có báo cáo, đơn hàng, nhân viên, sửa giá / barcode / bằng chứng nhận diện, thiết lập nâng cao của pipeline và chạy kiểm định. API FastAPI + Postgres, giao diện React. Xem [`docs/WEB.md`](docs/WEB.md).
 
 ## 5. Cấu trúc dự án
 
 ```
 stocktaking_ai/
 ├── README.md
-├── requirements.txt
-├── run.py                       # Điểm vào pipeline (Build -> Infer / Validate / UI)
-├── launch.bat                   # Khởi động Web POS (Windows); Linux/macOS: bin/launch.sh
-├── bin/                         # setup.bat / setup.sh / setup_colab.sh / launch.sh
-├── configs/
-│   ├── config.yaml              # Cấu hình pipeline (dữ liệu thật)
-│   ├── config.demo.yaml         # Cấu hình demo CPU (sinh tự động, không sửa tay)
-│   ├── backend.yaml             # Cấu hình web
-│   └── assets_manifest.json     # Checksum weights + gallery + benchmark
-├── src/                         # Pipeline AI (không import backend/)
-│   ├── catalog/  core/  decision/  detection/  inference/
-│   ├── models/   pipeline/  plugins/  retrieval/
-│   └── segmentation/  storage/  ui/  validation/
-├── backend/                     # API web POS (stdlib http.server + sqlite3)
-├── frontend/                    # Giao diện web (HTML/JS thuần)
-├── scripts/                     # Công cụ: kiểm môi trường, cổng kiểm chứng, snapshot, đặt lại mật khẩu
-├── debug/                       # Viewer từng giai đoạn của pipeline
-├── tests/                       # pytest + smoke giao diện
-├── notebooks/
-├── docs/                        # Đặc tả 01–04, WEB.md (web POS), DEMO.md (hướng dẫn ngày demo)
-├── data/                        # Dữ liệu thật (không commit)
-│   ├── gallery/                 # Ảnh tham chiếu theo từng SKU
-│   ├── benchmark/               # Dataset đánh giá định dạng COCO
-│   ├── db/app.db                # Catalog + dữ liệu web (SQLite)
-│   ├── cache/                   # FAISS index & metadata cache
-│   ├── query/  outputs/  metadata/
-├── data_demo/                   # Dữ liệu tổng hợp cho demo CPU (không commit)
-└── weights/                     # detector / refinement / retriever (không commit)
+├── Makefile                     # Mọi lệnh hằng ngày (make help)
+├── docker-compose.yml           # postgres + migrate + api + web; .gpu.yml / .prod.yml là lớp phủ
+├── .env.example                 # Mẫu cấu hình; `make setup` tạo .env và sinh bí mật
+├── backend/
+│   ├── pyproject.toml · uv.lock # uv, Python 3.12
+│   ├── entrypoints/             # api.py + lệnh vận hành (reset_password, seed_demo, import_legacy_sqlite, …)
+│   ├── app/                     # API web: core/ + modules/ (auth, orders, captures, catalog, …)
+│   ├── engine/                  # Pipeline AI (không import app/)
+│   │   ├── catalog/  core/  decision/  detection/  inference/
+│   │   ├── models/   pipeline/  plugins/  retrieval/
+│   │   └── segmentation/  storage/  validation/
+│   ├── migrations/              # Alembic
+│   ├── configs/                 # config.yaml (thật), config.demo.yaml (mock CPU, sinh tự động)
+│   ├── scripts/                 # Cổng kiểm định, manifest, snapshot, đổi thiết bị, smoke API
+│   ├── tests/                   # test engine + tests/api/
+│   ├── debug/ · notebooks/      # Công cụ nghiên cứu pipeline
+│   ├── data/                    # Dữ liệu thật (không commit): gallery, benchmark, cache FAISS, baseline
+│   ├── data_demo/               # Dữ liệu tổng hợp cho demo CPU (không commit)
+│   └── weights/                 # detector / refinement / retriever (không commit)
+├── frontend/                    # Vite + React + TypeScript (pnpm)
+├── docs/                        # Đặc tả 01–04, system-architecture, WEB, DEMO
+├── plans/                       # Kế hoạch refactor theo pha
+└── src_legacy/                  # Web POS v1, đóng băng
 ```
 
 ## 6. Yêu cầu hệ thống
 
-- **Hệ điều hành:** Linux (khuyến nghị Ubuntu 20.04/22.04) / macOS / Windows 11
-- **Python:** `>= 3.11`
-- **Thư viện chính:** `numpy`, `opencv-python-headless`, `PyYAML`, `pydantic`, `Pillow`, `matplotlib`, `faiss-cpu`
-- **Deep learning:** `torch`, `torchvision`, `transformers`, `rfdetr`, `supervision`, `sam2`
-- **Chuyên biệt:** `easyocr`, `pyzbar` (cần `libzbar0`), `tkinter`
-- **Phần cứng:** GPU NVIDIA với >= 8GB VRAM (khuyến nghị CUDA). Chạy CPU được hỗ trợ nhưng chậm hơn.
+- **Chạy web POS:** Docker Desktop (có `docker compose`), [`uv`](https://docs.astral.sh/uv/), `make`, `openssl`. Windows: chạy `make` trong Git Bash. `pnpm` chỉ cần cho test / kiểm kiểu frontend trên máy.
+- **Python:** `>= 3.11, < 3.13` (uv tự cài; giới hạn trên do torch, sam2, faiss-cpu).
+- **Thư viện:** khai báo trong `backend/pyproject.toml`. Bản nhẹ (`uv sync`) đủ cho API, test và pipeline với backend mock; bản đầy đủ (`uv sync --extra ml`) thêm `torch`, `rfdetr`, `sam2`, `transformers`, `easyocr`.
+- **Hệ thống:** `pyzbar` cần thư viện zbar (`apt install libzbar0`, `brew install zbar`); image Docker đã có sẵn.
+- **Phần cứng cho pipeline thật:** GPU NVIDIA với >= 8GB VRAM (khuyến nghị). Chạy CPU được nhưng chậm.
 
 ## 7. Cài đặt & thiết lập môi trường
 
-### Thiết lập nhanh
-
-Chạy script tương ứng: `bin\setup.bat` (Windows), `./bin/setup.sh` (Linux / macOS / WSL). Script tạo `venv/`, cài PyTorch + thư viện, tải và kiểm weights/data, chạy test; **không** tự mở giao diện. Máy không có GPU: script tự đặt `device: cpu` (đổi tay bằng `python scripts/set_device.py cpu|cuda`).
-
-### Thiết lập thủ công
+### Web POS (khuyến nghị)
 
 ```bash
 git clone https://github.com/longpham205/stocktaking_ai
 cd stocktaking_ai
 
-python -m venv venv
-source venv/bin/activate         # Windows: venv\Scripts\activate
-pip install -r requirements.txt
+make setup        # tạo .env, sinh bí mật, kiểm docker + uv
+make docker-up    # postgres, migration, api, web -> http://localhost:5173
+make seed-demo    # catalog demo + giá demo (cần backend/data_demo/, xem docs/WEB.md mục 3)
+make reset-password USER_NAME=admin ROLE=admin   # tạo tài khoản đầu tiên, mật khẩu in ra một lần
+```
 
-# Linux: thư viện hệ thống cho giải mã mã vạch
-sudo apt-get install -y libzbar0
+Mặc định API chạy với bộ nhận diện giả (`RECOGNIZER=fake`, không cần model). Các chế độ khác, tài khoản, điện thoại và lệnh vận hành: [`docs/WEB.md`](docs/WEB.md).
+
+### Chỉ pipeline (không web)
+
+```bash
+cd backend
+uv sync                 # bản nhẹ: backend mock trên CPU
+uv sync --extra ml      # pipeline thật
+uv run python scripts/set_device.py show|cpu|cuda   # đổi các khoá device: trong configs/config.yaml
 ```
 
 ### Model checkpoint
@@ -205,7 +203,7 @@ sudo apt-get install -y libzbar0
 
 ## 8. Đặc tả Dataset & Metadata
 
-- **Gallery (`data/gallery/`):** ảnh tham chiếu theo từng SKU; thư mục ánh xạ tới `product_id` qua catalog DB. SKU mới: bỏ ảnh vào `data/gallery_inbox/<tên>/` rồi chạy `python -m src.catalog.sync_gallery ...` (xem `docs/04_DATA_AND_CATALOG.md`). **[Kế hoạch]** mỗi SKU có ảnh nhiều mặt (trước, sau, hai bên) để khớp tốt hơn với việc sản phẩm có thể đặt ở hướng bất kỳ trên bàn thu ngân.
+- **Gallery (`backend/data/gallery/`):** ảnh tham chiếu theo từng SKU; thư mục ánh xạ tới `product_id` qua catalog DB. SKU mới: bỏ ảnh vào `data/gallery_inbox/<tên>/` rồi chạy `python -m engine.catalog.sync_gallery ...` (xem `docs/04_DATA_AND_CATALOG.md`). **[Kế hoạch]** mỗi SKU có ảnh nhiều mặt (trước, sau, hai bên) để khớp tốt hơn với việc sản phẩm có thể đặt ở hướng bất kỳ trên bàn thu ngân.
 - **Chuẩn màu (bảng `color_reference` trong catalog DB):** màu canonical dạng RGB + hex cho từng biến thể (Reranker tự đổi sang Lab). File `product_colors.json` chỉ còn là đầu vào một lần của migrate.
 
 ```json
@@ -214,16 +212,16 @@ sudo apt-get install -y libzbar0
 }
 ```
 
-- **Catalog (SQLite `data/db/app.db`, `catalog.source: sqlite`):** SKU, barcode, bằng chứng nhận diện (từ khoá OCR, mã màu, cặp dễ nhầm, plugin bắt buộc). Nạp lần đầu bằng `python -m src.catalog.migrate ...`; giá do web quản lý (bảng `product_prices`). Chi tiết: `docs/04_DATA_AND_CATALOG.md`.
-- **Benchmark (`data/benchmark/`):** annotation dạng COCO, `category_id` ánh xạ đến `product_id` nội bộ.
+- **Catalog:** SKU, barcode, bằng chứng nhận diện (từ khoá OCR, mã màu, cặp dễ nhầm, plugin bắt buộc). Web POS giữ catalog trong Postgres (cùng database với đơn hàng) và pipeline đọc từ đó; chạy pipeline độc lập thì nguồn theo `catalog.source` của file config (`sqlite` → `data/db/app.db`, `snapshot`, hoặc `database`). Nạp lần đầu bằng `python -m engine.catalog.migrate ...` (demo: `make seed-demo`); giá do web quản lý (bảng `product_prices`). Chi tiết: `docs/04_DATA_AND_CATALOG.md`.
+- **Benchmark (`backend/data/benchmark/`):** annotation dạng COCO, `category_id` ánh xạ đến `product_id` nội bộ.
 
 ## 9. Schema cấu hình
 
-Toàn bộ tham số runtime nằm trong `configs/config.yaml`:
+Tham số của pipeline nằm trong `backend/configs/config.yaml` (bảng dưới). Cấu hình của web (database, bí mật, chế độ nhận diện, giới hạn tải ảnh…) nằm trong `.env`, mô tả từng biến ở `.env.example`.
 
 | Khối | Phạm vi |
 | --- | --- |
-| `catalog` | Nguồn catalog: `source` (`sqlite`/`snapshot`), `db_path`/`snapshot_path` — dữ liệu SKU nằm trong DB, không trong config |
+| `catalog` | Nguồn catalog: `source` (`sqlite`/`snapshot`/`database`), `db_path`/`snapshot_path`/`db_url` — dữ liệu SKU nằm trong DB, không trong config |
 | `detection` | Backend, confidence, IoU, tham số detector |
 | `refinement` | Điều kiện gọi SAM2, giới hạn hình học |
 | `cropping` | Padding box, độ phân giải tensor |
@@ -236,31 +234,29 @@ Toàn bộ tham số runtime nằm trong `configs/config.yaml`:
 
 ## 10. Hướng dẫn thực thi
 
+Web POS: `make docker-up` rồi mở `http://localhost:5173` — chi tiết ở [`docs/WEB.md`](docs/WEB.md), các bước cho buổi demo ở [`docs/DEMO.md`](docs/DEMO.md).
+
+Pipeline chạy độc lập, từ thư mục `backend/`:
+
 ```bash
 # 1. Inference trên một ảnh bàn thu ngân
-python run.py --mode infer --image data/query/test_counter.jpg
+uv run python -m engine --mode infer --image data/query/test_counter.jpg
 
 # 2. Inference batch
-python run.py --mode infer --image-dir data/query/
+uv run python -m engine --mode infer --image-dir data/query/
 
 # 3. Validation trên benchmark COCO
-python run.py --mode validate --benchmark-dir data/benchmark/
+uv run python -m engine --mode validate --benchmark-dir data/benchmark/
 
-# 4. Giao diện desktop
-python run.py --mode ui
-
-# 5. Web POS (kiểm môi trường rồi khởi động server ở cổng 8000)
-.\launch.bat            # dữ liệu thật; Linux/macOS: ./bin/launch.sh
-.\launch.bat demo       # dữ liệu demo tổng hợp, chạy CPU
+# 4. Bộ demo tổng hợp (backend mock, CPU)
+uv run python -m engine --mode validate --config configs/config.demo.yaml --benchmark-dir data_demo/benchmark
 ```
 
-Web POS cần catalog đã migrate vào `data/db/app.db`; chi tiết và cách dùng trên điện thoại ở [`docs/WEB.md`](docs/WEB.md). Các bước chuẩn bị và xử lý sự cố cho buổi demo: [`docs/DEMO.md`](docs/DEMO.md).
-
-Dùng như thư viện Python:
+Dùng như thư viện Python (từ `backend/`):
 
 ```python
-from src.core.config import load_config
-from src.pipeline.pipeline import InventoryPipeline
+from engine.core.config import load_config
+from engine.pipeline.pipeline import InventoryPipeline
 
 config = load_config()
 pipeline = InventoryPipeline(config)
@@ -271,16 +267,15 @@ result, trace = pipeline.run_with_trace(image_data)   # chẩn đoán đầy đ�
 
 ## 11. Đặc tả Input & Output
 
-| Chế độ | Input | Artifacts (`data/outputs/`) |
+| Chế độ | Input | Artifacts (`backend/data/outputs/`) |
 | --- | --- | --- |
 | Inference | Ảnh / thư mục ảnh | `result.json` (audit log), `result.csv` (số lượng theo SKU), `result.jpg` (ảnh annotation) |
 | Validation | Thư mục benchmark COCO | `report.json/csv`, `records.csv`, ảnh & biểu đồ chẩn đoán |
-| GUI | Tương tác người dùng | Bảng đếm thời gian thực, overlay, thanh chỉnh ngưỡng |
-| Web POS | Ảnh chụp từ điện thoại / tải lên | Hoá đơn (dòng sản phẩm, số lượng, giá), ảnh kèm khung nhận diện; lưu trong `data/db/app.db` |
+| Web POS | Ảnh chụp từ điện thoại / tải lên | Hoá đơn (dòng sản phẩm, số lượng, giá), ảnh kèm khung nhận diện; đơn lưu trong Postgres, ảnh trong `MEDIA_DIR` |
 
 ## 12. Đánh giá hiệu năng
 
-Đo trên bộ test hiện có: 8 SKU cốt lõi, 31 cảnh, 293 instance (`python run.py --mode validate`). Số đo ngày 2026-10-03, config hiện tại (ngưỡng detector 0.50, catalog trong DB, Reranker chỉ dùng bằng chứng khai báo). Baseline cổng kiểm chứng: `data/baseline/report.json`.
+Đo trên bộ test hiện có: 8 SKU cốt lõi, 31 cảnh, 293 instance (`python -m engine --mode validate`). Số đo ngày 2026-10-03, config hiện tại (ngưỡng detector 0.50, catalog trong DB, Reranker chỉ dùng bằng chứng khai báo). Baseline cổng kiểm chứng: `backend/data/baseline/report.json`.
 
 | Giai đoạn | Metric | Giá trị |
 | --- | --- | --- |
