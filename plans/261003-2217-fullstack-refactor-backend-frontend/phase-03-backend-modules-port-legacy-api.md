@@ -1,6 +1,6 @@
 # Phase 03 — Backend modules (port API legacy)
 
-**Priority:** P0 · **Status:** in progress (3a auth, 3b settings + catalog đọc: done 2026-10-04) · Context: design.md §2 mapping; nguồn: `src_legacy/backend/{service,admin,security}.py`
+**Priority:** P0 · **Status:** in progress (3a auth, 3b settings + catalog đọc, 3c orders, 3d captures: done 2026-10-04) · Context: design.md §2 mapping; nguồn: `src_legacy/backend/{service,admin,security}.py`
 
 ## Thứ tự module (mỗi module: ports → config → repository → service → schemas → deps → router → tests)
 1. `auth`: login (mở shift, đóng shift cũ = đá máy cũ), logout, `GET /me`, onboarding-seen; scrypt giữ format hash cũ; JWT `{uid,sid,role,exp}` qua pyjwt; `CurrentUser` kiểm shift còn mở; `RequireAdmin`; limiter 5 lần/5 phút theo (username, IP) in-memory → 429 `RATE_LIMITED` + `retry_after`.
@@ -26,8 +26,8 @@ Bộ test API port từ `test_backend_api.py` (httpx ASGITransport + FakeRecogni
 |---|---|---|
 | 3a | `auth` (+ `entrypoints/reset_password.py`) | **done** (2026-10-04) |
 | 3b | `pos_settings`, `catalog` (đọc + giá) | **done** (2026-10-04) |
-| 3c | `orders` | pending |
-| 3d | `captures` (bộ nhận diện giả) | pending |
+| 3c | `orders` | **done** (2026-10-04) |
+| 3d | `captures` (bộ nhận diện giả) | **done** (2026-10-04) |
 | 3e | `audit`, phần ghi của `catalog`, `users`, `reports`, `engine_config`, `validation` | pending |
 
 ## Quyết định cho phần ghi catalog (PR 3e)
@@ -59,3 +59,29 @@ Vẫn một đường ghi qua engine, và catalog + nhật ký nằm trong cùng
 - `barcode` chỉ gồm khoảng trắng được coi là không lọc (bản cũ khớp với mọi SKU không có barcode).
 - Mặc định `allow_checkout_without_price` lấy từ biến môi trường `ALLOW_CHECKOUT_WITHOUT_PRICE` (`PosSettings`), thay `pos.allow_checkout_without_price` trong `configs/backend.yaml`.
 - Chưa làm trong 3b (cần `change_log`, thuộc 3e): `PATCH /api/admin/settings`, mật khẩu nâng cao, ghi giá. Test tự chèn dòng vào `settings` / `product_prices`.
+
+## Kết quả 3c
+- Route: `POST /api/orders`, `GET /api/orders/open`, `GET /api/orders/{id}`, `POST /api/orders/{id}/items`, `PATCH|DELETE /api/orders/{id}/items/{item_id}`, `POST /api/orders/{id}/checkout`, `POST /api/orders/{id}/void`, `GET /api/history?range=`, `GET /api/admin/orders?range=` (admin).
+- Giữ hành vi cũ: dùng lại đơn mở rỗng (gắn sang ca mới), khôi phục đơn mở sau khi đăng nhập lại, gộp dòng cùng SKU đã xác nhận (trần 999), đổi SKU của dòng thì bỏ cờ + bỏ giá tay + gộp, giá tay, 409 `PRICE_MISSING_BLOCKED` (+ `missing`) trừ khi `allow_checkout_without_price`, đóng băng đơn giá khi thanh toán, cộng `total_collected` của ca, 409 `ORDER_NOT_OPEN`, đơn của người khác trả 404, huỷ đơn đã thanh toán chỉ admin (trừ lại tiền của ca đã thu), lịch sử theo ngày của cửa hàng (`TIMEZONE_OFFSET_HOURS`).
+- `make lint`, `make type-check` (66 file): đạt. `make test`: 260 passed, 25 skipped (11 test đơn hàng mới).
+
+## Khác với bản cũ / kế hoạch (3c)
+- Mỗi thao tác đổi đơn khoá dòng `orders` (`SELECT ... FOR UPDATE`) trong giao dịch: hai yêu cầu cùng lúc trên một đơn (bấm Thanh toán hai lần) chạy lần lượt, lần sau nhận `ORDER_NOT_OPEN`. Bản cũ dựa vào khoá ghi của SQLite.
+- Repository cung cấp đơn vị công việc (`read()` / `write()` trả `OrdersUnit` trên một kết nối); luật nghiệp vụ ở service ghép các câu lệnh trong một giao dịch. Giá và tên sản phẩm đọc qua `CatalogService.lookup` trên kết nối khác (không cùng giao dịch với đơn).
+- Kiểm dữ liệu vào bằng pydantic (`StrictInt`): số lượng/giá phải là số nguyên JSON (bản cũ nhận cả `2.0`); id đơn không phải số trả 422 thay 404.
+- `admin/orders` làm luôn ở đây (cùng truy vấn với `history`), không đợi 3e.
+- `captures` trong đơn luôn là `[]` và chưa có route `/api/media/...`: phần của 3d. `thumbnail_url` đã ký sẵn khi dòng có `thumb_path`. Dòng bị gắn cờ trong test được chèn thẳng vào DB.
+
+## Kết quả 3d
+- Route: `POST /api/orders/{id}/captures` (body ảnh thô, `Idempotency-Key`, 202 `{job_id, duplicate}`), `GET /api/jobs/{id}` (`status`, `position`, `system_reloading`; xong thì `added`, `warnings`, `order`; lỗi thì `error`), `GET /api/media/{order}/{file}?exp=&sig=` (công khai, URL ký). Đơn hàng trả `captures` (ảnh gốc URL ký, `width`, `height`, `boxes` nối với `item_id`).
+- Giữ hành vi cũ: luật gộp (accepted cùng SKU một dòng, mỗi uncertain một dòng riêng có cờ), cộng dồn vào dòng đã xác nhận, ảnh thu nhỏ 240 px, khung đỏ cho vật không nhận ra (`item_id: null`), cảnh báo `overlap_detected` / `unrecognized_objects`, mã lỗi `IMAGE_DECODE_ERROR` (400), `IMAGE_TOO_LARGE` (413), `QUEUE_FULL` (503), `PIPELINE_TIMEOUT`, `GPU_OOM`, `PIPELINE_ERROR`, `ORDER_NOT_OPEN` (đơn đóng trong lúc nhận diện: không thêm dòng), job/đơn của người khác trả 404, bằng chứng numpy được chuyển về JSON.
+- Migration `0003`: `captures.image_width`, `image_height`, `warnings`.
+- `make lint`, `make type-check` (76 file): đạt. `make test`: 273 passed, 25 skipped (13 test mới). `LocalRecognizer.recognize` chạy thử trên `config.demo.yaml` (mock backends, CPU) bằng venv ML: 8 vật, có bằng chứng plugin, không ghi file kết quả của engine.
+
+## Khác với bản cũ / kế hoạch (3d)
+- Làm trước một phần Phase 4 (thay vì viết bản tạm rồi bỏ): `recognition/worker.py` (`asyncio.Queue` + một luồng, timeout, `position`), `recognition/mapper.py`, `FakeRecognizer` (port `FakeExecutor`), `RecognizerPort.recognize` + `LocalRecognizer.recognize`. Phase 4 còn: reload pipeline/catalog, kiểm định, evidence-test, `system_reloading`, `SYSTEM_BUSY`, `--workers 1`.
+- `job_id` là id của dòng `captures` (số nguyên) thay chuỗi hex 32 ký tự; trạng thái job đọc từ DB.
+- Không dọn job treo lúc khởi động (khởi động không được đụng DB: `api_app` và test ranh giới import chạy không có DB). Thay vào đó: job còn `queued`/`processing` trong DB mà worker của tiến trình không biết thì `GET /jobs/{id}` trả và ghi `error: SERVER_RESTARTED`.
+- Ảnh xử lý bằng Pillow (không OpenCV: đường fake không được nạp `cv2`), xoay theo EXIF như OpenCV. Đường dẫn ảnh lưu tương đối so với `MEDIA_DIR` (mặc định `data/transactions`).
+- `FakeRecognizer` chọn SKU từ catalog đang bán trong DB ở mỗi ảnh (bản cũ nhận danh sách lúc khởi động).
+- Chưa làm: xoá ảnh cũ theo hạn lưu trữ (bản cũ dọn lúc khởi động; theo "Quy ước" sẽ là lệnh/cron riêng), `GET /gallery/...` (3e).

@@ -7,8 +7,9 @@ in-memory copy to reload.
 """
 
 import json
+from collections.abc import Iterable
 
-from sqlalchemy import Boolean, String, and_, column, select, table
+from sqlalchemy import Boolean, ColumnElement, String, and_, column, select, table
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.modules.catalog.models import ProductPriceRow
@@ -48,6 +49,16 @@ class CatalogRepository:
 
     async def active_products(self) -> list[Product]:
         """Every product on sale with its current price, in no particular order."""
+        return await self._products(_P.c.is_active)
+
+    async def products_by_id(self, product_ids: Iterable[str]) -> dict[str, Product]:
+        """The products with these ids, on sale or not: an old order still shows its names."""
+        ids = list(product_ids)
+        if not ids:
+            return {}
+        return {product.id: product for product in await self._products(_P.c.product_id.in_(ids))}
+
+    async def _products(self, condition: ColumnElement[bool]) -> list[Product]:
         query = (
             select(
                 _P.c.product_id,
@@ -60,7 +71,7 @@ class CatalogRepository:
             .select_from(_P)
             .outerjoin(_PRICE, _PRICE.product_id == _P.c.product_id)
             .outerjoin(_E, and_(_E.c.product_id == _P.c.product_id, _E.c.evidence_type == "color_code"))
-            .where(_P.c.is_active)
+            .where(condition)
         )
         async with self.engine.connect() as conn:
             rows = (await conn.execute(query)).mappings().all()
