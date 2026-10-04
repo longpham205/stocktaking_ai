@@ -1,6 +1,6 @@
 # Phase 04 — Recognition worker in-process + job state trong DB
 
-**Priority:** P0 · **Status:** phần lớn đã làm trong Phase 3 (3d, 3e-4) · Context: design.md §1 (đã chốt: inference trong process API)
+**Priority:** P0 · **Status:** done (2026-10-04; phần lớn làm trong Phase 3: 3d, 3e-4) · Context: design.md §1 (đã chốt: inference trong process API)
 
 ## Các bước
 1. `recognition/worker.py` `RecognitionWorker`: `asyncio.Queue(maxsize=queue_max)` → đầy thì 503 `QUEUE_FULL`; 1 task tiêu thụ; mỗi job `await loop.run_in_executor(executor_1_thread, recognizer.recognize, ...)`; `asyncio.wait_for(timeout_seconds)` → đánh dấu `error: TIMEOUT` (thread GPU vẫn chạy nốt — ghi rõ giới hạn như legacy).
@@ -22,3 +22,11 @@
 ## Còn lại
 - Bước 7: `--workers 1` ghi rõ trong compose + Makefile (kiểm lại cấu hình hiện có).
 - "Done khi": `RECOGNIZER=fake make docker-up` -> chụp ảnh -> job done; `RECOGNIZER=local` + config demo chạy end-to-end qua API (chưa thử qua HTTP thật).
+
+## Kết quả khép Phase 4 (2026-10-04)
+- `--workers 1`: đã có trong `docker-compose.yml`, `docker-compose.prod.yml`, `Dockerfile`; Makefile ghi rõ lý do (model, hàng đợi, limiter, idempotency nằm trong bộ nhớ một process).
+- `backend/scripts/smoke_api.py` + `make smoke`: kiểm đầu-cuối API đang chạy qua HTTP thật (đăng nhập, đơn, ảnh, job, khung + ảnh ký, sửa dòng, thanh toán, lịch sử, báo cáo, thử bằng chứng, thiết lập nâng cao, staff bị chặn khỏi admin).
+- Chạy thật trên Docker (`make docker-up`, DB dev nạp catalog demo 50 SKU bằng `python -m engine.catalog.migrate --seed-dir data_demo/seed --legacy-config configs/legacy/config.demo.legacy.yaml --db-url postgresql+psycopg://...@postgres:5432/stocktaking --gallery-dir data_demo/gallery --benchmark-labels data_demo/benchmark/_annotations.coco.json` trong container `api`):
+  - `RECOGNIZER=fake`: toàn luồng đạt (job xong 0,7 s).
+  - `RECOGNIZER=local` + `PIPELINE_CONFIG=configs/config.demo.yaml` (engine thật, backend mock, CPU, image nhẹ): toàn luồng đạt (job 0,5 s); áp dụng `retrieval.top_k` qua `POST /admin/config/apply` (pipeline nạp lại 0,5 s), chụp ảnh sau khi nạp lại, hoàn tác về mặc định: đạt.
+- Chưa thử: `make docker-up-gpu` (image CUDA nhiều GB, pipeline thật trên GPU).
