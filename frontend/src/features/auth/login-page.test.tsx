@@ -46,4 +46,18 @@ describe('LoginPage', () => {
     await submit('staff', 'sai');
     expect(await screen.findByRole('alert')).toHaveTextContent('thử lại sau 5 phút');
   });
+
+  it('shows the typed password while the eye is on, and hides it again', async () => {
+    stubFetchRoutes({});
+    await renderApp('/login');
+    const user = userEvent.setup();
+    const field = await screen.findByLabelText('Mật khẩu');
+    await user.type(field, 'staff-pass-123');
+    expect(field).toHaveAttribute('type', 'password');
+    await user.click(screen.getByRole('button', { name: 'Hiện mật khẩu' }));
+    expect(field).toHaveAttribute('type', 'text');
+    expect(field).toHaveValue('staff-pass-123');
+    await user.click(screen.getByRole('button', { name: 'Ẩn mật khẩu' }));
+    expect(field).toHaveAttribute('type', 'password');
+  });
 });

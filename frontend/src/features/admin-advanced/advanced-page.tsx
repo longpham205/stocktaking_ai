@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Dialog } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { PasswordInput } from '@/components/ui/password-input';
 import { Label } from '@/components/ui/label';
 import { getChangeLog, revertChange } from '@/features/admin-products/api';
 import { percent, versusBaseline } from '@/features/admin-products/lib';
@@ -69,7 +70,7 @@ function PasswordField({ value, onChange, label = 'Mật khẩu nâng cao' }: { 
   return (
     <div className="space-y-1">
       <Label htmlFor="advanced-password">{label}</Label>
-      <Input id="advanced-password" type="password" autoComplete="off" value={value} onChange={(event) => onChange(event.target.value)} />
+      <PasswordInput id="advanced-password" autoComplete="off" value={value} onChange={(event) => onChange(event.target.value)} />
     </div>
   );
 }
