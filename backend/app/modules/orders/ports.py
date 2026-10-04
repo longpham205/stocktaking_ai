@@ -35,6 +35,19 @@ class OrderItem:
 
 
 @dataclass(frozen=True)
+class CaptureImage:
+    """A recognised basket photo of an order and the boxes drawn on it."""
+
+    id: int
+    created_at: datetime
+    image_path: str
+    width: int
+    height: int
+    # {"item_id", "product_id", "status": accepted|uncertain|rejected, "bbox": [x1, y1, x2, y2]}
+    boxes: list[dict[str, Any]]
+
+
+@dataclass(frozen=True)
 class HistoryEntry:
     order: Order
     cashier_name: str

@@ -39,6 +39,8 @@ class CoreSettings(BaseSettings):
     # Signs capture/gallery image URLs. No default: a process without it cannot sign media URLs.
     media_url_secret: str = ""
     media_url_ttl_seconds: int = 3600
+    # Capture photos and their thumbnails. Relative paths resolve from backend/.
+    media_dir: Path = Path("data/transactions")
 
     # "Today" in reports and history is the shop's day, not UTC's.
     timezone_offset_hours: float = 7.0
@@ -53,7 +55,7 @@ class CoreSettings(BaseSettings):
             raise ValueError("DATABASE_URL must be a postgresql+asyncpg:// URL")
         return value
 
-    @field_validator("data_dir", "pipeline_config")
+    @field_validator("data_dir", "pipeline_config", "media_dir")
     @classmethod
     def _from_backend_dir(cls, value: Path) -> Path:
         return value if value.is_absolute() else BACKEND_DIR / value

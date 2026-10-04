@@ -28,6 +28,16 @@ class CheckoutIn(BaseModel):
     cash_given: StrictInt | None = Field(None, ge=0, le=MAX_PRICE * 10)
 
 
+class CaptureOut(BaseModel):
+    id: int
+    created_at: str
+    # signed, expiring: an <img> cannot send the token
+    image_url: str
+    width: int
+    height: int
+    boxes: list[dict[str, Any]]
+
+
 class OrderItemOut(BaseModel):
     id: int
     product_id: str
@@ -53,8 +63,8 @@ class OrderOut(BaseModel):
     cash_given: int | None
     change_given: int | None
     items: list[OrderItemOut]
-    # the order's basket photos with their boxes (filled by the captures module)
-    captures: list[dict[str, Any]]
+    # the order's recognised basket photos with their boxes
+    captures: list[CaptureOut]
     item_count: int
     total: int
     missing_price_count: int

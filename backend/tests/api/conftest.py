@@ -14,6 +14,7 @@ os.environ["RECOGNIZER"] = "fake"
 os.environ["APP_ENV"] = "test"
 
 import asyncio  # noqa: E402
+import tempfile  # noqa: E402
 from collections.abc import AsyncIterator, Iterator  # noqa: E402
 from pathlib import Path  # noqa: E402
 from typing import Any  # noqa: E402
@@ -32,13 +33,17 @@ from app.core.db import sync_database_url  # noqa: E402
 from app.main import create_app  # noqa: E402
 from app.modules.auth.config import AuthSettings  # noqa: E402
 from app.modules.auth.passwords import hash_password  # noqa: E402
+from app.modules.captures.config import CapturesSettings  # noqa: E402
 from app.modules.pos_settings.config import PosSettings  # noqa: E402
+from app.modules.recognition.ports import RecognizerPort  # noqa: E402
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 # every web table, for TRUNCATE between tests (the engine's catalog tables: `catalog_url`)
 CATALOG_TABLES = "product_evidence, product, color_reference, catalog_meta"
 WEB_TABLES = "change_log, captures, order_items, orders, shifts, users, product_prices, settings, config_overrides"
 STAFF_PASSWORD, ADMIN_PASSWORD = "staff-pass-123", "admin-pass-456"
+# capture photos of a test run, never backend/data (a test that looks at them passes its own)
+TEST_MEDIA_DIR = Path(tempfile.mkdtemp(prefix="stocktaking-test-media-"))
 
 
 def alembic_config(url: str) -> Config:
@@ -71,6 +76,7 @@ def settings(**overrides: Any) -> CoreSettings:
         "recognizer": "fake",
         "database_url": TEST_DATABASE_URL,
         "media_url_secret": "test-media-secret",
+        "media_dir": TEST_MEDIA_DIR,
     }
     return CoreSettings(_env_file=None, **{**values, **overrides})  # type: ignore[call-arg]
 
@@ -85,6 +91,10 @@ def auth_settings(**overrides: Any) -> AuthSettings:
 
 def pos_settings(**overrides: Any) -> PosSettings:
     return PosSettings(_env_file=None, **overrides)  # type: ignore[call-arg]
+
+
+def captures_settings(**overrides: Any) -> CapturesSettings:
+    return CapturesSettings(_env_file=None, **overrides)  # type: ignore[call-arg]
 
 
 @pytest.fixture(scope="session")
@@ -102,7 +112,9 @@ def migrated_database_url() -> str:
 @pytest.fixture
 async def api_app() -> AsyncIterator[FastAPI]:
     """The app with its lifespan run (httpx's ASGI transport does not run it), no database needed."""
-    app = create_app(settings(), auth_settings=auth_settings(), pos_settings=pos_settings())
+    app = create_app(
+        settings(), auth_settings=auth_settings(), pos_settings=pos_settings(), captures_settings=captures_settings()
+    )
     async with app.router.lifespan_context(app):
         yield app
 
@@ -130,12 +142,20 @@ def catalog_url(migrated_database_url: str) -> Iterator[str]:
     yield url
 
 
-async def start_app(database_url: str, **auth_overrides: Any) -> FastAPI:
+async def start_app(
+    database_url: str,
+    recognizer: RecognizerPort | None = None,
+    captures: CapturesSettings | None = None,
+    core: dict[str, Any] | None = None,
+    **auth_overrides: Any,
+) -> FastAPI:
     """An app on the test database, not yet started: enter `app.router.lifespan_context(app)`."""
     return create_app(
-        settings(database_url=database_url),
+        settings(database_url=database_url, **(core or {})),
+        recognizer=recognizer,
         auth_settings=auth_settings(**auth_overrides),
         pos_settings=pos_settings(),
+        captures_settings=captures or captures_settings(),
     )
 
 

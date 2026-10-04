@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 from app.modules.auth.models import ShiftRow, UserRow
 from app.modules.captures.models import CaptureRow
 from app.modules.orders.models import OrderItemRow, OrderRow
-from app.modules.orders.ports import HistoryEntry, Order, OrderItem
+from app.modules.orders.ports import CaptureImage, HistoryEntry, Order, OrderItem
 
 _O = OrderRow
 _I = OrderItemRow
@@ -124,9 +124,10 @@ class OrdersUnit:
         row = (await self.conn.execute(query.order_by(_I.id).limit(1))).mappings().first()
         return _item(row) if row else None
 
-    async def insert_item(self, order_id: int, product_id: str, quantity: int) -> int:
+    async def insert_item(self, order_id: int, product_id: str, quantity: int, **values: Any) -> int:
+        """`values`: `flagged`, `thumb_path`, `evidence` of a line a capture adds."""
         created = await self.conn.execute(
-            insert(_I).values(order_id=order_id, product_id=product_id, quantity=quantity).returning(_I.id)
+            insert(_I).values(order_id=order_id, product_id=product_id, quantity=quantity, **values).returning(_I.id)
         )
         return int(created.scalar_one())
 
@@ -136,6 +137,27 @@ class OrdersUnit:
     async def delete_item(self, order_id: int, item_id: int) -> bool:
         deleted = await self.conn.execute(delete(_I).where(_I.id == item_id, _I.order_id == order_id))
         return bool(deleted.rowcount)
+
+    async def capture_images(self, order_id: int) -> list[CaptureImage]:
+        """The order's recognised photos with their boxes, oldest first."""
+        _C = CaptureRow
+        query = (
+            select(_C.id, _C.created_at, _C.image_path, _C.image_width, _C.image_height, _C.detections)
+            .where(_C.order_id == order_id, _C.job_status == "done", _C.detections.is_not(None))
+            .order_by(_C.id)
+        )
+        rows = (await self.conn.execute(query)).mappings().all()
+        return [
+            CaptureImage(
+                id=row["id"],
+                created_at=row["created_at"],
+                image_path=row["image_path"],
+                width=row["image_width"],
+                height=row["image_height"],
+                boxes=row["detections"],
+            )
+            for row in rows
+        ]
 
     async def add_to_shift(self, shift_id: int, amount: int) -> None:
         """Add to what the shift collected (a negative amount takes back a voided sale, never below 0)."""
