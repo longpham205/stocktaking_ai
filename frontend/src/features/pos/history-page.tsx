@@ -20,7 +20,8 @@ const RANGES: [HistoryRange, string][] = [
   ['30d', '30 ngày'],
 ];
 
-function OrderDetail({ orderId, onClose }: { orderId: number; onClose: () => void }) {
+/** One order in a dialog (the history, the admin's order list); an admin can void it from here. */
+export function OrderDetail({ orderId, onClose }: { orderId: number; onClose: () => void }) {
   const queryClient = useQueryClient();
   const isAdmin = useMe().data?.user.role === 'admin';
   const order = useQuery(orderQuery(orderId)).data;
@@ -30,6 +31,8 @@ function OrderDetail({ orderId, onClose }: { orderId: number; onClose: () => voi
     onSuccess: (voided) => {
       queryClient.setQueryData(qk.order(orderId), voided);
       void queryClient.invalidateQueries({ queryKey: ['history'] });
+      void queryClient.invalidateQueries({ queryKey: ['admin', 'orders'] });
+      void queryClient.invalidateQueries({ queryKey: ['admin', 'report'] });
       onClose();
     },
     onError: (error) => toast.error(errorText(error)),

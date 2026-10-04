@@ -7,4 +7,8 @@ export const qk = {
   job: (jobId: number) => ['jobs', jobId] as const,
   products: (search: string) => ['products', search] as const,
   history: (range: string) => ['history', range] as const,
+  settings: () => ['settings'] as const,
+  adminReport: (range: string) => ['admin', 'report', range] as const,
+  adminOrders: (range: string) => ['admin', 'orders', range] as const,
+  adminUsers: () => ['admin', 'users'] as const,
 };
