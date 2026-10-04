@@ -5,8 +5,9 @@ makes it, so the data and its log entry commit or roll back together.
 """
 
 from collections.abc import Iterable
+from typing import Any
 
-from sqlalchemy import RowMapping, insert, select
+from sqlalchemy import Connection, RowMapping, insert, select
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
 from app.modules.audit.models import ChangeLogRow
@@ -18,10 +19,8 @@ _L = ChangeLogRow
 _SELECT = select(_L, UserRow.username).outerjoin(UserRow, UserRow.id == _L.changed_by)
 
 
-async def record_changes(
-    conn: AsyncConnection, table: str, record_id: str, changes: Iterable[Change], changed_by: int | None
-) -> None:
-    rows = [
+def _rows(table: str, record_id: str, changes: Iterable[Change], changed_by: int | None) -> list[dict[str, Any]]:
+    return [
         {
             "table_name": table,
             "record_id": record_id,
@@ -32,8 +31,22 @@ async def record_changes(
         }
         for change in changes
     ]
-    if rows:
+
+
+async def record_changes(
+    conn: AsyncConnection, table: str, record_id: str, changes: Iterable[Change], changed_by: int | None
+) -> None:
+    if rows := _rows(table, record_id, changes, changed_by):
         await conn.execute(insert(_L), rows)
+
+
+def record_changes_sync(
+    conn: Connection, table: str, record_id: str, changes: Iterable[Change], changed_by: int | None
+) -> None:
+    """The same on a synchronous connection: the catalog writes go through the engine's
+    synchronous session (`catalog.repository.CatalogEdits`)."""
+    if rows := _rows(table, record_id, changes, changed_by):
+        conn.execute(insert(_L), rows)
 
 
 def _entry(row: RowMapping) -> ChangeEntry:

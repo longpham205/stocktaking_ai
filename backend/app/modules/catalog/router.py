@@ -1,13 +1,24 @@
-"""`/api/catalog/*`: the product search of the POS screen."""
+"""`/api/catalog/*` (the product search of the POS screen), `/api/admin/products*` and
+`/api/admin/colors*` (admins), and the signed gallery photos (`/api/gallery/...`, public)."""
 
 from dataclasses import asdict
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 
 from app.modules.auth.deps import current_user, require_admin
 from app.modules.auth.ports import CurrentUser
 from app.modules.catalog.deps import catalog_service
-from app.modules.catalog.schemas import AdminProductsOut, ProductOut, ProductPatch, ProductsOut
+from app.modules.catalog.schemas import (
+    AdminProductsOut,
+    ColorOut,
+    ColorPatch,
+    ColorsOut,
+    EvidenceOut,
+    EvidencePatch,
+    ProductOut,
+    ProductPatch,
+    ProductsOut,
+)
 from app.modules.catalog.service import CatalogService
 
 router = APIRouter(tags=["catalog"])
@@ -40,3 +51,41 @@ async def update_product(
     service: CatalogService = Depends(catalog_service),
 ) -> ProductOut:
     return await service.update(admin, product_id, body)
+
+
+@router.get("/admin/products/{product_id}/evidence", dependencies=[Depends(require_admin)])
+async def product_evidence(product_id: str, service: CatalogService = Depends(catalog_service)) -> EvidenceOut:
+    return await service.evidence(product_id)
+
+
+@router.patch("/admin/products/{product_id}/evidence")
+async def update_evidence(
+    product_id: str,
+    body: EvidencePatch,
+    admin: CurrentUser = Depends(require_admin),
+    service: CatalogService = Depends(catalog_service),
+) -> EvidenceOut:
+    return await service.update_evidence(admin, product_id, body)
+
+
+@router.get("/admin/colors", dependencies=[Depends(require_admin)])
+async def colors(service: CatalogService = Depends(catalog_service)) -> ColorsOut:
+    return ColorsOut(items=await service.colors())
+
+
+@router.patch("/admin/colors/{code}")
+async def update_color(
+    code: str,
+    body: ColorPatch,
+    admin: CurrentUser = Depends(require_admin),
+    service: CatalogService = Depends(catalog_service),
+) -> ColorOut:
+    return await service.update_color(admin, code, body)
+
+
+@router.get("/gallery/{product_id}/{index}", include_in_schema=False)
+async def gallery_image(
+    product_id: str, index: int, exp: int = 0, sig: str = "", service: CatalogService = Depends(catalog_service)
+) -> Response:
+    image = await service.gallery_image(product_id, index, exp, sig)
+    return Response(image, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=300"})

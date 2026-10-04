@@ -65,6 +65,10 @@ class RecognitionWorker:
         )
         return await asyncio.wait_for(future, self.timeout_seconds)
 
+    async def reload_catalog(self) -> None:
+        """The recognizer re-reads the catalog, on the worker thread: between two photos, never during one."""
+        await asyncio.get_running_loop().run_in_executor(self._executor, self.recognizer.reload_catalog)
+
     async def _consume(self, handler: Handler) -> None:
         while True:
             capture_id = await self._queue.get()

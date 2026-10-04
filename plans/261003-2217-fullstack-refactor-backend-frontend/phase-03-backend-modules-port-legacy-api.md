@@ -1,6 +1,6 @@
 # Phase 03 — Backend modules (port API legacy)
 
-**Priority:** P0 · **Status:** in progress (3a–3d, 3e-1 audit + settings + giá: done 2026-10-04) · Context: design.md §2 mapping; nguồn: `src_legacy/backend/{service,admin,security}.py`
+**Priority:** P0 · **Status:** in progress (3a–3d, 3e-1, 3e-2 ghi catalog: done 2026-10-04) · Context: design.md §2 mapping; nguồn: `src_legacy/backend/{service,admin,security}.py`
 
 ## Thứ tự module (mỗi module: ports → config → repository → service → schemas → deps → router → tests)
 1. `auth`: login (mở shift, đóng shift cũ = đá máy cũ), logout, `GET /me`, onboarding-seen; scrypt giữ format hash cũ; JWT `{uid,sid,role,exp}` qua pyjwt; `CurrentUser` kiểm shift còn mở; `RequireAdmin`; limiter 5 lần/5 phút theo (username, IP) in-memory → 429 `RATE_LIMITED` + `retry_after`.
@@ -29,7 +29,7 @@ Bộ test API port từ `test_backend_api.py` (httpx ASGITransport + FakeRecogni
 | 3c | `orders` | **done** (2026-10-04) |
 | 3d | `captures` (bộ nhận diện giả) | **done** (2026-10-04) |
 | 3e-1 | `audit` (nhật ký + hoàn tác), `PATCH /admin/settings`, mật khẩu nâng cao, ghi giá, `GET /admin/products` | **done** (2026-10-04) |
-| 3e-2 | ghi catalog (barcode, tên, bằng chứng, màu) theo hướng C, `GET /gallery/...` | pending |
+| 3e-2 | ghi catalog (barcode, tên, bằng chứng, màu) theo hướng C, `GET /gallery/...` | **done** (2026-10-04) |
 | 3e-3 | `users`, `reports` | pending |
 | 3e-4 | `engine_config`, `validation` (cùng phần reload/kiểm định của Phase 4) | pending |
 
@@ -101,3 +101,18 @@ Vẫn một đường ghi qua engine, và catalog + nhật ký nằm trong cùng
 - Mật khẩu nâng cao chưa có route dùng (3e-4: `admin/config/apply`, `admin/validation`); đã có `SettingsService.verify_advanced_password` và test ở mức service. Bộ đếm sai mật khẩu nâng cao dùng chung giới hạn với đăng nhập (`LOGIN_MAX_FAILED_ATTEMPTS`, `LOGIN_LOCKOUT_MINUTES`) nhưng đếm riêng.
 - Bản cũ seed mật khẩu nâng cao lúc khởi động từ cấu hình; giờ chỉ đặt bằng lệnh.
 - `MAX_PRICE` chuyển sang `catalog/schemas.py` (orders dùng lại).
+
+## Kết quả 3e-2
+- Engine: `engine/catalog/edits.py` (`set_barcode`, `set_name`, `all_evidence`, `put_evidence`, `set_color`, `product_ids`, `color_codes`): ghi trên `Session` của bên gọi, không commit; kiểm SKU tồn tại và barcode chưa thuộc SKU khác (`BarcodeTaken`). Test `tests/test_catalog_edits.py` (4). Cổng engine: 233 test engine đạt, G-demo `--exact` 0 khác biệt.
+- Web (hướng C): `catalog.repository.CatalogEdits` mở một session đồng bộ (psycopg) trong luồng phụ, gọi hàm của engine, ghi `change_log` trên cùng kết nối (`audit.repository.record_changes_sync`) rồi commit một lần. Engine chỉ được import ở lần sửa đầu tiên (khởi động bản fake vẫn không nạp `engine`).
+- Route: `PATCH /api/admin/products/{id}` thêm `barcode` (409 `BARCODE_DUPLICATE`, 422 sai định dạng) và `name` (gộp khoảng trắng, 1–120 ký tự, gỡ `needs_naming`) — giá, barcode, tên trong một giao dịch; `GET|PATCH /api/admin/products/{id}/evidence` (422 `CONFIRM_REQUIRED` + `confirm_text`, chuẩn hoá như engine, 422 `EVIDENCE_INVALID` + `errors` khi cả catalog không hợp lệ, `confusable_with` ghi hai chiều, cảnh báo từ khoá ngoài Latin); `GET /api/admin/colors`, `PATCH /api/admin/colors/{code}` (xác nhận, chuẩn hoá mã + hex, null để xoá); `GET /api/gallery/{pid}/{idx}?exp=&sig=` (công khai, URL ký, thu nhỏ ≤1024 px).
+- Hoàn tác: `product` (giá, barcode, tên), `product_evidence` (cặp dễ nhầm quay lại cả hai chiều), `color_reference`.
+- Bộ nhận diện nạp lại catalog sau mỗi lần ghi catalog của engine (không nạp lại khi chỉ đổi giá), trên luồng của worker (giữa hai ảnh): `RecognizerPort.reload_catalog`, `RecognitionWorker.reload_catalog`, `CatalogService.on_change`.
+- `make lint`, `make type-check` (82 file): đạt. `make test`: 289 passed, 25 skipped (5 test API mới + 4 test engine; 2 test của 3e-1 sửa theo hành vi mới).
+
+## Khác với bản cũ / kế hoạch (3e-2)
+- Bản cũ ghi catalog bằng SQL thẳng trong `service.py`; giờ mọi ghi catalog đi qua hàm của engine (hướng C).
+- Giá giờ cũng ghi qua session đồng bộ đó (cùng giao dịch với barcode/tên khi gửi chung); `CatalogRepository.set_price` (async, 3e-1) bỏ.
+- `ocr_min_length` và `gallery_dir` đọc từ YAML của engine (`PIPELINE_CONFIG`) ở mỗi lần dùng; ảnh gallery xử lý bằng Pillow (xoay theo EXIF).
+- Màu thiếu tham chiếu trong `GET /admin/colors` có thêm `r/g/b/source: null` (bản cũ không có các khoá đó).
+- Nạp lại catalog lỗi sau khi đã lưu: lỗi được trả ra (không che) — dữ liệu đã lưu.

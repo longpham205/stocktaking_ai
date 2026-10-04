@@ -58,6 +58,9 @@ class ScriptedRecognizer:
     ) -> Recognition:
         return self.script(image_path)
 
+    def reload_catalog(self) -> None:
+        return None
+
     def close(self) -> None:
         return None
 

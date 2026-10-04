@@ -2,6 +2,7 @@
 uses. Everything else depends on the contracts (`Backends`, `RecognizerPort`), not on these
 implementations."""
 
+import asyncio
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -28,7 +29,7 @@ from app.modules.captures.config import CapturesSettings, get_captures_settings
 from app.modules.captures.repository import CapturesRepository
 from app.modules.captures.router import router as captures_router
 from app.modules.captures.service import CapturesService
-from app.modules.catalog.repository import CatalogRepository
+from app.modules.catalog.repository import CatalogEdits, CatalogRepository
 from app.modules.catalog.router import router as catalog_router
 from app.modules.catalog.service import CatalogService
 from app.modules.orders.repository import OrdersRepository
@@ -72,10 +73,18 @@ def _build(
     # the advanced password is locked out like a login: same limits, its own counter
     advanced_limiter = LoginLimiter(auth_settings.login_max_failed_attempts, auth_settings.login_lockout_minutes * 60)
     built.pos_settings = SettingsService(SettingsRepository(engine), pos_settings, advanced_limiter)
-    built.catalog = CatalogService(CatalogRepository(engine))
+    edits = CatalogEdits(sync_database_url(settings.database_url))
+
+    async def close_edits() -> None:
+        await asyncio.to_thread(edits.close)
+
+    built.closers.append(close_edits)
+    built.catalog = CatalogService(CatalogRepository(engine), edits, settings)
     built.audit = AuditService(AuditRepository(engine), built.catalog)
     built.audit.register("settings", built.pos_settings.revert)
-    built.audit.register("product", built.catalog.revert)
+    built.audit.register("product", built.catalog.revert_product)
+    built.audit.register("product_evidence", built.catalog.revert_evidence)
+    built.audit.register("color_reference", built.catalog.revert_color)
     built.orders = OrdersService(OrdersRepository(engine), built.catalog, built.pos_settings, settings)
     built.recognizer = recognizer or build_recognizer(settings)
     built.worker = RecognitionWorker(
@@ -86,6 +95,8 @@ def _build(
     built.captures = CapturesService(
         CapturesRepository(engine), built.orders, built.pos_settings, built.worker, settings, captures_settings
     )
+    # the recognizer re-reads the catalog after an admin edit, between two photos
+    built.catalog.on_change(built.worker.reload_catalog)
     # stopped before the engine is disposed (closers run in reverse)
     built.closers.append(built.worker.close)
     return built

@@ -127,7 +127,7 @@ async def test_price_update_validation_and_log(admin: httpx.AsyncClient, staff: 
     }
     assert (await staff.get("/api/catalog/products?search=chan%20may")).json()["items"][0]["price"] == 15000
     await admin.patch("/api/admin/products/2", json={"price": 15000})  # unchanged: not logged
-    for bad in ({"price": -5}, {"price": 1.5}, {"price": "100"}, {"foo": "x"}, {"barcode": "123456"}, {}):
+    for bad in ({"price": -5}, {"price": 1.5}, {"price": "100"}, {"foo": "x"}, {}):
         assert (await admin.patch("/api/admin/products/2", json=bad)).status_code == 422, bad
     missing = await admin.patch("/api/admin/products/404", json={"price": 1})
     assert missing.status_code == 404 and missing.json()["code"] == "NOT_FOUND"
@@ -155,16 +155,16 @@ async def test_price_revert_chain_and_what_cannot_be_reverted(db_app: FastAPI, a
     stale = await admin.post(f"/api/admin/change-log/{newest['id']}/revert")  # the price is no longer 2000
     assert stale.status_code == 409 and stale.json()["code"] == "CHANGE_STALE"
     assert (await admin.post("/api/admin/change-log/99999/revert")).status_code == 404
-    # not revertible (yet): a barcode change, a table nobody registered
+    # not revertible: a product field nobody edits, a table nobody registered (engine settings: 3e-4)
     async with db_app.state.backends.engine.begin() as conn:
         rows = [
-            {"table_name": "product", "record_id": "2", "field_name": "barcode", "old_value": "", "new_value": "1"},
+            {"table_name": "product", "record_id": "2", "field_name": "brand", "old_value": "", "new_value": "1"},
             {
-                "table_name": "color_reference",
-                "record_id": "BE203",
-                "field_name": "hex",
+                "table_name": "config",
+                "record_id": "retrieval.top_k",
+                "field_name": "retrieval.top_k",
+                "new_value": "6",
                 "old_value": None,
-                "new_value": "#000000",
             },
         ]
         ids = (await conn.execute(insert(ChangeLogRow).returning(ChangeLogRow.id), rows)).scalars().all()
