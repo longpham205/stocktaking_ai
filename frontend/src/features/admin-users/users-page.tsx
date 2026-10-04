@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Dialog } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { PasswordInput } from '@/components/ui/password-input';
 import { errorText } from '@/features/pos/use-order';
 import { apiFetch } from '@/lib/api-client';
 import { qk } from '@/lib/query-keys';
@@ -39,16 +40,14 @@ function ResetPasswordDialog({ staff, onClose, onSave }: { staff: Staff; onClose
   return (
     <Dialog open onClose={onClose} title={`Đặt lại mật khẩu cho ${staff.username}`}>
       <form className="space-y-3" onSubmit={submit}>
-        <Input
-          type="password"
+        <PasswordInput
           autoComplete="new-password"
           placeholder={`Mật khẩu mới (tối thiểu ${MIN_PASSWORD} ký tự)`}
           aria-label="Mật khẩu mới"
           value={password}
           onChange={(event) => setPassword(event.target.value)}
         />
-        <Input
-          type="password"
+        <PasswordInput
           autoComplete="new-password"
           placeholder="Nhập lại mật khẩu mới"
           aria-label="Nhập lại mật khẩu mới"
@@ -135,9 +134,8 @@ export function UsersPage() {
             value={form.full_name}
             onChange={(event) => setForm({ ...form, full_name: event.target.value })}
           />
-          <Input
+          <PasswordInput
             className="w-44"
-            type="password"
             autoComplete="new-password"
             placeholder={`Mật khẩu (≥${MIN_PASSWORD})`}
             aria-label="Mật khẩu"
