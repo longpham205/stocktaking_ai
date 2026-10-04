@@ -1,6 +1,6 @@
 # Phase 04 — Recognition worker in-process + job state trong DB
 
-**Priority:** P0 · **Status:** pending · Context: design.md §1 (đã chốt: inference trong process API)
+**Priority:** P0 · **Status:** phần lớn đã làm trong Phase 3 (3d, 3e-4) · Context: design.md §1 (đã chốt: inference trong process API)
 
 ## Các bước
 1. `recognition/worker.py` `RecognitionWorker`: `asyncio.Queue(maxsize=queue_max)` → đầy thì 503 `QUEUE_FULL`; 1 task tiêu thụ; mỗi job `await loop.run_in_executor(executor_1_thread, recognizer.recognize, ...)`; `asyncio.wait_for(timeout_seconds)` → đánh dấu `error: TIMEOUT` (thread GPU vẫn chạy nốt — ghi rõ giới hạn như legacy).
@@ -13,3 +13,12 @@
 
 ## Done khi
 `RECOGNIZER=fake make docker-up` → chụp ảnh → job done; `RECOGNIZER=local` + config demo (mock backends, CPU) chạy end-to-end; test worker (queue đầy, timeout, reload rollback, restart dọn job treo) xanh.
+
+## Đã làm trước trong Phase 3 (2026-10-04)
+- 3d: `recognition/worker.py` (queue + một luồng, timeout, `position`), job state trong `captures`, job treo báo `SERVER_RESTARTED` khi được hỏi (thay vì dọn lúc khởi động), `mapper.py`, `fake.py`, `local_pipeline.recognize`.
+- 3e-2: `reload_catalog` trên luồng worker sau khi ghi catalog.
+- 3e-4: `reload_pipeline` (giải phóng GPU, rollback), `validate`, evidence-test, cờ `reloading`/`validating`, `SYSTEM_BUSY`, `RELOAD_IN_PROGRESS`.
+
+## Còn lại
+- Bước 7: `--workers 1` ghi rõ trong compose + Makefile (kiểm lại cấu hình hiện có).
+- "Done khi": `RECOGNIZER=fake make docker-up` -> chụp ảnh -> job done; `RECOGNIZER=local` + config demo chạy end-to-end qua API (chưa thử qua HTTP thật).

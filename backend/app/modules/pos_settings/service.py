@@ -65,6 +65,9 @@ class SettingsService:
         old = None if entry.old is None else json.loads(entry.old)
         await self.update(current, SettingsPatch.model_validate({entry.field: old}))
 
+    async def advanced_password_set(self) -> bool:
+        return bool((await self.repo.values([ADVANCED_PASSWORD_KEY])).get(ADVANCED_PASSWORD_KEY))
+
     async def verify_advanced_password(self, current: CurrentUser, password: str | None) -> None:
         """The advanced password (not the login one) guards the engine settings. Locked for a while
         after repeated wrong tries, per account."""

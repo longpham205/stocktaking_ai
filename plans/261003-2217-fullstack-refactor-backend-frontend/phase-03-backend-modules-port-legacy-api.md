@@ -1,6 +1,6 @@
 # Phase 03 — Backend modules (port API legacy)
 
-**Priority:** P0 · **Status:** in progress (3a–3d, 3e-1..3e-3: done 2026-10-04; còn 3e-4) · Context: design.md §2 mapping; nguồn: `src_legacy/backend/{service,admin,security}.py`
+**Priority:** P0 · **Status:** done (2026-10-04: 3a–3d, 3e-1..3e-4) · Context: design.md §2 mapping; nguồn: `src_legacy/backend/{service,admin,security}.py`
 
 ## Thứ tự module (mỗi module: ports → config → repository → service → schemas → deps → router → tests)
 1. `auth`: login (mở shift, đóng shift cũ = đá máy cũ), logout, `GET /me`, onboarding-seen; scrypt giữ format hash cũ; JWT `{uid,sid,role,exp}` qua pyjwt; `CurrentUser` kiểm shift còn mở; `RequireAdmin`; limiter 5 lần/5 phút theo (username, IP) in-memory → 429 `RATE_LIMITED` + `retry_after`.
@@ -31,7 +31,7 @@ Bộ test API port từ `test_backend_api.py` (httpx ASGITransport + FakeRecogni
 | 3e-1 | `audit` (nhật ký + hoàn tác), `PATCH /admin/settings`, mật khẩu nâng cao, ghi giá, `GET /admin/products` | **done** (2026-10-04) |
 | 3e-2 | ghi catalog (barcode, tên, bằng chứng, màu) theo hướng C, `GET /gallery/...` | **done** (2026-10-04) |
 | 3e-3 | `users`, `reports` | **done** (2026-10-04) |
-| 3e-4 | `engine_config`, `validation` (cùng phần reload/kiểm định của Phase 4) | pending |
+| 3e-4 | `engine_config`, `validation` (cùng phần reload/kiểm định của Phase 4) | **done** (2026-10-04) |
 
 ## Quyết định cho phần ghi catalog (PR 3e)
 Engine cung cấp hàm ghi nhận kết nối từ bên gọi và KHÔNG commit (cùng kiểu `set_meta` đang có); module quản trị
@@ -126,3 +126,18 @@ Vẫn một đường ghi qua engine, và catalog + nhật ký nằm trong cùng
 - Không có đổi vai trò qua `PATCH /admin/users` (bản cũ cũng không có; kế hoạch nêu trong chat có nhắc nhầm).
 - Mật khẩu băm trong luồng phụ (scrypt chậm có chủ ý).
 - Thống kê lượt chụp dùng `job_status` (`done`/`error`) thay `status` (`success`/`error`/`timeout`) của bản cũ; timeout giờ là `error` với mã `PIPELINE_TIMEOUT`.
+
+## Kết quả 3e-4
+- `engine_config`: `GET /api/admin/config` (registry 8 khoá chỉ xem + 20 khoá áp dụng được, giá trị gốc/hiện tại, `overridden`, `config_error`, `reloading`, `advanced_password_set`), `POST /api/admin/config/apply` (422 `CONFIRM_REQUIRED`, mật khẩu nâng cao, kiểm từng giá trị theo registry, null = về giá trị YAML, validate cả `AppConfig` -> 422 `CONFIG_INVALID`, nạp lại pipeline trên luồng worker: 409 `RELOAD_IN_PROGRESS`, 504 `RELOAD_TIMEOUT`, 500 `RELOAD_FAILED` (bộ nhận diện quay về thiết lập cũ, DB không đổi), rồi lưu `config_overrides` + `change_log`); hoàn tác bảng `config` (cần mật khẩu nâng cao).
+- `validation`: `GET|POST /api/admin/validation` (xác nhận + mật khẩu nâng cao; chạy nền trên luồng worker với pipeline đang nạp; 409 `SYSTEM_BUSY` khi đang chạy; trạng thái idle/running/done/error, kết quả F1 + fusion so với baseline), `POST /api/admin/evidence-test` (ảnh thô, không lưu: chữ OCR + SKU có từ khoá khớp, màu đo + màu tham chiếu gần nhất, mã vạch + SKU trùng).
+- Worker: cờ `reloading` (hiện ở `GET /jobs` là `system_reloading`) và `validating` (chụp ảnh và thử bằng chứng trả 503 `SYSTEM_BUSY`). `RecognizerPort` thêm `reload_pipeline`, `validate`; `LocalRecognizer` giải phóng GPU trước khi nạp, rollback khi lỗi, và khởi động với các ghi đè đã lưu (`stored_overrides_sync`).
+- `make lint`, `make type-check` (108 file): đạt. `make test`: 300 passed, 25 skipped (5 test mới; 1 test của 3e-1 sửa vì bảng `config` giờ hoàn tác được). Chạy thử `LocalRecognizer` thật trên `config.demo.yaml` bằng venv ML: nạp lại với ghi đè, rollback khi ghi đè sai, nhận diện sau rollback, kiểm định (F1 0.5912, fusion 0.6804).
+
+## Khác với bản cũ / kế hoạch (3e-4)
+- Làm luôn phần reload/kiểm định/evidence-test/`SYSTEM_BUSY` của Phase 4.
+- Bộ nhận diện thật đọc `config_overrides` lúc khởi động bằng kết nối đồng bộ (chỉ khi `RECOGNIZER=local`; bản fake không đụng DB lúc khởi động).
+- Báo cáo kiểm định ghi vào `DATA_DIR/validation_web/<thời điểm UTC>`.
+- Đọc body ảnh thô dùng chung ở `app/core/uploads.py` (chụp ảnh và thử bằng chứng).
+
+## Phase 3: hoàn tất
+Đủ route của web cũ trừ: dọn ảnh cũ theo hạn lưu trữ và sao lưu DB lúc khởi động (theo "Quy ước": làm thành lệnh riêng, Phase 7), seed tài khoản/giá lúc khởi động (thay bằng `make reset-password`, `make reset-advanced-password`; seed giá: Phase 7 `make seed-demo`).

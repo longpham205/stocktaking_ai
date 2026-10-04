@@ -155,17 +155,11 @@ async def test_price_revert_chain_and_what_cannot_be_reverted(db_app: FastAPI, a
     stale = await admin.post(f"/api/admin/change-log/{newest['id']}/revert")  # the price is no longer 2000
     assert stale.status_code == 409 and stale.json()["code"] == "CHANGE_STALE"
     assert (await admin.post("/api/admin/change-log/99999/revert")).status_code == 404
-    # not revertible: a product field nobody edits, a table nobody registered (engine settings: 3e-4)
+    # not revertible: a product field nobody edits, a table nobody registered
     async with db_app.state.backends.engine.begin() as conn:
         rows = [
             {"table_name": "product", "record_id": "2", "field_name": "brand", "old_value": "", "new_value": "1"},
-            {
-                "table_name": "config",
-                "record_id": "retrieval.top_k",
-                "field_name": "retrieval.top_k",
-                "new_value": "6",
-                "old_value": None,
-            },
+            {"table_name": "users", "record_id": "1", "field_name": "role", "old_value": "staff", "new_value": "admin"},
         ]
         ids = (await conn.execute(insert(ChangeLogRow).returning(ChangeLogRow.id), rows)).scalars().all()
     for entry_id in ids:

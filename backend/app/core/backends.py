@@ -12,12 +12,14 @@ from app.modules.audit.service import AuditService
 from app.modules.auth.service import AuthService
 from app.modules.captures.service import CapturesService
 from app.modules.catalog.service import CatalogService
+from app.modules.engine_config.service import EngineConfigService
 from app.modules.orders.service import OrdersService
 from app.modules.pos_settings.service import SettingsService
 from app.modules.recognition.ports import RecognizerPort
 from app.modules.recognition.worker import RecognitionWorker
 from app.modules.reports.service import ReportsService
 from app.modules.users.service import UsersService
+from app.modules.validation.service import ValidationService
 
 Closer = Callable[[], Awaitable[None]]
 
@@ -36,5 +38,7 @@ class Backends:
     captures: CapturesService | None = None
     users: UsersService | None = None
     reports: ReportsService | None = None
+    engine_config: EngineConfigService | None = None
+    validation: ValidationService | None = None
     # run in reverse order at shutdown
     closers: list[Closer] = field(default_factory=list)

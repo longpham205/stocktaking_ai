@@ -32,6 +32,9 @@ from app.modules.captures.service import CapturesService
 from app.modules.catalog.repository import CatalogEdits, CatalogRepository
 from app.modules.catalog.router import router as catalog_router
 from app.modules.catalog.service import CatalogService
+from app.modules.engine_config.repository import EngineConfigRepository, stored_overrides_sync
+from app.modules.engine_config.router import router as engine_config_router
+from app.modules.engine_config.service import EngineConfigService
 from app.modules.orders.repository import OrdersRepository
 from app.modules.orders.router import router as orders_router
 from app.modules.orders.service import OrdersService
@@ -47,6 +50,8 @@ from app.modules.reports.service import ReportsService
 from app.modules.users.repository import UsersRepository
 from app.modules.users.router import router as users_router
 from app.modules.users.service import UsersService
+from app.modules.validation.router import router as validation_router
+from app.modules.validation.service import ValidationService
 
 logger = logging.getLogger("app.main")
 
@@ -59,7 +64,9 @@ def build_recognizer(settings: CoreSettings) -> RecognizerPort:
     # lazy: torch, faiss and the engine are imported only by a process that runs the real pipeline
     from app.modules.recognition.local_pipeline import LocalRecognizer
 
-    return LocalRecognizer(settings.pipeline_config, sync_database_url(settings.database_url))
+    url = sync_database_url(settings.database_url)
+    # with the engine settings an admin applied earlier (config_overrides): they survive a restart
+    return LocalRecognizer(settings.pipeline_config, url, stored_overrides_sync(url))
 
 
 def _build(
@@ -105,6 +112,11 @@ def _build(
     built.reports = ReportsService(
         ReportsRepository(engine), built.catalog, built.worker, settings.timezone_offset_hours
     )
+    built.engine_config = EngineConfigService(
+        EngineConfigRepository(engine), built.pos_settings, built.worker, settings
+    )
+    built.audit.register("config", built.engine_config.revert)
+    built.validation = ValidationService(built.worker, built.catalog, built.pos_settings, settings)
     # the recognizer re-reads the catalog after an admin edit, between two photos
     built.catalog.on_change(built.worker.reload_catalog)
     # stopped before the engine is disposed (closers run in reverse)
@@ -181,5 +193,7 @@ def create_app(
     app.include_router(audit_router, prefix="/api")
     app.include_router(users_router, prefix="/api")
     app.include_router(reports_router, prefix="/api")
+    app.include_router(engine_config_router, prefix="/api")
+    app.include_router(validation_router, prefix="/api")
     app.add_middleware(RequestLog)
     return app
