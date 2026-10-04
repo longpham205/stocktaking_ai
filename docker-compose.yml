@@ -1,8 +1,7 @@
-# The API (FastAPI + the recognition engine) and its Postgres. `migrate` applies the Alembic
-# revisions once and exits; the API starts only after it succeeded. The web console joins in
-# phase 5 (frontend/ does not exist yet).
+# The web console, the API (FastAPI + the recognition engine) and its Postgres. `migrate` applies
+# the Alembic revisions once and exits; the API starts only after it succeeded.
 #
-#   make setup && make docker-up        -> http://localhost:8000/healthz
+#   make setup && make docker-up        -> http://localhost:5173 (the console; the API on :8000)
 #
 # Default: the light image and RECOGNIZER=fake (no torch, runs anywhere).
 # Real pipeline on an NVIDIA GPU: `make docker-up-gpu` (docker-compose.gpu.yml).
@@ -80,6 +79,24 @@ services:
       interval: 3s
       timeout: 3s
       retries: 20
+    restart: unless-stopped
+
+  web:
+    # dev: Vite with hot reload on the bind-mounted source; it proxies /api to the api service
+    build:
+      context: ./frontend
+      target: dev
+    environment:
+      API_PROXY_TARGET: http://api:8000
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      # the image's own (Linux) node_modules, not the host's
+      - /app/node_modules
+    depends_on:
+      api:
+        condition: service_healthy
     restart: unless-stopped
 
 volumes:

@@ -2,7 +2,7 @@
 # On Windows run it from Git Bash (the recipes are POSIX shell).
 .PHONY: help setup docker-up docker-up-gpu docker-up-prod docker-up-data docker-down logs \
         migrate migration dev-api test lint format type-check check-env clean reset-password \
-        reset-advanced-password smoke
+        reset-advanced-password smoke test-web
 
 COMPOSE      := docker compose
 COMPOSE_GPU  := $(COMPOSE) -f docker-compose.yml -f docker-compose.gpu.yml
@@ -32,9 +32,9 @@ setup: .env      ## create .env, fill any missing secret in it, check docker and
 	@cp .env.example .env
 	@echo ".env created from .env.example"
 
-docker-up: setup ## build and start postgres, migrate, api -> http://localhost:8000/healthz
+docker-up: setup ## build and start postgres, migrate, api, web -> http://localhost:5173
 	$(COMPOSE) up --build -d --wait
-	@echo "api: http://localhost:8000/healthz   docs (dev): http://localhost:8000/docs"
+	@echo "web: http://localhost:5173   api: http://localhost:8000/healthz   docs (dev): http://localhost:8000/docs"
 
 docker-up-gpu: setup  ## same, with the real pipeline on an NVIDIA GPU (large image)
 	$(COMPOSE_GPU) up --build -d --wait
@@ -71,14 +71,18 @@ smoke:           ## end-to-end check of the running API over HTTP; needs SMOKE_A
 test: docker-up-data  ## backend suite; the API tests use their own database (stocktaking_test)
 	cd backend && uv run pytest -q
 
+test-web:        ## frontend suite (vitest), on the host (needs pnpm)
+	cd frontend && pnpm install --frozen-lockfile && pnpm test
+
 lint:            ## ruff check + format check on the web app
 	cd backend && uv run ruff check $(LINT_PATHS) && uv run ruff format --check $(LINT_PATHS)
 
 format:          ## apply ruff's fixes and formatting to the web app
 	cd backend && uv run ruff check --fix $(LINT_PATHS) && uv run ruff format $(LINT_PATHS)
 
-type-check:      ## mypy (strict) on app/, entrypoints/, migrations/
+type-check:      ## mypy (strict) on app/, entrypoints/, migrations/; tsc (strict) on the frontend
 	cd backend && uv run mypy
+	cd frontend && pnpm install --frozen-lockfile && pnpm typecheck
 
 reset-password: migrate  ## new random password for an account, created if missing: make reset-password USER_NAME=admin ROLE=admin
 	@test -n "$(USER_NAME)" || (echo 'usage: make reset-password USER_NAME=admin [ROLE=admin]' && exit 1)
@@ -93,5 +97,5 @@ check-env:       ## what this machine has: tools, .env, the engine's device keys
 	cd backend && uv run python scripts/set_device.py show
 
 clean:           ## remove caches (not data, not weights, not the database volume)
-	rm -rf backend/.pytest_cache backend/.mypy_cache backend/.ruff_cache
+	rm -rf backend/.pytest_cache backend/.mypy_cache backend/.ruff_cache frontend/dist
 	find backend -name __pycache__ -type d -prune -exec rm -rf {} +
