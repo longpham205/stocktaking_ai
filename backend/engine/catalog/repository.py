@@ -228,42 +228,61 @@ class SqliteCatalogRepository(BaseCatalogRepository):
         super().__init__()
 
     def _load(self) -> CatalogData:
-        from engine.catalog.db import ColorReference, Product, ProductEvidence, Session, make_engine, select
+        from engine.catalog.db import make_engine
 
-        engine = make_engine(self._db_path)
-        try:
-            with Session(engine) as s:
-                products = [
-                    ProductRecord(
-                        product_id=row.product_id,
-                        product_name=row.product_name,
-                        brand=row.brand,
-                        category=row.category,
-                        barcode=row.barcode,
-                        description=row.description,
-                        image_count=int(row.image_count),
-                        gallery_folder=row.gallery_folder,
-                        is_active=bool(row.is_active),
-                        needs_naming=bool(row.needs_naming),
-                    )
-                    for row in s.exec(select(Product)).all()
-                ]
-                evidence: dict[str, dict[str, Any]] = {}
-                for row in s.exec(select(ProductEvidence)).all():
-                    try:
-                        value = json.loads(row.value_json)
-                    except json.JSONDecodeError as exc:
-                        raise ValueError(
-                            f"value_json hỏng ở bằng chứng {row.evidence_type} của SKU {row.product_id}: {exc}"
-                        ) from exc
-                    evidence.setdefault(row.product_id, {})[row.evidence_type] = value
-                colors = {
-                    row.color_code: ColorRef(r=row.r, g=row.g, b=row.b, hex=row.hex, source=row.source)
-                    for row in s.exec(select(ColorReference)).all()
-                }
-        finally:
-            engine.dispose()
-        return CatalogData.build(products, evidence, colors)
+        return _read_catalog(make_engine(self._db_path))
+
+
+class DatabaseCatalogRepository(BaseCatalogRepository):
+    """Đọc catalog từ DB theo URL SQLAlchemy (Postgres của web). Bảng do Alembic tạo, cùng schema."""
+
+    def __init__(self, db_url: str) -> None:
+        self._db_url = db_url
+        super().__init__()
+
+    def _load(self) -> CatalogData:
+        from engine.catalog.db import make_engine_from_url
+
+        return _read_catalog(make_engine_from_url(self._db_url))
+
+
+def _read_catalog(engine: Any) -> CatalogData:
+    """Nạp toàn bộ catalog qua một engine SQLAlchemy rồi đóng engine (dùng chung cho mọi nguồn DB)."""
+    from engine.catalog.db import ColorReference, Product, ProductEvidence, Session, select
+
+    try:
+        with Session(engine) as s:
+            products = [
+                ProductRecord(
+                    product_id=row.product_id,
+                    product_name=row.product_name,
+                    brand=row.brand,
+                    category=row.category,
+                    barcode=row.barcode,
+                    description=row.description,
+                    image_count=int(row.image_count),
+                    gallery_folder=row.gallery_folder,
+                    is_active=bool(row.is_active),
+                    needs_naming=bool(row.needs_naming),
+                )
+                for row in s.exec(select(Product)).all()
+            ]
+            evidence: dict[str, dict[str, Any]] = {}
+            for row in s.exec(select(ProductEvidence)).all():
+                try:
+                    value = json.loads(row.value_json)
+                except json.JSONDecodeError as exc:
+                    raise ValueError(
+                        f"value_json hỏng ở bằng chứng {row.evidence_type} của SKU {row.product_id}: {exc}"
+                    ) from exc
+                evidence.setdefault(row.product_id, {})[row.evidence_type] = value
+            colors = {
+                row.color_code: ColorRef(r=row.r, g=row.g, b=row.b, hex=row.hex, source=row.source)
+                for row in s.exec(select(ColorReference)).all()
+            }
+    finally:
+        engine.dispose()
+    return CatalogData.build(products, evidence, colors)
 
 
 __all__ = [
@@ -275,4 +294,5 @@ __all__ = [
     "BaseCatalogRepository",
     "InMemoryCatalogRepository",
     "SqliteCatalogRepository",
+    "DatabaseCatalogRepository",
 ]

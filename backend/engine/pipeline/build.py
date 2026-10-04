@@ -59,19 +59,22 @@ class BuildPipeline:
         logger.info("=" * 72)
 
     def _build_metadata(self) -> None:
-        """Đồng bộ thư mục gallery vào catalog DB (nguồn sqlite). Nguồn snapshot chỉ đọc: bỏ qua."""
-        if self._config.catalog.source != "sqlite":
+        """Đồng bộ thư mục gallery vào catalog DB (nguồn sqlite/database). Nguồn snapshot chỉ đọc: bỏ qua."""
+        if self._config.catalog.source == "snapshot":
             logger.info("Catalog source '%s' is read-only; gallery sync skipped.", self._config.catalog.source)
             return
         self._sync_gallery_to_catalog()
 
     def _sync_gallery_to_catalog(self) -> None:
-        """Nguồn sqlite: thư mục gallery mới -> SKU mới (needs_naming), cập nhật số ảnh."""
-        from engine.catalog.db import make_engine
+        """Nguồn sqlite/database: thư mục gallery mới -> SKU mới (needs_naming), cập nhật số ảnh."""
+        from engine.catalog.db import make_engine, make_engine_from_url
         from engine.catalog.sync_gallery import sync_gallery
 
         logger.info("Syncing gallery folders into catalog DB...")
-        engine = make_engine(self._config.resolve_path(self._config.catalog.db_path))
+        if self._config.catalog.source == "database":
+            engine = make_engine_from_url(self._config.catalog.db_url)
+        else:
+            engine = make_engine(self._config.resolve_path(self._config.catalog.db_path))
         try:
             result = sync_gallery(engine, self._config.resolve_path(self._config.paths.gallery_dir))
         finally:
