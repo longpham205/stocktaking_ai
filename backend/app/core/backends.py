@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.core.config import CoreSettings
+from app.modules.audit.service import AuditService
 from app.modules.auth.service import AuthService
 from app.modules.captures.service import CapturesService
 from app.modules.catalog.service import CatalogService
@@ -26,6 +27,7 @@ class Backends:
     recognizer: RecognizerPort | None = None
     auth: AuthService | None = None
     pos_settings: SettingsService | None = None
+    audit: AuditService | None = None
     catalog: CatalogService | None = None
     orders: OrdersService | None = None
     worker: RecognitionWorker | None = None

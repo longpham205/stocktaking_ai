@@ -4,8 +4,9 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, StrictBool, StrictInt
 
+from app.modules.catalog.schemas import MAX_PRICE
+
 MAX_QTY = 999
-MAX_PRICE = 100_000_000
 
 
 class ItemIn(BaseModel):

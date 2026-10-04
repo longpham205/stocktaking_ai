@@ -16,7 +16,11 @@ from app.core.db import make_engine, sync_database_url
 from app.core.deps import backends
 from app.core.errors import AppError, Unavailable, app_error_handler, validation_error_handler
 from app.core.logging import RequestLog, configure_logging
+from app.modules.audit.repository import AuditRepository
+from app.modules.audit.router import router as audit_router
+from app.modules.audit.service import AuditService
 from app.modules.auth.config import AuthSettings, get_auth_settings
+from app.modules.auth.limiter import LoginLimiter
 from app.modules.auth.repository import AuthRepository
 from app.modules.auth.router import router as auth_router
 from app.modules.auth.service import AuthService
@@ -65,8 +69,13 @@ def _build(
         # nobody could log in: stop at startup instead of failing every login with a 500
         raise RuntimeError("JWT_SECRET is not set: run `make setup` (it fills the secrets in .env)")
     built.auth = AuthService(AuthRepository(engine), auth_settings)
-    built.pos_settings = SettingsService(SettingsRepository(engine), pos_settings)
+    # the advanced password is locked out like a login: same limits, its own counter
+    advanced_limiter = LoginLimiter(auth_settings.login_max_failed_attempts, auth_settings.login_lockout_minutes * 60)
+    built.pos_settings = SettingsService(SettingsRepository(engine), pos_settings, advanced_limiter)
     built.catalog = CatalogService(CatalogRepository(engine))
+    built.audit = AuditService(AuditRepository(engine), built.catalog)
+    built.audit.register("settings", built.pos_settings.revert)
+    built.audit.register("product", built.catalog.revert)
     built.orders = OrdersService(OrdersRepository(engine), built.catalog, built.pos_settings, settings)
     built.recognizer = recognizer or build_recognizer(settings)
     built.worker = RecognitionWorker(
@@ -148,5 +157,6 @@ def create_app(
     app.include_router(catalog_router, prefix="/api")
     app.include_router(orders_router, prefix="/api")
     app.include_router(captures_router, prefix="/api")
+    app.include_router(audit_router, prefix="/api")
     app.add_middleware(RequestLog)
     return app

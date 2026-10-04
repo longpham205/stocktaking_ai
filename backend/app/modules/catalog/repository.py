@@ -9,9 +9,12 @@ in-memory copy to reload.
 import json
 from collections.abc import Iterable
 
-from sqlalchemy import Boolean, ColumnElement, String, and_, column, select, table
+from sqlalchemy import Boolean, ColumnElement, String, and_, column, delete, func, select, table
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncEngine
 
+from app.modules.audit.ports import Change
+from app.modules.audit.repository import record_changes
 from app.modules.catalog.models import ProductPriceRow
 from app.modules.catalog.ports import Product
 
@@ -57,6 +60,27 @@ class CatalogRepository:
         if not ids:
             return {}
         return {product.id: product for product in await self._products(_P.c.product_id.in_(ids))}
+
+    async def set_price(self, product_id: str, price: int | None, changed_by: int) -> bool:
+        """Set (or with None, remove) the price and log the change, in one transaction. False when
+        the price was already that."""
+        async with self.engine.begin() as conn:
+            current = select(_PRICE.price).where(_PRICE.product_id == product_id).with_for_update()
+            old = (await conn.execute(current)).scalar_one_or_none()
+            if old == price:
+                return False
+            change = Change("price", None if old is None else str(old), None if price is None else str(price))
+            await record_changes(conn, "product", product_id, [change], changed_by)
+            if price is None:
+                await conn.execute(delete(_PRICE).where(_PRICE.product_id == product_id))
+            else:
+                statement = insert(_PRICE).values(product_id=product_id, price=price)
+                await conn.execute(
+                    statement.on_conflict_do_update(
+                        index_elements=[_PRICE.product_id], set_={"price": price, "updated_at": func.now()}
+                    )
+                )
+        return True
 
     async def _products(self, condition: ColumnElement[bool]) -> list[Product]:
         query = (
