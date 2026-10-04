@@ -1,6 +1,6 @@
 # Phase 06 — Frontend features (POS + Admin)
 
-**Priority:** P1 · **Status:** in progress (6a POS: done 2026-10-04; 6b admin: pending) · Nguồn hành vi: `src_legacy/frontend/app.js`, `docs/WEB.md`
+**Priority:** P1 · **Status:** in progress (6a POS, 6b-1 admin cơ bản: done 2026-10-04; 6b-2 sản phẩm + nâng cao: pending) · Nguồn hành vi: `src_legacy/frontend/app.js`, `docs/WEB.md`
 
 ## POS (staff, mobile-first)
 - [ ] onboarding (một lần, `POST me/onboarding-seen`)
@@ -32,3 +32,17 @@ Checklist parity đủ; vitest cho mỗi feature (stub API); smoke thủ công t
 ## Chưa thử được (cần điện thoại thật qua HTTPS)
 - Khung ngắm camera trực tiếp và cảm biến nghiêng (trình duyệt nội bộ chặn camera; `http://` qua IP LAN cũng bị chặn — app tự chuyển sang "Chụp bằng camera máy"/"Chọn ảnh").
 - Máy quét mã vạch thật (đã test bằng phím giả lập), in hoá đơn ra máy in.
+
+## Kết quả 6b-1 — admin: báo cáo, đơn hàng, nhân viên, cài đặt (2026-10-04)
+- `features/admin-reports/reports-page.tsx`: 9 thẻ KPI hôm nay (tỉ lệ lỗi > 10% và SKU thiếu giá tô đỏ), chọn khoảng today/7d/30d, biểu đồ cột CSS theo ngày (tooltip ngày · tiền · số đơn; 30 cột thì 5 ngày một nhãn), top sản phẩm, tự làm mới 15 s.
+- `features/admin-orders/orders-page.tsx`: đơn của mọi nhân viên (today/7d/30d/all), "Chi tiết" dùng lại hộp thoại `OrderDetail` của lịch sử (admin huỷ đơn).
+- `features/admin-users/users-page.tsx`: thêm nhân viên, trạng thái (đang trong ca / hoạt động / đã khoá), khoá-mở khoá, đặt lại mật khẩu (nhập hai lần, ≥ 8 ký tự); server từ chối thì giữ nguyên form.
+- `features/admin-settings/settings-page.tsx`: ba công tắc + hai thanh trượt ngưỡng với ô "Dùng mặc định của hệ thống" (null); lưu xong làm mới `/me` cho màn POS.
+- `components/ui/switch.tsx` (tự viết, `role="switch"`).
+- Test: 33 vitest (6 mới). `pnpm typecheck`, `pnpm build` đạt.
+
+## Khác bản cũ (6b-1)
+- Cài đặt chỉ gửi các khoá thật sự đổi (bản cũ gửi cả 5 khoá mỗi lần lưu, nên mỗi lần lưu sinh 5 dòng nhật ký); không đổi gì thì báo "Không có gì thay đổi".
+
+## Chưa làm (6b-1)
+- Chưa thử trong trình duyệt trên Docker: Docker Desktop đang tắt lúc làm xong. Cần `make docker-up` rồi đăng nhập `e2e_admin` xem bốn màn.

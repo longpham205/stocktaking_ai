@@ -25,7 +25,11 @@ describe('route guards', () => {
     expect(screen.queryByRole('link', { name: /Báo cáo/ })).not.toBeInTheDocument();
     staff.unmount();
 
-    stubFetchRoutes({ '/api/me': () => jsonResponse(meBody('admin')) });
+    // the admin home asks for the report: an error answer is enough for this test (it only checks the shell)
+    stubFetchRoutes({
+      '/api/me': () => jsonResponse(meBody('admin')),
+      '/api/admin/reports': () => apiError(503, 'DB_UNAVAILABLE', 'x'),
+    });
     const admin = await renderApp('/');
     expect(admin.router.state.location.pathname).toBe('/admin/reports');
     expect(await screen.findByRole('link', { name: /Báo cáo/ })).toBeInTheDocument();

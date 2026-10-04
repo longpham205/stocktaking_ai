@@ -9,6 +9,10 @@ import {
 } from '@tanstack/react-router';
 import { AppShell } from '@/components/app-shell';
 import { ComingSoon, RouteError, RouteNotFound, RoutePending } from '@/components/route-states';
+import { AdminOrdersPage } from '@/features/admin-orders/orders-page';
+import { ReportsPage } from '@/features/admin-reports/reports-page';
+import { SettingsPage } from '@/features/admin-settings/settings-page';
+import { UsersPage } from '@/features/admin-users/users-page';
 import { LoginPage } from '@/features/auth/login-page';
 import { meQuery } from '@/features/auth/use-auth';
 import { getOpenOrder } from '@/features/pos/api';
@@ -163,17 +167,18 @@ const adminIndexRoute = createRoute({
   },
 });
 
+/** The admin tabs. Products and the advanced settings arrive with 6b-2. */
 const ADMIN_TABS = [
-  ['reports', 'Báo cáo'],
-  ['products', 'Sản phẩm'],
-  ['orders', 'Đơn hàng'],
-  ['users', 'Nhân viên'],
-  ['settings', 'Cài đặt'],
-  ['advanced', 'Thiết lập nâng cao'],
+  ['reports', ReportsPage],
+  ['products', () => <ComingSoon title="Sản phẩm" />],
+  ['orders', AdminOrdersPage],
+  ['users', UsersPage],
+  ['settings', SettingsPage],
+  ['advanced', () => <ComingSoon title="Thiết lập nâng cao" />],
 ] as const;
 
-const adminTabRoutes = ADMIN_TABS.map(([path, title]) =>
-  createRoute({ getParentRoute: () => adminRoute, path, component: () => <ComingSoon title={title} /> }),
+const adminTabRoutes = ADMIN_TABS.map(([path, component]) =>
+  createRoute({ getParentRoute: () => adminRoute, path, component }),
 );
 
 const routeTree = rootRoute.addChildren([
