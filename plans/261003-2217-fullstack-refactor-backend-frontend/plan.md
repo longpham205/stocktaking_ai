@@ -30,7 +30,7 @@ stocktaking_ai/
 | 4 | Recognition worker in-process + job state trong DB | [phase-04](phase-04-inference-worker-and-job-queue.md) | done (2026-10-04, mostly within phase 3) |
 | 5 | Frontend scaffold + shared (api, auth, i18n, ui) | [phase-05](phase-05-frontend-scaffold-and-shared-layer.md) | done (2026-10-04) |
 | 6 | Frontend features: POS flow + Admin | [phase-06](phase-06-frontend-features-pos-and-admin.md) | done (2026-10-04); phone smoke over HTTPS left to do by hand |
-| 7 | Data migration, scripts, tests, docs, cleanup | [phase-07](phase-07-migration-scripts-tests-docs.md) | pending |
+| 7 | Data migration, scripts, tests, docs, cleanup | [phase-07](phase-07-migration-scripts-tests-docs.md) | in progress (7a data and ops commands done 2026-10-04) |
 
 Thứ tự: 0 → 1 → 2 → 3 ∥ 5 → 4 → 6 → 7 (frontend scaffold làm song song với backend modules vì hợp đồng API giữ nguyên path).
 

@@ -2,7 +2,7 @@
 # On Windows run it from Git Bash (the recipes are POSIX shell).
 .PHONY: help setup docker-up docker-up-gpu docker-up-prod docker-up-data docker-down logs \
         migrate migration dev-api test lint format type-check check-env clean reset-password \
-        reset-advanced-password smoke test-web
+        reset-advanced-password smoke test-web seed-demo import-legacy db-save db-restore purge-media
 
 COMPOSE      := docker compose
 COMPOSE_GPU  := $(COMPOSE) -f docker-compose.yml -f docker-compose.gpu.yml
@@ -91,10 +91,32 @@ reset-password: migrate  ## new random password for an account, created if missi
 reset-advanced-password: migrate  ## new random advanced password (guards the engine settings), printed once
 	cd backend && uv run python -m entrypoints.reset_password --advanced
 
-check-env:       ## what this machine has: tools, .env, the engine's device keys
+check-env:       ## what this installation has and lacks: tools, secrets, database, catalog, pipeline, GPU
 	@docker --version; docker compose version; uv --version
 	@test -f .env && echo ".env: present" || echo ".env: missing (make setup)"
+	cd backend && uv run python -m entrypoints.check_env
 	cd backend && uv run python scripts/set_device.py show
+
+seed-demo: migrate  ## demo catalog (50 products) and demo prices into DATABASE_URL; safe to run again
+	cd backend && uv run python -m entrypoints.seed_demo
+
+import-legacy: migrate  ## copy a web v1 SQLite database into DATABASE_URL: make import-legacy DATA_DIR=data_demo [REPLACE=1]
+	@test -n "$(DATA_DIR)" || (echo 'usage: make import-legacy DATA_DIR=data_demo [REPLACE=1]' && exit 1)
+	cd backend && uv run python -m entrypoints.import_legacy_sqlite --sqlite $(DATA_DIR)/db/app.db $(if $(REPLACE),--replace,)
+
+db-save: docker-up-data  ## dump the database to backups/NAME.dump: make db-save NAME=demo_clean
+	@test -n "$(NAME)" || (echo 'usage: make db-save NAME=demo_clean' && exit 1)
+	@mkdir -p backups
+	$(COMPOSE) exec -T postgres pg_dump -U stocktaking -d stocktaking -Fc > backups/$(NAME).dump
+	@echo "saved backups/$(NAME).dump"
+
+db-restore: docker-up-data  ## REPLACE the database with backups/NAME.dump (stop the api first): make db-restore NAME=demo_clean
+	@test -f "backups/$(NAME).dump" || (echo 'usage: make db-restore NAME=<a file in backups/ without .dump>' && exit 1)
+	$(COMPOSE) exec -T postgres pg_restore -U stocktaking -d stocktaking --clean --if-exists --no-owner < backups/$(NAME).dump
+	@echo "restored backups/$(NAME).dump"
+
+purge-media:     ## delete capture photos older than DAYS (default 30): make purge-media DAYS=30 [DRY_RUN=1]
+	cd backend && uv run python -m entrypoints.purge_media --days $(or $(DAYS),30) $(if $(DRY_RUN),--dry-run,)
 
 clean:           ## remove caches (not data, not weights, not the database volume)
 	rm -rf backend/.pytest_cache backend/.mypy_cache backend/.ruff_cache frontend/dist
