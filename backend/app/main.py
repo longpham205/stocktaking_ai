@@ -41,6 +41,12 @@ from app.modules.pos_settings.router import router as settings_router
 from app.modules.pos_settings.service import SettingsService
 from app.modules.recognition.ports import RecognizerPort
 from app.modules.recognition.worker import RecognitionWorker
+from app.modules.reports.repository import ReportsRepository
+from app.modules.reports.router import router as reports_router
+from app.modules.reports.service import ReportsService
+from app.modules.users.repository import UsersRepository
+from app.modules.users.router import router as users_router
+from app.modules.users.service import UsersService
 
 logger = logging.getLogger("app.main")
 
@@ -94,6 +100,10 @@ def _build(
     )
     built.captures = CapturesService(
         CapturesRepository(engine), built.orders, built.pos_settings, built.worker, settings, captures_settings
+    )
+    built.users = UsersService(UsersRepository(engine))
+    built.reports = ReportsService(
+        ReportsRepository(engine), built.catalog, built.worker, settings.timezone_offset_hours
     )
     # the recognizer re-reads the catalog after an admin edit, between two photos
     built.catalog.on_change(built.worker.reload_catalog)
@@ -169,5 +179,7 @@ def create_app(
     app.include_router(orders_router, prefix="/api")
     app.include_router(captures_router, prefix="/api")
     app.include_router(audit_router, prefix="/api")
+    app.include_router(users_router, prefix="/api")
+    app.include_router(reports_router, prefix="/api")
     app.add_middleware(RequestLog)
     return app
