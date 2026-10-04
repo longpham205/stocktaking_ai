@@ -144,3 +144,6 @@ docs/dev/
 !.env.example
 .mypy_cache/
 .ruff_cache/
+
+# database dumps of `make db-save`
+/backups/

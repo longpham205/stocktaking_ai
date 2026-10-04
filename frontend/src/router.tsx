@@ -8,8 +8,10 @@ import {
   type RouterHistory,
 } from '@tanstack/react-router';
 import { AppShell } from '@/components/app-shell';
-import { ComingSoon, RouteError, RouteNotFound, RoutePending } from '@/components/route-states';
+import { RouteError, RouteNotFound, RoutePending } from '@/components/route-states';
+import { AdvancedPage } from '@/features/admin-advanced/advanced-page';
 import { AdminOrdersPage } from '@/features/admin-orders/orders-page';
+import { ProductsPage } from '@/features/admin-products/products-page';
 import { ReportsPage } from '@/features/admin-reports/reports-page';
 import { SettingsPage } from '@/features/admin-settings/settings-page';
 import { UsersPage } from '@/features/admin-users/users-page';
@@ -167,14 +169,14 @@ const adminIndexRoute = createRoute({
   },
 });
 
-/** The admin tabs. Products and the advanced settings arrive with 6b-2. */
+/** The admin tabs. */
 const ADMIN_TABS = [
   ['reports', ReportsPage],
-  ['products', () => <ComingSoon title="Sản phẩm" />],
+  ['products', ProductsPage],
   ['orders', AdminOrdersPage],
   ['users', UsersPage],
   ['settings', SettingsPage],
-  ['advanced', () => <ComingSoon title="Thiết lập nâng cao" />],
+  ['advanced', AdvancedPage],
 ] as const;
 
 const adminTabRoutes = ADMIN_TABS.map(([path, component]) =>
