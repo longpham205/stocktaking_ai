@@ -21,7 +21,7 @@ class ChangeLogOut(BaseModel):
 
 
 class RevertIn(BaseModel):
-    # reverting an engine setting needs the advanced password (phase 3e-4)
+    # reverting an engine setting needs the advanced password
     advanced_password: str | None = None
 
 

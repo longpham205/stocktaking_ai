@@ -1,5 +1,5 @@
 import { apiFetch } from '@/lib/api-client';
-import type { Health, LoginOut, MeOut } from '@/lib/types';
+import type { LoginOut, MeOut } from '@/lib/types';
 
 /** One function per route the shared layer calls; feature modules keep theirs next to them. */
 
@@ -13,8 +13,4 @@ export function logout(): Promise<{ ok: boolean }> {
 
 export function getMe(): Promise<MeOut> {
   return apiFetch<MeOut>('/api/me');
-}
-
-export function getHealth(): Promise<Health> {
-  return apiFetch<Health>('/api/health');
 }

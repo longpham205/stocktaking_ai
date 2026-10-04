@@ -1,6 +1,6 @@
 # Phase 07 — Data migration, scripts, tests, docs, cleanup
 
-**Priority:** P1 · **Status:** in progress (7a dữ liệu + lệnh vận hành, 7b tài liệu: done 2026-10-04; 7c rà soát: pending)
+**Priority:** P1 · **Status:** done (7a dữ liệu + lệnh vận hành, 7b tài liệu, 7c rà soát cuối: 2026-10-04); còn các mục "chưa kiểm" ghi ở cuối file
 
 ## Các bước
 1. `entrypoints/import_legacy_sqlite.py --sqlite data_demo/db/app.db`: copy users (giữ hash scrypt), orders/items/captures, prices, settings, overrides, change_log, catalog → Postgres; `make import-legacy DATA_DIR=data_demo`.
@@ -17,7 +17,7 @@ Từ máy sạch: `make setup && make docker-up && make seed-demo` → demo ch�
 |---|---|---|
 | 7a | `seed-demo`, `import-legacy`, `db-save`/`db-restore`, `purge-media`, `check-env` | **done** (2026-10-04) |
 | 7b | README, WEB.md, DEMO.md, luật phát triển, system-architecture, sơ đồ mới | **done** (2026-10-04) |
-| 7c | tự review, dọn thừa, chạy mọi cổng, thử từ DB mới tinh | pending |
+| 7c | tự review, dọn thừa, chạy mọi cổng, thử từ DB mới tinh | **done** (2026-10-04) |
 Người dùng chốt: KHÔNG thêm Playwright (bước 3 của kế hoạch gốc): đã có `make smoke` (API qua HTTP thật) và test vitest cho UI.
 
 ## Kết quả 7a
@@ -47,3 +47,22 @@ Người dùng chốt: KHÔNG thêm Playwright (bước 3 của kế hoạch g�
 - Sơ đồ Mermaid chưa xem bản vẽ trên GitHub.
 - `make docker-up-gpu`, `make docker-up-prod` đủ luồng, `make db-restore`, tunnel HTTPS trên điện thoại thật (và việc Vite bản dev có nhận tên miền tunnel không).
 - Quy trình sinh `data_demo/` từ máy sạch (`make_demo_dataset.py` → validate → `make seed-demo`) viết theo code, chưa chạy lại (không được chạy lại script sinh dữ liệu demo khi chưa hỏi).
+
+## Kết quả 7c
+- Rà soát: quét tên định nghĩa mà không nơi nào dùng (backend `app/`, `entrypoints/`; frontend `src/`), đối chiếu `.env.example` với các lớp settings, đọc lại các file nhạy cảm (`core/signed_url.py`, `core/uploads.py`, `auth/` tokens + limiter + service + deps, `captures/` service + router, `recognition/worker.py`, `orders/service.py`, `validation/service.py`, `engine_config/service.py`).
+- Lỗi đã sửa: `signed_url.verify` so chuỗi bằng `hmac.compare_digest` trên `str`; chữ ký có ký tự ngoài ASCII trong query làm `GET /api/media/...` và `GET /api/gallery/...` (hai route công khai) trả **500** thay vì 403. Giờ so trên bytes; thêm một dòng kiểm trong `test_signed_url_round_trip_expiry_and_tampering`. Kiểm trên API đang chạy: 500 -> 403.
+- Dọn thừa: xoá `frontend/src/components/ui/skeleton.tsx` (không ai import), bốn thành phần con không dùng của `card.tsx`, `getHealth` + kiểu `Health`; bỏ chữ "phase ..." còn sót trong comment (`audit/schemas.py`, `pyproject.toml`); thêm `DB_POOL_SIZE`, `DB_MAX_OVERFLOW` vào `.env.example` (settings có, mẫu thiếu).
+- Cổng sau khi sửa: `make lint`, `make type-check` (mypy 112 file + tsc) đạt; `make test` 303 passed / 25 skipped; `make test-web` 48 passed; `pnpm build` đạt. Engine không bị đụng: test engine 233 passed và G-demo `--exact` 0 khác biệt (chạy trên cùng code engine, trước khi sửa web).
+- Từ database trống (người dùng chọn: database riêng `stocktaking_fresh` trên Postgres dev, không xoá volume): `make seed-demo` (tự chạy `make migrate`: tới 0003; 50 SKU, 66 bằng chứng, 4 màu, 42 giá), chạy lần hai chèn 0; tạo `fresh_admin`/`fresh_staff` + mật khẩu nâng cao bằng `entrypoints.reset_password`; `make check-env` không FAIL; API tạm ở cổng 8001 (`RECOGNIZER=fake`, `config.demo.yaml`); `make smoke`: **SMOKE PASSED** (18 bước), log API không có lỗi. Database và thư mục ảnh tạm đã xoá sau khi thử.
+
+## Ghi nhận khi rà soát, chưa sửa (hành vi giống web v1, cần quyết định)
+- Lượt chụp đang chờ lúc admin áp dụng thiết lập nâng cao hoặc bắt đầu kiểm định sẽ đợi sau việc đó trên cùng luồng; thời gian đợi tính vào `RECOGNITION_TIMEOUT_SECONDS` (60 s) nên có thể bị báo `PIPELINE_TIMEOUT`.
+- Giới hạn đăng nhập sai tính theo (tài khoản, IP). Sau proxy (`web`, tunnel) mọi request có cùng IP, nên thực tế là khoá theo tài khoản: người ngoài gõ sai đủ số lần có thể khoá tạm một tài khoản.
+- `MEDIA_URL_SECRET` trống chỉ lộ ra khi ký URL ảnh đầu tiên (500), không dừng lúc khởi động như `JWT_SECRET`. `make setup` và `make check-env` đã che trường hợp này.
+- `POST /api/admin/evidence-test`: lỗi pipeline ngoài timeout trả 500 mặc định, không theo dạng `{"detail", "code"}`.
+- Ảnh đã lưu của một lượt chụp bị từ chối vì hàng đợi vừa đầy không được xoá (chờ `make purge-media`).
+
+## Chưa kiểm (cả Phase 7)
+- Job `migrate` của compose trên volume Postgres mới tinh (`docker compose down -v` rồi `make docker-up`): không làm vì sẽ xoá DB dev.
+- `make db-restore`; `make docker-up-gpu`; `make docker-up-prod` đủ luồng; G thật trên GPU (engine không đổi trong Phase 7); POS trên điện thoại thật qua HTTPS.
+- `src_legacy/` giữ nguyên: xoá hay không do người dùng và mentor quyết.
