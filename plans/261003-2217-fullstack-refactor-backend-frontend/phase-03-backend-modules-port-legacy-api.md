@@ -1,6 +1,6 @@
 # Phase 03 — Backend modules (port API legacy)
 
-**Priority:** P0 · **Status:** in progress (3a–3d, 3e-1, 3e-2 ghi catalog: done 2026-10-04) · Context: design.md §2 mapping; nguồn: `src_legacy/backend/{service,admin,security}.py`
+**Priority:** P0 · **Status:** in progress (3a–3d, 3e-1..3e-3: done 2026-10-04; còn 3e-4) · Context: design.md §2 mapping; nguồn: `src_legacy/backend/{service,admin,security}.py`
 
 ## Thứ tự module (mỗi module: ports → config → repository → service → schemas → deps → router → tests)
 1. `auth`: login (mở shift, đóng shift cũ = đá máy cũ), logout, `GET /me`, onboarding-seen; scrypt giữ format hash cũ; JWT `{uid,sid,role,exp}` qua pyjwt; `CurrentUser` kiểm shift còn mở; `RequireAdmin`; limiter 5 lần/5 phút theo (username, IP) in-memory → 429 `RATE_LIMITED` + `retry_after`.
@@ -30,7 +30,7 @@ Bộ test API port từ `test_backend_api.py` (httpx ASGITransport + FakeRecogni
 | 3d | `captures` (bộ nhận diện giả) | **done** (2026-10-04) |
 | 3e-1 | `audit` (nhật ký + hoàn tác), `PATCH /admin/settings`, mật khẩu nâng cao, ghi giá, `GET /admin/products` | **done** (2026-10-04) |
 | 3e-2 | ghi catalog (barcode, tên, bằng chứng, màu) theo hướng C, `GET /gallery/...` | **done** (2026-10-04) |
-| 3e-3 | `users`, `reports` | pending |
+| 3e-3 | `users`, `reports` | **done** (2026-10-04) |
 | 3e-4 | `engine_config`, `validation` (cùng phần reload/kiểm định của Phase 4) | pending |
 
 ## Quyết định cho phần ghi catalog (PR 3e)
@@ -116,3 +116,13 @@ Vẫn một đường ghi qua engine, và catalog + nhật ký nằm trong cùng
 - `ocr_min_length` và `gallery_dir` đọc từ YAML của engine (`PIPELINE_CONFIG`) ở mỗi lần dùng; ảnh gallery xử lý bằng Pillow (xoay theo EXIF).
 - Màu thiếu tham chiếu trong `GET /admin/colors` có thêm `r/g/b/source: null` (bản cũ không có các khoá đó).
 - Nạp lại catalog lỗi sau khi đã lưu: lỗi được trả ra (không che) — dữ liệu đã lưu.
+
+## Kết quả 3e-3
+- `users` (dùng bảng `users`/`shifts` của auth): `GET /api/admin/users` (kèm `online` = đang có ca mở), `POST /api/admin/users` (tên tài khoản 3–32 ký tự, hạ chữ thường; mật khẩu ≥8; vai trò staff|admin; 409 `USER_EXISTS`), `PATCH /api/admin/users/{id}` (`password` — đóng ca đang mở; `full_name`; `is_active` — khoá thì đóng ca, không tự khoá chính mình: 409).
+- `reports`: `GET /api/admin/reports?range=today|7d|30d` — doanh thu từng ngày theo ngày của cửa hàng (đủ cả ngày không có đơn), top 5 (nhiều đơn vị nhất, rồi doanh thu theo giá đã đóng băng), KPI hôm nay (đơn, doanh thu, lượt chụp, tỉ lệ lỗi, thời gian xử lý trung bình của lượt thành công, ca đang mở, nhân viên đang hoạt động, hàng đợi, số SKU / thiếu giá / thiếu barcode). Đơn bị huỷ không còn trong báo cáo.
+- `make lint`, `make type-check` (96 file): đạt. `make test`: 295 passed, 25 skipped (6 test mới).
+
+## Khác với bản cũ / kế hoạch (3e-3)
+- Không có đổi vai trò qua `PATCH /admin/users` (bản cũ cũng không có; kế hoạch nêu trong chat có nhắc nhầm).
+- Mật khẩu băm trong luồng phụ (scrypt chậm có chủ ý).
+- Thống kê lượt chụp dùng `job_status` (`done`/`error`) thay `status` (`success`/`error`/`timeout`) của bản cũ; timeout giờ là `error` với mã `PIPELINE_TIMEOUT`.

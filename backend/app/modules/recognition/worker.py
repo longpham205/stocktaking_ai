@@ -46,6 +46,11 @@ class RecognitionWorker:
             raise Unavailable("Hệ thống đang bận, thử lại sau ít giây", code="QUEUE_FULL") from None
         self._waiting.append(capture_id)
 
+    @property
+    def queued(self) -> int:
+        """Captures waiting (the one being processed not counted)."""
+        return len(self._waiting)
+
     def position(self, capture_id: int) -> int:
         """How many captures are ahead of this one in the queue (0 once it is being processed)."""
         return self._waiting.index(capture_id) if capture_id in self._waiting else 0

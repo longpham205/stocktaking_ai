@@ -16,6 +16,8 @@ from app.modules.orders.service import OrdersService
 from app.modules.pos_settings.service import SettingsService
 from app.modules.recognition.ports import RecognizerPort
 from app.modules.recognition.worker import RecognitionWorker
+from app.modules.reports.service import ReportsService
+from app.modules.users.service import UsersService
 
 Closer = Callable[[], Awaitable[None]]
 
@@ -32,5 +34,7 @@ class Backends:
     orders: OrdersService | None = None
     worker: RecognitionWorker | None = None
     captures: CapturesService | None = None
+    users: UsersService | None = None
+    reports: ReportsService | None = None
     # run in reverse order at shutdown
     closers: list[Closer] = field(default_factory=list)
