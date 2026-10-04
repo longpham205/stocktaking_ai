@@ -11,6 +11,7 @@ from app.modules.auth.ports import CurrentUser, User
 from app.modules.auth.repository import AuthRepository
 from app.modules.auth.schemas import LoginOut, MeOut, ShiftOut, UserOut
 from app.modules.auth.tokens import TokenClaims, TokenError, make_token, verify_token
+from app.modules.pos_settings.schemas import SettingsOut
 
 
 class Unauthorized(AppError):
@@ -88,12 +89,13 @@ class AuthService:
             return
         await self.repo.close_shift(claims.shift_id)
 
-    async def me(self, current: CurrentUser) -> MeOut:
+    async def me(self, current: CurrentUser, settings: SettingsOut) -> MeOut:
         user, shift = await self.repo.user(current.user_id), await self.repo.shift(current.shift_id)
         assert user is not None and shift is not None  # `current` was just authenticated
         return MeOut(
             user=_user_out(user),
             shift=ShiftOut(id=shift.id, started_at=iso(shift.started_at), total_collected=shift.total_collected),
+            settings=settings,
         )
 
     async def mark_onboarding_seen(self, current: CurrentUser) -> None:

@@ -14,7 +14,7 @@ os.environ["RECOGNIZER"] = "fake"
 os.environ["APP_ENV"] = "test"
 
 import asyncio  # noqa: E402
-from collections.abc import AsyncIterator  # noqa: E402
+from collections.abc import AsyncIterator, Iterator  # noqa: E402
 from pathlib import Path  # noqa: E402
 from typing import Any  # noqa: E402
 
@@ -28,12 +28,15 @@ from sqlalchemy.engine import make_url  # noqa: E402
 from sqlalchemy.ext.asyncio import create_async_engine  # noqa: E402
 
 from app.core.config import CoreSettings  # noqa: E402
+from app.core.db import sync_database_url  # noqa: E402
 from app.main import create_app  # noqa: E402
 from app.modules.auth.config import AuthSettings  # noqa: E402
 from app.modules.auth.passwords import hash_password  # noqa: E402
+from app.modules.pos_settings.config import PosSettings  # noqa: E402
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
-# every web table, for TRUNCATE between tests (the engine's catalog tables have their own fixture)
+# every web table, for TRUNCATE between tests (the engine's catalog tables: `catalog_url`)
+CATALOG_TABLES = "product_evidence, product, color_reference, catalog_meta"
 WEB_TABLES = "change_log, captures, order_items, orders, shifts, users, product_prices, settings, config_overrides"
 STAFF_PASSWORD, ADMIN_PASSWORD = "staff-pass-123", "admin-pass-456"
 
@@ -80,6 +83,10 @@ def auth_settings(**overrides: Any) -> AuthSettings:
     return AuthSettings(_env_file=None, **{**values, **overrides})  # type: ignore[call-arg]
 
 
+def pos_settings(**overrides: Any) -> PosSettings:
+    return PosSettings(_env_file=None, **overrides)  # type: ignore[call-arg]
+
+
 @pytest.fixture(scope="session")
 def migrated_database_url() -> str:
     """A fresh test database built by the migrations themselves, down and up once, so a broken
@@ -95,7 +102,7 @@ def migrated_database_url() -> str:
 @pytest.fixture
 async def api_app() -> AsyncIterator[FastAPI]:
     """The app with its lifespan run (httpx's ASGI transport does not run it), no database needed."""
-    app = create_app(settings(), auth_settings=auth_settings())
+    app = create_app(settings(), auth_settings=auth_settings(), pos_settings=pos_settings())
     async with app.router.lifespan_context(app):
         yield app
 
@@ -110,9 +117,26 @@ async def database_url(migrated_database_url: str) -> str:
     return migrated_database_url
 
 
+@pytest.fixture
+def catalog_url(migrated_database_url: str) -> Iterator[str]:
+    """The migrated test database through the engine's synchronous driver, catalog tables emptied."""
+    from engine.catalog.db import make_engine_from_url
+
+    url = sync_database_url(migrated_database_url)
+    engine = make_engine_from_url(url)
+    with engine.begin() as conn:
+        conn.execute(text(f"TRUNCATE {CATALOG_TABLES} RESTART IDENTITY CASCADE"))
+    engine.dispose()
+    yield url
+
+
 async def start_app(database_url: str, **auth_overrides: Any) -> FastAPI:
     """An app on the test database, not yet started: enter `app.router.lifespan_context(app)`."""
-    return create_app(settings(database_url=database_url), auth_settings=auth_settings(**auth_overrides))
+    return create_app(
+        settings(database_url=database_url),
+        auth_settings=auth_settings(**auth_overrides),
+        pos_settings=pos_settings(),
+    )
 
 
 async def seed_accounts(app: FastAPI) -> None:

@@ -1,6 +1,6 @@
 # Phase 03 — Backend modules (port API legacy)
 
-**Priority:** P0 · **Status:** in progress (3a auth: done 2026-10-04) · Context: design.md §2 mapping; nguồn: `src_legacy/backend/{service,admin,security}.py`
+**Priority:** P0 · **Status:** in progress (3a auth, 3b settings + catalog đọc: done 2026-10-04) · Context: design.md §2 mapping; nguồn: `src_legacy/backend/{service,admin,security}.py`
 
 ## Thứ tự module (mỗi module: ports → config → repository → service → schemas → deps → router → tests)
 1. `auth`: login (mở shift, đóng shift cũ = đá máy cũ), logout, `GET /me`, onboarding-seen; scrypt giữ format hash cũ; JWT `{uid,sid,role,exp}` qua pyjwt; `CurrentUser` kiểm shift còn mở; `RequireAdmin`; limiter 5 lần/5 phút theo (username, IP) in-memory → 429 `RATE_LIMITED` + `retry_after`.
@@ -25,7 +25,7 @@ Bộ test API port từ `test_backend_api.py` (httpx ASGITransport + FakeRecogni
 | PR | Module | Trạng thái |
 |---|---|---|
 | 3a | `auth` (+ `entrypoints/reset_password.py`) | **done** (2026-10-04) |
-| 3b | `pos_settings`, `catalog` (đọc + giá) | pending |
+| 3b | `pos_settings`, `catalog` (đọc + giá) | **done** (2026-10-04) |
 | 3c | `orders` | pending |
 | 3d | `captures` (bộ nhận diện giả) | pending |
 | 3e | `audit`, phần ghi của `catalog`, `users`, `reports`, `engine_config`, `validation` | pending |
@@ -47,3 +47,15 @@ Vẫn một đường ghi qua engine, và catalog + nhật ký nằm trong cùng
 - Không seed tài khoản lúc khởi động (theo "Quy ước" ở trên): tạo/đặt lại bằng `make reset-password USER_NAME=admin ROLE=admin` (mật khẩu ngẫu nhiên, in một lần).
 - Thiếu `JWT_SECRET` thì API dừng ngay lúc khởi động với thông báo rõ; `make setup` điền các bí mật còn thiếu vào `.env` đã có (không ghi đè giá trị đã có); `make docker-up*` chạy `setup` trước.
 - Mật khẩu được kiểm trong luồng phụ (`asyncio.to_thread`) vì scrypt cố ý chậm.
+
+## Kết quả 3b
+- Route: `GET /api/settings`, `GET /api/catalog/products?search=&barcode=` (cần đăng nhập); `GET /api/me` trả thêm `settings`.
+- Giữ hành vi cũ: 5 khoá công khai (`allow_checkout_without_price`, `similarity_threshold`, `min_confidence_accept`, `tilt_block_capture`, `auto_print_receipt`), giá trị trong bảng `settings` đè mặc định; tìm sản phẩm không dấu theo một phần tên hoặc đúng id, barcode khớp chính xác và ưu tiên hơn `search`, chỉ SKU đang bán, tối đa 50, thứ tự catalog của engine; mỗi sản phẩm có `price` (null khi chưa có giá), `needs_naming`, `missing_color_reference`.
+- `make lint`, `make type-check` (60 file): đạt. `make test`: 249 passed, 25 skipped (8 test mới: 3 settings, 5 catalog).
+
+## Khác với bản cũ / kế hoạch (3b)
+- `design.md` ghi `catalog/repository.py` dùng `engine.catalog` qua adapter. Ở đây API đọc thẳng các bảng `product`, `product_evidence`, `color_reference` bằng SQLAlchemy Core: `tests/test_import_boundary.py` cấm tiến trình `RECOGNIZER=fake` import `engine`, và đọc bằng truy vấn thì luôn thấy dữ liệu admin vừa lưu (không còn bản sao trong bộ nhớ phải `reload()`). Phần GHI catalog (3e) vẫn đi qua hàm của engine như đã chốt.
+- API không còn dừng khởi động khi catalog rỗng (bản cũ báo lỗi ở `DbCatalog`): catalog rỗng trả danh sách rỗng; nạp catalog là việc của `make seed-demo` / Phase 7.
+- `barcode` chỉ gồm khoảng trắng được coi là không lọc (bản cũ khớp với mọi SKU không có barcode).
+- Mặc định `allow_checkout_without_price` lấy từ biến môi trường `ALLOW_CHECKOUT_WITHOUT_PRICE` (`PosSettings`), thay `pos.allow_checkout_without_price` trong `configs/backend.yaml`.
+- Chưa làm trong 3b (cần `change_log`, thuộc 3e): `PATCH /api/admin/settings`, mật khẩu nâng cao, ghi giá. Test tự chèn dòng vào `settings` / `product_prices`.

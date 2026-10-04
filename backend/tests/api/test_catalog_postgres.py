@@ -1,11 +1,9 @@
 """The engine's catalog on the web's Postgres: the tables Alembic builds are the engine's tables,
 and the engine reads the same catalog from them as from a SQLite file."""
 
-from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
-from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session
 
@@ -15,23 +13,10 @@ from engine.catalog.migrate import LegacySources, apply_plan, build_plan
 from engine.catalog.repository import DatabaseCatalogRepository, SqliteCatalogRepository
 from engine.catalog.sync_gallery import sync_gallery
 
-CATALOG_TABLES = "product_evidence, product, color_reference, catalog_meta"
-
 
 def test_sync_database_url_swaps_only_the_driver() -> None:
     url = "postgresql+asyncpg://u:p@127.0.0.1:5437/stocktaking"
     assert sync_database_url(url) == "postgresql+psycopg://u:p@127.0.0.1:5437/stocktaking"
-
-
-@pytest.fixture
-def catalog_url(migrated_database_url: str) -> Iterator[str]:
-    """The migrated test database through the engine's synchronous driver, catalog tables emptied."""
-    url = sync_database_url(migrated_database_url)
-    engine = make_engine_from_url(url)
-    with engine.begin() as conn:
-        conn.execute(text(f"TRUNCATE {CATALOG_TABLES} RESTART IDENTITY CASCADE"))
-    engine.dispose()
-    yield url
 
 
 def _sources() -> LegacySources:

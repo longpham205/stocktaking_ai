@@ -2,6 +2,8 @@
 
 from pydantic import BaseModel
 
+from app.modules.pos_settings.schemas import SettingsOut
+
 
 class LoginIn(BaseModel):
     username: str = ""
@@ -30,6 +32,7 @@ class ShiftOut(BaseModel):
 class MeOut(BaseModel):
     user: UserOut
     shift: ShiftOut
+    settings: SettingsOut
 
 
 class OkOut(BaseModel):
