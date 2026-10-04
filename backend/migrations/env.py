@@ -1,7 +1,7 @@
 """Alembic environment: the app's DATABASE_URL, diffing app.core.base.metadata.
 
 Every module that owns tables is imported here so they register on the metadata; forgetting one
-means autogenerate would emit a DROP TABLE for it. No module owns a table yet (phase 2 adds them).
+means autogenerate would emit a DROP TABLE for it.
 
 A caller may hand in a URL (`config.attributes["database_url"]`): the tests migrate their own
 database that way; otherwise it is the process settings'.
@@ -15,6 +15,13 @@ from sqlalchemy.ext.asyncio import create_async_engine
 
 from app.core.base import metadata
 from app.core.config import get_settings
+from app.modules.audit import models as _audit  # noqa: F401  change_log
+from app.modules.auth import models as _auth  # noqa: F401  users, shifts
+from app.modules.captures import models as _captures  # noqa: F401  captures
+from app.modules.catalog import models as _catalog  # noqa: F401  product_prices
+from app.modules.engine_config import models as _engine_config  # noqa: F401  config_overrides
+from app.modules.orders import models as _orders  # noqa: F401  orders, order_items
+from app.modules.pos_settings import models as _pos_settings  # noqa: F401  settings
 
 target_metadata = metadata
 
