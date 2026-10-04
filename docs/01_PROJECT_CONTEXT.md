@@ -46,7 +46,7 @@ The complete inventory process consists of:
   production pipeline* — never a simplified parallel evaluation path —
   at the granularity of each individual stage, so regressions can be
   attributed to a specific stage rather than only observed end-to-end.
-- Provide a web POS (cashier and admin screens) for demonstration and interactive validation; the original Tkinter desktop UI is frozen in `src_legacy/`
+- Provide a web POS (cashier and admin screens) for demonstration and interactive validation; the original Tkinter desktop UI was removed (last present in git commit `f30710d`)
   review.
 
 ---
@@ -173,8 +173,7 @@ stocktaking_ai/
 │   ├── weights/                 # Model checkpoints (RF-DETR, SAM2, SigLIP2)
 │   └── tests/                   # Engine tests + tests/api/ (web API)
 ├── frontend/                    # Web console (Vite + React)
-├── docs/                        # Architecture specs, context, and developer guidelines
-└── src_legacy/                  # Frozen web POS v1 and the Tkinter desktop UI
+└── docs/                        # Architecture specs, context, and developer guidelines
 ```
 
 # 5. High-Level Architecture

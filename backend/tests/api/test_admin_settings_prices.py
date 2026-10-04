@@ -1,5 +1,5 @@
 """Admin edits of 3e-1: shop settings, prices, the change log and its reverts, the advanced password.
-Ported from the legacy suite (src_legacy/tests/test_backend_api.py)."""
+Ported from the legacy suite (tests/test_backend_api.py of web v1, git commit f30710d)."""
 
 from collections.abc import AsyncIterator
 from typing import Any

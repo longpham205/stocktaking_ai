@@ -260,7 +260,7 @@ Standalone registry of pure metric formulas (`precision`, `recall`, `f1`, `mrr`,
 
 # **14\. ui/app.py (removed)**
 
-The Tkinter desktop UI is no longer part of the engine; its frozen copy is in `src_legacy/engine/ui/`. The admin pages of the web POS replace it.
+The Tkinter desktop UI is no longer part of the engine (last present in git commit `f30710d`, `src/ui/`). The admin pages of the web POS replace it.
 
 # **15\. Web POS (`backend/app/`, `frontend/`) — outside the engine**
 

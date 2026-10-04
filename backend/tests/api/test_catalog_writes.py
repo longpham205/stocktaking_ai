@@ -1,6 +1,6 @@
 """Admin writes to the engine's catalog (3e-2): barcode and name, recognition evidence, colour
 references, gallery photos, their reverts, and the recognizer re-reading the catalog afterwards.
-Ported from the legacy suite (src_legacy/tests/test_backend_api.py)."""
+Ported from the legacy suite (tests/test_backend_api.py of web v1, git commit f30710d)."""
 
 import io
 import json

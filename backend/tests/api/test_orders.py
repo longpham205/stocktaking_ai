@@ -1,5 +1,5 @@
 """Orders: lines, prices, checkout, void, history. Ported from the legacy suite
-(src_legacy/tests/test_backend_api.py); the lines a capture would add are inserted directly."""
+(tests/test_backend_api.py of web v1, git commit f30710d); the lines a capture would add are inserted directly."""
 
 from typing import Any
 

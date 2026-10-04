@@ -1,5 +1,5 @@
 """Login, shifts and the per-request session check. Ported from the legacy suite
-(src_legacy/tests/test_backend_api.py), plus the pieces that are new here (JWT, entrypoint)."""
+(tests/test_backend_api.py of web v1, git commit f30710d), plus the pieces that are new here (JWT, entrypoint)."""
 
 import pytest
 from fastapi import Depends, FastAPI

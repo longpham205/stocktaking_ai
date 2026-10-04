@@ -2,7 +2,7 @@
 
 > Hệ thống AI nhận diện và đếm từng sản phẩm đặt trên **bàn thu ngân** từ một ảnh chụp duy nhất — kết hợp truy xuất hình ảnh với bằng chứng từ OCR, màu sắc và mã vạch để phân biệt các biến thể sản phẩm có bao bì gần như giống hệt nhau.
 
-> **Kiến trúc:** `backend/` (FastAPI + Postgres + engine nhận diện ở `backend/engine/`) và `frontend/` (Vite + React), chạy bằng `make` và Docker Compose. Web POS thế hệ đầu (stdlib `http.server` + SQLite) đóng băng trong [`src_legacy/`](src_legacy/README.md), chỉ để đối chiếu.
+> **Kiến trúc:** `backend/` (FastAPI + Postgres + engine nhận diện ở `backend/engine/`) và `frontend/` (Vite + React), chạy bằng `make` và Docker Compose. Web POS thế hệ đầu (stdlib `http.server` + SQLite) không còn trong cây thư mục; xem lại ở commit `f30710d` (`git worktree add ../stocktaking-legacy f30710d`).
 
 > **Hướng dẫn nhanh:** chạy web POS — [`docs/WEB.md`](docs/WEB.md) · kiến trúc và sơ đồ — [`docs/system-architecture.md`](docs/system-architecture.md) · ngày demo — [`docs/DEMO.md`](docs/DEMO.md) · dữ liệu và catalog — [`docs/04_DATA_AND_CATALOG.md`](docs/04_DATA_AND_CATALOG.md) · luật phát triển — [`docs/03_DEVELOPMENT_RULES.md`](docs/03_DEVELOPMENT_RULES.md).
 
@@ -154,8 +154,7 @@ stocktaking_ai/
 │   └── weights/                 # detector / refinement / retriever (không commit)
 ├── frontend/                    # Vite + React + TypeScript (pnpm)
 ├── docs/                        # Đặc tả 01–04, system-architecture, WEB, DEMO
-├── plans/                       # Kế hoạch refactor theo pha
-└── src_legacy/                  # Web POS v1, đóng băng
+└── plans/                       # Kế hoạch refactor theo pha
 ```
 
 ## 6. Yêu cầu hệ thống

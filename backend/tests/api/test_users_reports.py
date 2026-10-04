@@ -1,5 +1,5 @@
 """Staff management and the admin reports (3e-3). Ported from the legacy suite
-(src_legacy/tests/test_backend_api.py)."""
+(tests/test_backend_api.py of web v1, git commit f30710d)."""
 
 from collections.abc import AsyncIterator
 from typing import Any

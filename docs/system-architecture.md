@@ -200,7 +200,7 @@ Máy chủ là nguồn sự thật: đơn đang dở lấy từ `GET /api/orders
 
 ## 8. Điểm khác web v1
 
-| Web v1 (`src_legacy/`) | Hiện tại |
+| Web v1 (commit `f30710d`) | Hiện tại |
 |---|---|
 | `http.server` + `sqlite3`, một cổng 8000 phục vụ cả giao diện | FastAPI + Postgres + Alembic; giao diện là dịch vụ riêng |
 | HTML/JS thuần | Vite + React + TypeScript |
