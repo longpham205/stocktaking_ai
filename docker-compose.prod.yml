@@ -2,7 +2,7 @@
 #
 #   make docker-up-prod    = docker compose -f docker-compose.yml -f docker-compose.prod.yml up
 #
-# The built web console (nginx) joins this file in phase 5.
+# The web console is the built SPA served by nginx (frontend/nginx.conf proxies /api).
 services:
   api:
     command: ["uvicorn", "entrypoints.api:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1", "--no-access-log"]
@@ -13,3 +13,11 @@ services:
       - ./backend/data:/srv/data
       - ./backend/data_demo:/srv/data_demo
       - ./backend/weights:/srv/weights:ro
+
+  web:
+    build:
+      target: prod
+    environment: !reset {}
+    ports: !override
+      - "5173:80"
+    volumes: !reset []
