@@ -52,5 +52,8 @@ class LocalRecognizer:
             rejected_bboxes=[(b.x1, b.y1, b.x2, b.y2) for b in result.rejected_bboxes],
         )
 
+    def reload_catalog(self) -> None:
+        self._runner.reload_catalog()
+
     def close(self) -> None:
         return None

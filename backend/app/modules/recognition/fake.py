@@ -71,6 +71,9 @@ class FakeRecognizer:
             rejected_bboxes=rejected,
         )
 
+    def reload_catalog(self) -> None:
+        return None  # reads the catalog at every photo
+
     def close(self) -> None:
         if self._engine is not None:
             self._engine.dispose()
