@@ -1,5 +1,7 @@
 # Script bash phải giữ LF (core.autocrlf=true sẽ đổi sang CRLF và làm hỏng bash)
 *.sh text eol=lf
+# cmd.exe needs CRLF
+*.bat text eol=crlf
 
 # Read by POSIX tools inside containers or by make: keep LF on every platform
 Makefile text eol=lf

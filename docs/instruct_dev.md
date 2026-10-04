@@ -4,6 +4,72 @@
 
 Mọi lệnh `make` chạy ở **gốc repo**. Trên Windows dùng **Git Bash** (công thức trong `Makefile` là shell POSIX; PowerShell và cmd không chạy được).
 
+## Quên mật khẩu? Chép và chạy
+
+Các lệnh dưới chạy **trong container**, nên dùng được ở mọi terminal (PowerShell, cmd, Git Bash), miễn là đang đứng ở gốc repo và các dịch vụ đang chạy (`docker compose ps`). Mật khẩu mới in ra **một lần**: chép ngay.
+
+Xem đang có những tài khoản nào:
+
+```bash
+docker compose exec postgres psql -U stocktaking -d stocktaking -c "select username, role, is_active from users order by id"
+```
+
+Mật khẩu mới cho `admin` (tạo tài khoản nếu chưa có):
+
+```bash
+docker compose exec api python -m entrypoints.reset_password admin --create --role admin
+```
+
+Mật khẩu mới cho một thu ngân, ví dụ `staff` (tạo nếu chưa có):
+
+```bash
+docker compose exec api python -m entrypoints.reset_password staff --create --role staff
+```
+
+Tự gõ mật khẩu thay vì để máy sinh (tối thiểu 8 ký tự, không hiện khi gõ):
+
+```bash
+docker compose exec api python -m entrypoints.reset_password admin --prompt
+```
+
+Tài khoản bị khoá (admin khoá trong màn Nhân viên): mở lại và đặt mật khẩu mới.
+
+```bash
+docker compose exec api python -m entrypoints.reset_password staff --unlock
+```
+
+Mật khẩu **nâng cao** (áp dụng thiết lập pipeline, kiểm định), khác mật khẩu đăng nhập:
+
+```bash
+docker compose exec api python -m entrypoints.reset_password --advanced
+```
+
+Nhớ: đặt lại mật khẩu sẽ đăng xuất tài khoản đó ở mọi thiết bị (đơn đang dở không mất). Bị báo "sai quá nhiều lần" thì đợi 5 phút hoặc `docker compose restart api`. Chi tiết ở mục 4.
+
+## 0. Cách nhanh nhất: một cú nhấp
+
+- **Windows:** nhấp đúp `run_e2e.bat` ở gốc repo (cần Git for Windows; file `.bat` tự tìm Git Bash).
+- **Linux / macOS / Git Bash:** `./run_e2e.sh`
+
+Script làm lần lượt mục 2 và mục 5 của tài liệu này, dừng ở bước đầu tiên bị lỗi:
+
+1. kiểm công cụ (`docker`, `uv`, `make`, `openssl`), Docker đang chạy, có `backend/data_demo/`;
+2. `make setup`;
+3. `make docker-up` với `RECOGNIZER=fake` và `PIPELINE_CONFIG=configs/config.demo.yaml`;
+4. `make seed-demo`;
+5. tạo (hoặc đặt lại mật khẩu) hai tài khoản thử `e2e_admin`, `e2e_staff`;
+6. `make check-env`;
+7. `make smoke` → in `E2E PASSED` rồi mở `http://localhost:5173`.
+
+Điều cần biết:
+
+- Lần đầu mất vài phút (build image); các lần sau khoảng một phút.
+- Mật khẩu của `e2e_admin` / `e2e_staff` sinh ngẫu nhiên mỗi lần chạy, chỉ dùng cho smoke và **không in ra**. Tài khoản của bạn không bị đụng. Để tự đăng nhập xem giao diện, tạo tài khoản riêng một lần: `make reset-password USER_NAME=admin ROLE=admin` (mục 4).
+- Mỗi lần chạy, smoke **thanh toán một đơn thật**: đơn đó ở lại trong database và báo cáo ngày.
+- `run_e2e.bat full` (hoặc `./run_e2e.sh full`): chạy thêm `make lint`, `make type-check`, `make test`, `make test-web` trước khi bật dịch vụ.
+- Đổi chế độ: đặt biến trước khi gọi, ví dụ `RECOGNIZER=local ./run_e2e.sh`. `NO_OPEN=1` để không mở trình duyệt.
+- Script chỉ gọi các target `make` có sẵn; khi một bước lỗi, chạy tay đúng lệnh đó theo các mục dưới để xem kỹ.
+
 ## 1. Chuẩn bị máy (một lần)
 
 | Cần | Kiểm bằng | Ghi chú |
@@ -268,7 +334,8 @@ Trước khi push: `make format`, `make lint`, `make type-check`, `make test`, `
 
 | Hiện tượng | Nguyên nhân và cách xử lý |
 |---|---|
-| `make: command not found`, hoặc lỗi cú pháp lạ | đang ở PowerShell/cmd → mở Git Bash |
+| `make: command not found`, `'test' is not recognized as an internal or external command`, hoặc lỗi cú pháp lạ | đang chạy `make` trong PowerShell/cmd → dùng Git Bash. Từ PowerShell: `& "C:\Program Files\Git\bin\bash.exe" -l` rồi `cd` lại vào repo (đừng gõ `bash` trần: thường là bash của WSL). VS Code: `Terminal: Select Default Profile` → Git Bash |
+| `make` in dòng `usage: ...` rồi dừng | thiếu tham số, hoặc gõ cả dấu ngoặc vuông. Trong tài liệu, `[ROLE=admin]` nghĩa là "tuỳ chọn": gõ `ROLE=admin`, không gõ ngoặc |
 | `api` không lên, log có `JWT_SECRET is not set` | chưa chạy `make setup` |
 | Đăng nhập báo sai dù vừa tạo tài khoản | chép thiếu ký tự; tên tài khoản luôn là chữ thường; tạo lại bằng `make reset-password` |
 | "Đăng nhập sai quá nhiều lần" | đợi 5 phút hoặc `docker compose restart api` |
