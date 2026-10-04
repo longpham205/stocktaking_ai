@@ -18,7 +18,7 @@ describe('route guards', () => {
 
   it('opens each role on its home, with its own navigation', async () => {
     setToken('t');
-    stubFetchRoutes({ '/api/me': () => jsonResponse(meBody('staff')) });
+    stubFetchRoutes({ '/api/me': () => jsonResponse(meBody('staff')), '/api/orders/open': () => jsonResponse({ order: null }) });
     const staff = await renderApp('/');
     expect(staff.router.state.location.pathname).toBe('/pos');
     expect(await screen.findByRole('link', { name: /Lịch sử/ })).toBeInTheDocument();
@@ -34,7 +34,7 @@ describe('route guards', () => {
 
   it('keeps a cashier out of the admin pages', async () => {
     setToken('t');
-    stubFetchRoutes({ '/api/me': () => jsonResponse(meBody('staff')) });
+    stubFetchRoutes({ '/api/me': () => jsonResponse(meBody('staff')), '/api/orders/open': () => jsonResponse({ order: null }) });
     const { router } = await renderApp('/admin/users');
     expect(router.state.location.pathname).toBe('/pos');
   });
@@ -48,7 +48,7 @@ describe('route guards', () => {
 
   it('shows a not-found page for an unknown address', async () => {
     setToken('t');
-    stubFetchRoutes({ '/api/me': () => jsonResponse(meBody('staff')) });
+    stubFetchRoutes({ '/api/me': () => jsonResponse(meBody('staff')), '/api/orders/open': () => jsonResponse({ order: null }) });
     await renderApp('/khong-co');
     expect(await screen.findByText('Không có trang này')).toBeInTheDocument();
   });

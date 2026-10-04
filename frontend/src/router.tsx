@@ -11,8 +11,16 @@ import { AppShell } from '@/components/app-shell';
 import { ComingSoon, RouteError, RouteNotFound, RoutePending } from '@/components/route-states';
 import { LoginPage } from '@/features/auth/login-page';
 import { meQuery } from '@/features/auth/use-auth';
+import { getOpenOrder } from '@/features/pos/api';
+import { CapturePage } from '@/features/pos/capture-page';
+import { DonePage } from '@/features/pos/done-page';
+import { HistoryPage } from '@/features/pos/history-page';
+import { InvoicePage } from '@/features/pos/invoice-page';
+import { OnboardingPage } from '@/features/pos/onboarding-page';
+import { PayPage } from '@/features/pos/pay-page';
 import { ApiError } from '@/lib/api-client';
 import { getToken } from '@/lib/auth-token';
+import { qk } from '@/lib/query-keys';
 import type { MeOut } from '@/lib/types';
 
 export interface RouterContext {
@@ -66,16 +74,75 @@ const indexRoute = createRoute({
   },
 });
 
+/** `/pos`: a new basket. An open order with lines left from before (a reload, a new login) is resumed. */
 const posRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/pos',
-  component: () => <ComingSoon title="Bán hàng" />,
+  beforeLoad: ({ context }) => {
+    if (context.me.user.role === 'staff' && !context.me.user.has_seen_onboarding) throw redirect({ to: '/onboarding' });
+  },
+  loader: async ({ context }) => {
+    const open = await context.queryClient.fetchQuery({ queryKey: qk.openOrder(), queryFn: getOpenOrder, staleTime: 0 });
+    if (open && open.items.length > 0) {
+      context.queryClient.setQueryData(qk.order(open.id), open);
+      throw redirect({ to: '/pos/orders/$orderId', params: { orderId: String(open.id) }, search: { resumed: true } });
+    }
+  },
+  component: () => <CapturePage />,
+});
+
+const onboardingRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/onboarding',
+  component: OnboardingPage,
+});
+
+const orderId = (params: { orderId: string }) => Number(params.orderId);
+
+const invoiceRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/pos/orders/$orderId',
+  validateSearch: (search: Record<string, unknown>): { job?: number; resumed?: boolean } => ({
+    job: search.job === undefined ? undefined : Number(search.job),
+    resumed: search.resumed === true || search.resumed === 'true' ? true : undefined,
+  }),
+  component: function Invoice() {
+    const { job, resumed } = invoiceRoute.useSearch();
+    return <InvoicePage orderId={orderId(invoiceRoute.useParams())} jobId={job} resumed={resumed} />;
+  },
+});
+
+const moreCaptureRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/pos/orders/$orderId/capture',
+  component: function MoreCapture() {
+    return <CapturePage orderId={orderId(moreCaptureRoute.useParams())} />;
+  },
+});
+
+const payRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/pos/orders/$orderId/pay',
+  component: function Pay() {
+    return <PayPage orderId={orderId(payRoute.useParams())} />;
+  },
+});
+
+const doneRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/pos/orders/$orderId/done',
+  validateSearch: (search: Record<string, unknown>): { fresh?: boolean } => ({
+    fresh: search.fresh === true || search.fresh === 'true' ? true : undefined,
+  }),
+  component: function Done() {
+    return <DonePage orderId={orderId(doneRoute.useParams())} fresh={doneRoute.useSearch().fresh} />;
+  },
 });
 
 const historyRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/history',
-  component: () => <ComingSoon title="Lịch sử bán hàng" />,
+  component: HistoryPage,
 });
 
 /** `/admin/*`: admins only; a cashier who types the address lands on the POS. */
@@ -114,6 +181,11 @@ const routeTree = rootRoute.addChildren([
   appRoute.addChildren([
     indexRoute,
     posRoute,
+    onboardingRoute,
+    invoiceRoute,
+    moreCaptureRoute,
+    payRoute,
+    doneRoute,
     historyRoute,
     adminRoute.addChildren([adminIndexRoute, ...adminTabRoutes]),
   ]),

@@ -21,6 +21,7 @@ describe('LoginPage', () => {
     const fetchMock = stubFetchRoutes({
       '/api/auth/login': () => jsonResponse({ token: 'tok-1', user: meBody('staff').user }),
       '/api/me': () => jsonResponse(meBody('staff')),
+      '/api/orders/open': () => jsonResponse({ order: null }),
     });
     const { router } = await renderApp('/login');
     await submit('staff', 'staff-pass-123');

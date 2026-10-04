@@ -1,8 +1,10 @@
 import type { ReactNode } from 'react';
 import { Link } from '@tanstack/react-router';
 import { BarChart3, Camera, History, LogOut, Package, Receipt, ScanLine, Settings, SlidersHorizontal, Users } from 'lucide-react';
+import { useConfirm } from '@/components/confirm-dialog';
 import { Button } from '@/components/ui/button';
 import { useLogout, useMe } from '@/features/auth/use-auth';
+import { getOpenOrder, voidOrder } from '@/features/pos/api';
 import type { Role } from '@/lib/types';
 
 interface NavItem {
@@ -33,6 +35,17 @@ export function navFor(role: Role): NavItem[] {
 export function AppShell({ children }: { children: ReactNode }) {
   const me = useMe().data;
   const logoutMutation = useLogout();
+  const { confirm, dialog } = useConfirm();
+
+  /** Ends the shift. An unpaid basket is voided first, after asking (it would stay open otherwise). */
+  async function logout() {
+    const open = await getOpenOrder().catch(() => null);
+    if (open && open.items.length > 0) {
+      if (!(await confirm('Đơn hiện tại chưa thanh toán. Huỷ đơn và đóng ca?', 'Huỷ đơn và đóng ca', true))) return;
+      await voidOrder(open.id).catch(() => undefined);
+    }
+    logoutMutation.mutate();
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -60,7 +73,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
           <div className="flex items-center gap-3 text-sm">
             {me && <span className="text-muted-foreground">{me.user.full_name || me.user.username}</span>}
-            <Button variant="ghost" size="sm" onClick={() => logoutMutation.mutate()} disabled={logoutMutation.isPending}>
+            <Button variant="ghost" size="sm" onClick={() => void logout()} disabled={logoutMutation.isPending}>
               <LogOut className="h-4 w-4" />
               Đăng xuất
             </Button>
@@ -68,6 +81,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </header>
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6">{children}</main>
+      {dialog}
     </div>
   );
 }
