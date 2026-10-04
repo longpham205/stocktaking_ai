@@ -69,3 +69,20 @@
     overflow: hidden;
   }
 }
+
+/* A printed receipt: only #print-area (the done screen's receipt) goes on paper. */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #print-area,
+  #print-area * {
+    visibility: visible;
+  }
+  #print-area {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 58mm;
+  }
+}

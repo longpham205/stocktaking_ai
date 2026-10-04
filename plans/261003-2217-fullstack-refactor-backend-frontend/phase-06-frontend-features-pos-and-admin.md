@@ -1,6 +1,6 @@
 # Phase 06 — Frontend features (POS + Admin)
 
-**Priority:** P1 · **Status:** pending · Nguồn hành vi: `src_legacy/frontend/app.js`, `docs/WEB.md`
+**Priority:** P1 · **Status:** in progress (6a POS: done 2026-10-04; 6b admin: pending) · Nguồn hành vi: `src_legacy/frontend/app.js`, `docs/WEB.md`
 
 ## POS (staff, mobile-first)
 - [ ] onboarding (một lần, `POST me/onboarding-seen`)
@@ -20,3 +20,15 @@
 
 ## Done khi
 Checklist parity đủ; vitest cho mỗi feature (stub API); smoke thủ công trên điện thoại qua HTTPS forward.
+
+## Kết quả 6a — POS (2026-10-04)
+- Route: `/pos` (chụp; khôi phục đơn mở còn hàng -> hoá đơn kèm "Đã khôi phục đơn #…"; staff chưa xem hướng dẫn -> `/onboarding`), `/onboarding` (4 bước, đánh dấu đã xem ngay khi hiện), `/pos/orders/$id` (hoá đơn; `?job=` theo dõi job), `/pos/orders/$id/capture` (chụp thêm), `/pos/orders/$id/pay`, `/pos/orders/$id/done` (`?fresh` -> tự in nếu cài đặt bật), `/history`.
+- `frontend/src/features/pos/`: `api.ts`, `types.ts`, `lib.ts` (nghiêng, tiền, bàn phím tiền mặt, nhóm lịch sử theo ngày, thu nhỏ ảnh ≤2048 px + EXIF bằng `createImageBitmap`), `use-order.ts` (mỗi thay đổi thay đơn trong cache bằng đơn server trả về), `use-camera.ts` (khung ngắm camera sau, lý do khi không dùng được, cảm biến nghiêng + xin quyền iOS), `use-barcode-scanner.ts`, `capture-page.tsx`, `invoice-page.tsx` (theo dõi job 700 ms, hàng chờ, `system_reloading`, hết hạn 120 s không tính lúc nạp lại; cảnh báo chồng lấp/vật chưa nhận diện/dòng cần xác nhận; chặn thanh toán khi thiếu giá), `capture-overlay.tsx` (khung 🟩🟨🟥/xám, đánh dấu hai chiều, chọn lượt, phóng to 1–4×), `line-item.tsx`, `product-picker.tsx` (tìm không dấu, mã vạch), `pay-page.tsx`, `done-page.tsx` (+ hoá đơn in, CSS `@media print`), `history-page.tsx` (chi tiết, admin huỷ đơn), `onboarding-page.tsx`.
+- Dùng chung: `components/ui/dialog.tsx` (portal + Tailwind, không thêm thư viện), `components/confirm-dialog.tsx` (`useConfirm`); đăng xuất khi đơn dở thì hỏi rồi huỷ đơn.
+- Test: 27 vitest (14 mới: hàm thuần 4, luồng POS 10 — chụp -> job -> hoá đơn có khung + cảnh báo + đánh dấu, xác nhận dòng, giá tay + chặn thanh toán, xoá dòng có hỏi, máy quét, tiền mặt + tiền thừa, khôi phục đơn, hướng dẫn, đăng xuất có đơn dở, lịch sử + admin huỷ); chạy lại 3 lần ổn định. `pnpm typecheck`, `pnpm build` đạt.
+- Chạy thật trên Docker trong trình duyệt nội bộ (bộ nhận diện giả, ảnh tạo bằng canvas qua ô "Chọn ảnh"): hướng dẫn -> chụp -> hoá đơn 7 món, 7 khung, ảnh ký + 6 ảnh thu nhỏ tải được -> xác nhận dòng vàng -> nhập giá tay -> tiền mặt 530.000đ, thối 4.500đ -> lịch sử -> khôi phục đơn dở sau khi tải lại -> huỷ đơn.
+- Docker: `vite.config.ts` bật polling khi có `VITE_USE_POLLING` (compose dev đặt sẵn: Docker Desktop không chuyển sự kiện file qua bind-mount); image `web` dev/prod có tag riêng (`stocktaking-ai-web:dev|prod`) — trước đó build prod đã ghi đè image dev.
+
+## Chưa thử được (cần điện thoại thật qua HTTPS)
+- Khung ngắm camera trực tiếp và cảm biến nghiêng (trình duyệt nội bộ chặn camera; `http://` qua IP LAN cũng bị chặn — app tự chuyển sang "Chụp bằng camera máy"/"Chọn ảnh").
+- Máy quét mã vạch thật (đã test bằng phím giả lập), in hoá đơn ra máy in.
