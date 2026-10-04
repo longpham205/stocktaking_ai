@@ -29,6 +29,8 @@ dependencies = [
     "uvicorn[standard]>=0.30",
     "sqlalchemy[asyncio]>=2.0",
     "asyncpg>=0.30",
+    # the engine reads its catalog through a synchronous connection
+    "psycopg[binary]>=3.2",
     "alembic>=1.14",
 ]
 

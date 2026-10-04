@@ -18,6 +18,12 @@ def iso(value: datetime) -> str:
     return value.astimezone(UTC).isoformat(timespec="seconds")
 
 
+def sync_database_url(url: str) -> str:
+    """The same database through the synchronous driver (psycopg). The engine's catalog code is
+    synchronous SQLModel; it shares the database, not the connection pool, with the API."""
+    return url.replace("postgresql+asyncpg://", "postgresql+psycopg://", 1)
+
+
 def make_engine(url: str, pool_size: int = 5, max_overflow: int = 5) -> AsyncEngine:
     # pre-ping: a connection the server closed (restart, idle timeout) is replaced, not handed out
     return create_async_engine(url, pool_size=pool_size, max_overflow=max_overflow, pool_pre_ping=True)

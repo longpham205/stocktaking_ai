@@ -11,7 +11,7 @@ from sqlalchemy import text
 
 from app.core.backends import Backends
 from app.core.config import CoreSettings, get_settings
-from app.core.db import make_engine
+from app.core.db import make_engine, sync_database_url
 from app.core.deps import backends
 from app.core.errors import AppError, Unavailable, app_error_handler
 from app.core.logging import RequestLog, configure_logging
@@ -28,7 +28,7 @@ def build_recognizer(settings: CoreSettings) -> RecognizerPort:
     # lazy: torch, faiss and the engine are imported only by a process that runs the real pipeline
     from app.modules.recognition.local_pipeline import LocalRecognizer
 
-    return LocalRecognizer(settings.pipeline_config)
+    return LocalRecognizer(settings.pipeline_config, sync_database_url(settings.database_url))
 
 
 def _build(settings: CoreSettings, recognizer: RecognizerPort | None) -> Backends:
