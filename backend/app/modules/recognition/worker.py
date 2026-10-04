@@ -12,13 +12,16 @@ import asyncio
 import logging
 from collections.abc import Awaitable, Callable
 from concurrent.futures import ThreadPoolExecutor
+from typing import Any
 
-from app.core.errors import Unavailable
+from app.core.errors import Conflict, Unavailable
 from app.modules.recognition.ports import Recognition, RecognizerPort
 
 logger = logging.getLogger("app.recognition.worker")
 
 Handler = Callable[[int], Awaitable[None]]
+# a pipeline reload longer than this is reported (the thread cannot be stopped; see the server log)
+RELOAD_TIMEOUT_SECONDS = 900
 
 
 class RecognitionWorker:
@@ -30,6 +33,12 @@ class RecognitionWorker:
         self._current: int | None = None
         self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="recognizer")
         self._task: asyncio.Task[None] | None = None
+        self._exclusive: asyncio.Task[None] | None = None
+        self._reload_lock = asyncio.Lock()
+        # an admin is applying engine settings: jobs wait longer
+        self.reloading = False
+        # a validation holds the thread for minutes: new captures are refused (SYSTEM_BUSY)
+        self.validating = False
 
     def start(self, handler: Handler) -> None:
         """Start consuming. Inside the running event loop (the app's lifespan)."""
@@ -74,6 +83,48 @@ class RecognitionWorker:
         """The recognizer re-reads the catalog, on the worker thread: between two photos, never during one."""
         await asyncio.get_running_loop().run_in_executor(self._executor, self.recognizer.reload_catalog)
 
+    async def reload_pipeline(self, overrides: dict[str, Any]) -> None:
+        """Rebuild the pipeline on the worker thread, between two photos. One reload at a time
+        (409 RELOAD_IN_PROGRESS); TimeoutError past `RELOAD_TIMEOUT_SECONDS`."""
+        if self._reload_lock.locked():
+            raise Conflict("Đang áp dụng thiết lập khác, thử lại sau", code="RELOAD_IN_PROGRESS")
+        async with self._reload_lock:
+            self.reloading = True
+            try:
+                future = asyncio.get_running_loop().run_in_executor(
+                    self._executor, self.recognizer.reload_pipeline, overrides
+                )
+                await asyncio.wait_for(future, RELOAD_TIMEOUT_SECONDS)
+            finally:
+                self.reloading = False
+
+    def start_validation(
+        self,
+        benchmark_dir: str | None,
+        output_dir: Any,
+        done: Callable[[dict[str, Any] | None, BaseException | None], None],
+    ) -> None:
+        """Run the validation on the worker thread in the background; `done(report, error)` when it
+        ends. Captures are refused meanwhile (`validating`)."""
+        if self.validating or self.reloading:
+            raise Conflict("Đang kiểm định hoặc đang áp dụng thiết lập", code="SYSTEM_BUSY")
+        self.validating = True
+
+        async def run() -> None:
+            try:
+                report = await asyncio.get_running_loop().run_in_executor(
+                    self._executor, self.recognizer.validate, benchmark_dir, output_dir
+                )
+            except Exception as exc:  # reported to the admin; the queue goes on
+                logger.exception("validation failed")
+                done(None, exc)
+            else:
+                done(report, None)
+            finally:
+                self.validating = False
+
+        self._exclusive = asyncio.create_task(run(), name="validation")
+
     async def _consume(self, handler: Handler) -> None:
         while True:
             capture_id = await self._queue.get()
@@ -90,10 +141,11 @@ class RecognitionWorker:
     async def close(self) -> None:
         """Stop taking jobs. A job cut off here stays pending in the database and is reported as
         interrupted by a restart when asked for."""
-        if self._task is not None:
-            self._task.cancel()
-            try:
-                await self._task
-            except asyncio.CancelledError:
-                pass
+        for task in (self._task, self._exclusive):
+            if task is not None:
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
         self._executor.shutdown(wait=False, cancel_futures=True)

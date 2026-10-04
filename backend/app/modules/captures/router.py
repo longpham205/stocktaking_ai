@@ -10,6 +10,7 @@ from app.core.backends import Backends
 from app.core.deps import backends
 from app.core.errors import AppError, Invalid, NotFound
 from app.core.signed_url import verify
+from app.core.uploads import read_limited
 from app.modules.auth.deps import current_user
 from app.modules.auth.ports import CurrentUser
 from app.modules.captures.deps import captures_service
@@ -22,23 +23,6 @@ router = APIRouter(tags=["captures"])
 _MEDIA_PATH = re.compile(r"^\d+/[A-Za-z0-9_.\-]+$")
 
 
-def _too_large() -> AppError:
-    return AppError("Ảnh quá lớn", code="IMAGE_TOO_LARGE", status_code=413)
-
-
-async def _read_limited(request: Request, limit: int) -> bytes:
-    """The raw body, refused as soon as it is known to exceed `limit`."""
-    declared = request.headers.get("content-length")
-    if declared and declared.isdigit() and int(declared) > limit:
-        raise _too_large()
-    body = bytearray()
-    async for chunk in request.stream():
-        body += chunk
-        if len(body) > limit:
-            raise _too_large()
-    return bytes(body)
-
-
 @router.post("/orders/{order_id}/captures", status_code=202)
 async def submit_capture(
     order_id: int,
@@ -47,7 +31,7 @@ async def submit_capture(
     current: CurrentUser = Depends(current_user),
     service: CapturesService = Depends(captures_service),
 ) -> SubmitOut:
-    data = await _read_limited(request, service.settings.max_upload_bytes)
+    data = await read_limited(request, service.settings.max_upload_bytes)
     if not data:
         raise Invalid("Thiếu ảnh")
     return await service.submit(current, order_id, data, idempotency_key)

@@ -1,8 +1,9 @@
 """The plug the web app sees the ML engine through. The app depends on this protocol only; which
 adapter implements it (`local_pipeline`: the engine, `fake`: canned results) is decided once, in
-`app.main.build_recognizer`. Reload, validation and evidence tests arrive with phase 4."""
+`app.main.build_recognizer`."""
 
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Protocol
 
 # x1, y1, x2, y2 in pixels of the source image
@@ -41,6 +42,16 @@ class RecognizerPort(Protocol):
 
     def reload_catalog(self) -> None:
         """Re-read the catalog after an admin edit (barcode, evidence, colours). On the worker thread."""
+        ...
+
+    def reload_pipeline(self, overrides: dict[str, Any]) -> None:
+        """Rebuild the pipeline with these engine-setting overrides (`{"a.b": value}`). On failure the
+        previous settings are back in place and the error is raised. On the worker thread."""
+        ...
+
+    def validate(self, benchmark_dir: str | None, output_dir: Path) -> dict[str, Any]:
+        """Run the benchmark validation with the loaded pipeline; the report goes to `output_dir`.
+        `benchmark_dir` None: the one the engine config names. On the worker thread (minutes)."""
         ...
 
     def close(self) -> None: ...

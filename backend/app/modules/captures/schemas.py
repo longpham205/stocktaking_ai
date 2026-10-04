@@ -18,7 +18,7 @@ class JobOut(BaseModel):
     status: str
     # captures ahead of this one in the queue
     position: int
-    # an admin is applying new engine settings: the wait is longer (phase 4)
+    # an admin is applying new engine settings: the wait is longer
     system_reloading: bool = False
     # when done: objects added, what to tell the cashier, the order afterwards
     added: int | None = None

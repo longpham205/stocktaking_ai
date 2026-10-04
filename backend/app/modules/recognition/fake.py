@@ -10,6 +10,7 @@ import hashlib
 import time
 from collections.abc import Sequence
 from pathlib import Path
+from typing import Any
 
 from sqlalchemy import Engine, create_engine, text
 
@@ -25,6 +26,8 @@ class FakeRecognizer:
         photo; otherwise from `product_ids`."""
         self._database_url, self._product_ids, self._delay = database_url, list(product_ids), delay_seconds
         self._engine: Engine | None = None
+        # the engine-setting overrides it was last asked to apply (it applies none)
+        self.overrides: dict[str, Any] = {}
 
     def _ids(self) -> list[str]:
         if self._database_url is None:
@@ -73,6 +76,17 @@ class FakeRecognizer:
 
     def reload_catalog(self) -> None:
         return None  # reads the catalog at every photo
+
+    def reload_pipeline(self, overrides: dict[str, Any]) -> None:
+        self.overrides = dict(overrides)
+
+    def validate(self, benchmark_dir: str | None, output_dir: Path) -> dict[str, Any]:
+        time.sleep(self._delay)
+        return {
+            "end_to_end": {"f1": 0.5, "precision": 0.5, "recall": 0.5},
+            "fusion": {"accuracy_after": 0.6},
+            "fake": True,
+        }
 
     def close(self) -> None:
         if self._engine is not None:

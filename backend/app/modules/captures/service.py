@@ -82,6 +82,12 @@ class CapturesService:
         return rel
 
     async def submit(self, current: CurrentUser, order_id: int, data: bytes, key: str | None) -> SubmitOut:
+        if self.worker.validating:  # a validation holds the recognizer for many minutes: say so at once
+            raise AppError(
+                "Hệ thống đang kiểm định độ chính xác, tạm thời chưa nhận diện được — thêm món thủ công hoặc thử lại sau",
+                code="SYSTEM_BUSY",
+                status_code=503,
+            )
         await self.orders.check_open(current, order_id)
         key = (key or "").strip()[:64] or None
         if (duplicate := self._recent(order_id, key)) is not None:
@@ -122,7 +128,12 @@ class CapturesService:
             status, error = "error", _error("SERVER_RESTARTED", "Máy chủ đã khởi động lại, hãy chụp lại")
             async with self.repo.write() as unit:
                 await unit.update(capture.id, job_status=status, job_error=error, only_if_status=PENDING)
-        out = JobOut(status=status, position=self.worker.position(capture.id) if status == "queued" else 0)
+        out = JobOut(
+            status=status,
+            position=self.worker.position(capture.id) if status == "queued" else 0,
+            # an admin is applying engine settings: the wait is longer than usual
+            system_reloading=self.worker.reloading,
+        )
         if status == "done":
             out.added, out.warnings, out.order = capture.item_count, capture.warnings or [], order
         elif status == "error":
