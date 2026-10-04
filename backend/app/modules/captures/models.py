@@ -7,7 +7,7 @@ left `queued` or `processing` by a restart is marked as an error at startup.
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import BigInteger, CheckConstraint, ForeignKey, String, Text
+from sqlalchemy import BigInteger, CheckConstraint, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -26,7 +26,13 @@ class CaptureRow(Base):
     job_error: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     item_count: Mapped[int] = mapped_column(server_default="0")
     processing_time_ms: Mapped[float | None]
+    # relative to MEDIA_DIR: `<order id>/capture_<random>.jpg`
     image_path: Mapped[str | None] = mapped_column(Text)
+    # size of the photo the boxes are drawn on (EXIF orientation applied)
+    image_width: Mapped[int | None] = mapped_column(Integer)
+    image_height: Mapped[int | None] = mapped_column(Integer)
     # one box per detected object: bbox, the order line it became (or none, for a rejected object)
     detections: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB)
+    # what the cashier is told after the job: [{"type": "overlap_detected"}, ...]
+    warnings: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB)
     created_at: Mapped[datetime] = created_at_column()

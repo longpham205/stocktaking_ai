@@ -1,5 +1,7 @@
 """Orders: one open order per cashier at a time, lines merged per product, prices frozen at checkout."""
 
+from typing import Any
+
 from app.core.clock import local_midnight_utc
 from app.core.config import CoreSettings
 from app.core.db import iso
@@ -8,10 +10,11 @@ from app.core.signed_url import signed_query
 from app.modules.auth.ports import CurrentUser
 from app.modules.auth.service import Forbidden
 from app.modules.catalog.service import CatalogService
-from app.modules.orders.ports import Order
+from app.modules.orders.ports import CaptureImage, Order
 from app.modules.orders.repository import OrdersRepository, OrdersUnit
 from app.modules.orders.schemas import (
     MAX_QTY,
+    CaptureOut,
     CheckoutIn,
     HistoryItemOut,
     ItemIn,
@@ -24,6 +27,16 @@ from app.modules.pos_settings.service import SettingsService
 HISTORY_LIMIT = 200
 # range name -> how many days before today it starts
 _RANGE_DAYS = {"today": 0, "7d": 6, "30d": 29}
+
+
+async def merge_or_insert(unit: OrdersUnit, order_id: int, product_id: str, quantity: int, **values: Any) -> int:
+    """More of a product goes onto its confirmed line; otherwise a new line (with `values`: the
+    thumbnail and evidence of a recognised one). Returns the line id."""
+    line = await unit.mergeable_item(order_id, product_id)
+    if line is None:
+        return await unit.insert_item(order_id, product_id, quantity, **values)
+    await unit.update_item(line.id, quantity=min(MAX_QTY, line.quantity + quantity))
+    return line.id
 
 
 class OrdersService:
@@ -39,6 +52,21 @@ class OrdersService:
             return None
         query = signed_query(self.settings.media_url_secret, rel_path, self.settings.media_url_ttl_seconds)
         return f"/api/media/{rel_path}?{query}"
+
+    def _capture_views(self, images: list[CaptureImage]) -> list[CaptureOut]:
+        """The photos still on disk (old ones are purged after the retention period)."""
+        return [
+            CaptureOut(
+                id=image.id,
+                created_at=iso(image.created_at),
+                image_url=self._thumbnail_url(image.image_path) or "",
+                width=image.width,
+                height=image.height,
+                boxes=image.boxes,
+            )
+            for image in images
+            if (self.settings.media_dir / image.image_path).is_file()
+        ]
 
     async def _view(self, unit: OrdersUnit, order: Order) -> OrderOut:
         """The order as the POS shows it. An open order is priced from the catalog as it is now;
@@ -79,7 +107,7 @@ class OrdersService:
             cash_given=order.cash_given,
             change_given=order.change_given,
             items=items,
-            captures=[],
+            captures=self._capture_views(await unit.capture_images(order.id)),
             item_count=sum(item.quantity for item in items),
             total=(order.total_amount or 0) if paid else total,
             missing_price_count=sum(1 for item in items if item.price_missing),
@@ -100,6 +128,13 @@ class OrdersService:
         if order.status != "open":
             raise Conflict("Đơn hàng đã thanh toán hoặc đã huỷ", code="ORDER_NOT_OPEN")
         return order
+
+    async def check_open(self, current: CurrentUser, order_id: int) -> None:
+        """404 unless the caller may see the order, 409 `ORDER_NOT_OPEN` unless it is open."""
+        async with self.repo.read() as unit:
+            order = await self._visible(unit, current, order_id)
+        if order.status != "open":
+            raise Conflict("Đơn hàng đã thanh toán hoặc đã huỷ", code="ORDER_NOT_OPEN")
 
     async def get(self, current: CurrentUser, order_id: int) -> OrderOut:
         async with self.repo.read() as unit:
@@ -159,17 +194,8 @@ class OrdersService:
         product_id = await self._known_product(body.product_id)
         async with self.repo.write() as unit:
             await self._open(unit, current, order_id)
-            await self._merge_or_insert(unit, order_id, product_id, body.quantity)
+            await merge_or_insert(unit, order_id, product_id, body.quantity)
         return await self.get(current, order_id)
-
-    @staticmethod
-    async def _merge_or_insert(unit: OrdersUnit, order_id: int, product_id: str, quantity: int) -> int:
-        """More of a product goes onto its confirmed line; otherwise a new line. Returns the line id."""
-        line = await unit.mergeable_item(order_id, product_id)
-        if line is None:
-            return await unit.insert_item(order_id, product_id, quantity)
-        await unit.update_item(line.id, quantity=min(MAX_QTY, line.quantity + quantity))
-        return line.id
 
     async def update_item(self, current: CurrentUser, order_id: int, item_id: int, body: ItemPatch) -> OrderOut:
         sent = body.model_fields_set

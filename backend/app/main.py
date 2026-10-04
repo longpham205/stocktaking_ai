@@ -20,6 +20,10 @@ from app.modules.auth.config import AuthSettings, get_auth_settings
 from app.modules.auth.repository import AuthRepository
 from app.modules.auth.router import router as auth_router
 from app.modules.auth.service import AuthService
+from app.modules.captures.config import CapturesSettings, get_captures_settings
+from app.modules.captures.repository import CapturesRepository
+from app.modules.captures.router import router as captures_router
+from app.modules.captures.service import CapturesService
 from app.modules.catalog.repository import CatalogRepository
 from app.modules.catalog.router import router as catalog_router
 from app.modules.catalog.service import CatalogService
@@ -31,6 +35,7 @@ from app.modules.pos_settings.repository import SettingsRepository
 from app.modules.pos_settings.router import router as settings_router
 from app.modules.pos_settings.service import SettingsService
 from app.modules.recognition.ports import RecognizerPort
+from app.modules.recognition.worker import RecognitionWorker
 
 logger = logging.getLogger("app.main")
 
@@ -39,7 +44,7 @@ def build_recognizer(settings: CoreSettings) -> RecognizerPort:
     if settings.recognizer == "fake":
         from app.modules.recognition.fake import FakeRecognizer
 
-        return FakeRecognizer()
+        return FakeRecognizer(database_url=sync_database_url(settings.database_url))
     # lazy: torch, faiss and the engine are imported only by a process that runs the real pipeline
     from app.modules.recognition.local_pipeline import LocalRecognizer
 
@@ -51,6 +56,7 @@ def _build(
     recognizer: RecognizerPort | None,
     auth_settings: AuthSettings,
     pos_settings: PosSettings,
+    captures_settings: CapturesSettings,
 ) -> Backends:
     engine = make_engine(settings.database_url, settings.db_pool_size, settings.db_max_overflow)
     built = Backends(settings=settings, engine=engine)
@@ -63,6 +69,16 @@ def _build(
     built.catalog = CatalogService(CatalogRepository(engine))
     built.orders = OrdersService(OrdersRepository(engine), built.catalog, built.pos_settings, settings)
     built.recognizer = recognizer or build_recognizer(settings)
+    built.worker = RecognitionWorker(
+        built.recognizer,
+        captures_settings.recognition_queue_max,
+        captures_settings.recognition_timeout_seconds,
+    )
+    built.captures = CapturesService(
+        CapturesRepository(engine), built.orders, built.pos_settings, built.worker, settings, captures_settings
+    )
+    # stopped before the engine is disposed (closers run in reverse)
+    built.closers.append(built.worker.close)
     return built
 
 
@@ -86,23 +102,27 @@ def create_app(
     recognizer: RecognizerPort | None = None,
     auth_settings: AuthSettings | None = None,
     pos_settings: PosSettings | None = None,
+    captures_settings: CapturesSettings | None = None,
 ) -> FastAPI:
     settings = settings or get_settings()
     auth_settings = auth_settings or get_auth_settings()
     pos_settings = pos_settings or get_pos_settings()
+    captures_settings = captures_settings or get_captures_settings()
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         configure_logging(settings.log_level, settings.log_format)
         # the schema is Alembic's (`make migrate`, compose's `migrate` job), never created here
-        built = _build(settings, recognizer, auth_settings, pos_settings)
+        built = _build(settings, recognizer, auth_settings, pos_settings, captures_settings)
         app.state.backends = built
+        assert built.worker is not None and built.captures is not None
+        built.worker.start(built.captures.process)
         logger.info("ready", extra={"env": settings.app_env, "recognizer": settings.recognizer})
         yield
-        if built.recognizer is not None:
-            built.recognizer.close()
         for close in reversed(built.closers):
             await close()
+        if built.recognizer is not None:
+            built.recognizer.close()
 
     # generated API docs only in dev: demos expose the API through a public tunnel
     dev = settings.app_env == "dev"
@@ -127,5 +147,6 @@ def create_app(
     app.include_router(settings_router, prefix="/api")
     app.include_router(catalog_router, prefix="/api")
     app.include_router(orders_router, prefix="/api")
+    app.include_router(captures_router, prefix="/api")
     app.add_middleware(RequestLog)
     return app
