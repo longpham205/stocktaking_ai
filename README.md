@@ -2,6 +2,8 @@
 
 > Hệ thống AI nhận diện và đếm từng sản phẩm đặt trên **bàn thu ngân** từ một ảnh chụp duy nhất — kết hợp truy xuất hình ảnh với bằng chứng từ OCR, màu sắc và mã vạch để phân biệt các biến thể sản phẩm có bao bì gần như giống hệt nhau.
 
+> **⚠️ Đang refactor (branch `refactor/fullstack-layout`):** repo đang chuyển sang `backend/` (FastAPI + engine ML) và `frontend/` (React), xem [plan](plans/261003-2217-fullstack-refactor-backend-frontend/plan.md). Engine ML nay ở `backend/engine/` (trước là `src/`), chạy từ `backend/`: `uv sync` rồi `uv run python -m engine --mode validate --config configs/config.demo.yaml --benchmark-dir data_demo/benchmark`. Web POS cũ đóng băng trong [`src_legacy/`](src_legacy/README.md). Các lệnh `python -m backend` / `launch.bat` bên dưới thuộc bản cũ, sẽ được viết lại ở phase 7.
+
 > **Ghi chú phiên bản:** Tài liệu này mô tả hệ thống ở trạng thái v0.1.0 (extended). Các mục đánh dấu **[Kế hoạch]** là hạng mục chưa triển khai, dự kiến bổ sung ở các phiên bản sau.
 
 > **Hướng dẫn nhanh:** chạy web POS — [`docs/WEB.md`](docs/WEB.md) · chuẩn bị và xử lý sự cố ngày demo — [`docs/DEMO.md`](docs/DEMO.md) · dữ liệu và catalog — [`docs/04_DATA_AND_CATALOG.md`](docs/04_DATA_AND_CATALOG.md).

@@ -1,0 +1,24 @@
+# Override: no reload, no source bind mounts, JSON logs, no generated API docs.
+#
+#   make docker-up-prod    = docker compose -f docker-compose.yml -f docker-compose.prod.yml up
+#
+# The web console is the built SPA served by nginx (frontend/nginx.conf proxies /api).
+services:
+  api:
+    command: ["uvicorn", "entrypoints.api:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1", "--no-access-log"]
+    environment:
+      APP_ENV: prod
+      LOG_FORMAT: json
+    volumes: !override
+      - ./backend/data:/srv/data
+      - ./backend/data_demo:/srv/data_demo
+      - ./backend/weights:/srv/weights:ro
+
+  web:
+    image: stocktaking-ai-web:prod
+    build:
+      target: prod
+    environment: !reset {}
+    ports: !override
+      - "5173:80"
+    volumes: !reset []

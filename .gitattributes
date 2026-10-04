@@ -1,2 +1,10 @@
 # Script bash phải giữ LF (core.autocrlf=true sẽ đổi sang CRLF và làm hỏng bash)
 *.sh text eol=lf
+
+# Read by POSIX tools inside containers or by make: keep LF on every platform
+Makefile text eol=lf
+Dockerfile* text eol=lf
+*.dockerignore text eol=lf
+docker-compose*.yml text eol=lf
+.env.example text eol=lf
+nginx.conf text eol=lf
