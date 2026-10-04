@@ -8,7 +8,7 @@
 
 # Purpose
 
-Mandatory code standards and module interaction principles for every file in `src/` (Rules 1–18). The web POS in `backend/` and `frontend/` follows Rule 19.
+Mandatory code standards and module interaction principles for every file in the recognition engine, `backend/engine/` (Rules 1–18; this is the former `src/`). The web application in `backend/app/`, `backend/entrypoints/` and `frontend/` follows Rule 19.
 
 Whenever code and this document disagree, **this document wins**.
 
@@ -26,7 +26,8 @@ Whenever code and this document disagree, **this document wins**.
 
 # 2. Python Environment
 
-- Python `>= 3.11`
+- Python `>= 3.11, < 3.13` (`backend/pyproject.toml`; the tooling targets 3.12)
+- Dependencies are managed with `uv` (`uv sync`, `uv sync --extra ml`); there is no `requirements.txt`
 - Use modern generic syntax:
   - `list[str]`
   - `X | None`
@@ -89,8 +90,8 @@ Log levels:
 
 All configuration must be loaded through:
 
-- `core.config`
-- `configs/config.yaml`
+- `engine.core.config`
+- `backend/configs/config.yaml`
 
 This explicitly includes:
 
@@ -103,7 +104,7 @@ This explicitly includes:
 
 None of these values may be hard-coded as source-level constants, even during active tuning.
 
-**Product data is not configuration.** SKUs and recognition evidence (OCR keywords, colour codes, confusable pairs, forced plugins, colour references) live in the catalog database and are read through `CatalogRepository` — never in `config.yaml` and never as source constants (see Rule 19.7 and `04_DATA_AND_CATALOG.md`). The config only selects the catalog source (`catalog.source`).
+**Product data is not configuration.** SKUs and recognition evidence (OCR keywords, colour codes, confusable pairs, forced plugins, colour references) live in the catalog database and are read through `CatalogRepository` — never in `config.yaml` and never as source constants (see Rule 19.5 and `04_DATA_AND_CATALOG.md`). The config only selects the catalog source (`catalog.source`).
 
 See **Rule 18**.
 
@@ -129,13 +130,13 @@ The recovery behavior must be explicit and documented.
 
 # 9. Import Statements
 
-Use **absolute imports from the `src` root**.
+Use **absolute imports from the `engine` package** (`from engine.core.config import ...`); the process runs from `backend/`.
 
 ### Import order
 
 1. Standard library
 2. Third-party packages
-3. Local `src` modules
+3. Local `engine` modules
 
 ### Forbidden
 
@@ -193,7 +194,7 @@ This document intentionally does not duplicate those rules to prevent the two do
 Only dataclasses defined in:
 
 ```text
-src/models/models.py
+backend/engine/models/models.py
 ```
 
 may cross module boundaries.
@@ -288,7 +289,7 @@ Every module must be unit-testable in isolation using synthetic inputs.
 See:
 
 ```text
-tests/conftest.py
+backend/tests/conftest.py
 ```
 
 This property is essential for debugging and must be preserved when extending the system.
@@ -334,17 +335,91 @@ The following rules are absolute:
 
 ---
 
-# 19. Web Backend Rules
+# 19. Web Application Rules
 
-The web POS (`backend/`, `frontend/`) is a thin layer **around** the pipeline and must never change how it works.
+The web POS (`backend/app/`, `backend/entrypoints/`, `frontend/`) is a layer **around** the engine and must never change how it works. Architecture: `docs/system-architecture.md`.
 
-1. **Single entry point.** `backend/` runs the pipeline only through `InferenceRunner` / `ValidationRunner`. It never calls `InventoryPipeline.run()`, never imports a concrete backend model (`Detector`, `Retriever`, RF-DETR/SAM2/SigLIP2) or plugin. Importing pure modules that touch no GPU (`AppConfig`, `src.core.config.build_config`, `src.catalog.repository`, `src.catalog.validation`) is allowed. When in doubt whether an import touches the GPU, treat it as forbidden.
-2. **`src/` never imports `backend/`.** `src/` must keep running standalone (`run.py --mode infer/validate/ui`, notebooks, Colab).
-3. **Pass thresholds per call, do not mutate config.** Per-request behaviour (`similarity_threshold`, `min_confidence_accept`) goes through the `run_single` arguments, not by editing `AppConfig` at runtime.
-4. **Safe by default.** The backend is exposed through a public tunnel in demos: every endpoint except the health check and login needs a token; there are no default secrets (they are generated randomly and kept out of git); no auto-generated API docs endpoint; uploaded images are verified by decoding them (never trust `Content-Type`); request bodies and uploads have size limits; media URLs are signed and expire; one open shift per account.
-5. **Business data changes are logged.** Any admin edit of prices, barcodes or settings writes a `change_log` row with old/new value and the user.
-6. **Identifiers are stable.** `product_id` equals the benchmark `category_id` and is never renumbered, reused or edited through the UI.
-7. **Evidence is explicit.** The Reranker and every plugin use only evidence declared in the catalog (OCR keywords, colour code, barcode, confusable pairs, forced plugins), read through `CatalogRepository`. They must not infer evidence from a product name or folder name; undeclared evidence scores 0. *(In force since Phase 1B / C8; see `docs/04_DATA_AND_CATALOG.md`.)*
+## 19.1 Boundary with the engine
+
+1. **The engine never imports the web.** Nothing in `backend/engine/` imports `app`, `entrypoints` or FastAPI. The engine must keep running standalone (`python -m engine --mode infer|validate`, notebooks, Colab).
+2. **The web reaches the engine through one port.** Recognition, catalog reload, pipeline reload and validation go through `RecognizerPort` (`app/modules/recognition/ports.py`) and are executed by `RecognitionWorker` on its single thread. No router or service calls `InventoryPipeline`, a detector, a retriever or a plugin.
+3. **Engine imports in `app/` are lazy.** Outside `recognition/local_pipeline.py` (itself imported only when `RECOGNIZER=local`), `import engine...` appears only inside functions, and only in `catalog/`, `engine_config/` and `validation/`. With `RECOGNIZER=fake` the API must start without importing `engine`, torch, faiss, transformers, sam2, easyocr, rfdetr or cv2; `tests/test_import_boundary.py` enforces it.
+4. **Catalog writes go through the engine's functions** (`engine.catalog.edits`, validated by `engine.catalog.validation`), never through hand-written SQL on the catalog tables. Reads for web screens may query those tables in `catalog/repository.py`.
+5. **Pass thresholds per call, do not mutate config.** Per-capture behaviour (`similarity_threshold`, `min_confidence_accept`) is an argument of `recognize`. Engine settings change only through `engine_config` (stored in `config_overrides`, applied by rebuilding the pipeline, rolled back on failure).
+
+## 19.2 Layers inside a module
+
+Each module in `app/modules/<name>/` has `models.py` (tables), `repository.py`, `service.py`, `schemas.py`, `ports.py`, `deps.py`, `router.py`.
+
+1. **SQL lives in `repository.py` only** (SQLAlchemy Core, async). Routers and services never build queries.
+2. **Routers are thin**: parse the request, call one service method, return its schema. Business rules live in `service.py`.
+3. **Modules depend on each other's ports**, not on each other's repositories. Wiring happens in one place: `app/main.py` builds every service into `Backends`.
+4. **Several statements that must succeed together share one transaction**, following `orders/repository.py` (`read()` / `write()` units on one connection; rows locked with `lock=True`).
+5. **The schema belongs to Alembic.** Change `models.py`, then `make migration MSG="..."`. Nothing creates or alters tables at start-up.
+6. **One API process.** The model, the recognition queue, the login limiter and the idempotency keys live in the process's memory: `--workers 1` is mandatory. Anything that must survive a restart goes to the database (a capture's job state is in `captures`).
+
+## 19.3 Errors and language
+
+1. Business errors raise `AppError` (or a subclass in `app/core/errors.py`) and reach the client as `{"detail": "<message>", "code": "<CODE>"}`. Error codes and HTTP statuses are part of the contract with the frontend: do not rename them.
+2. `detail` and every text the user sees are Vietnamese. Docstrings, comments and commit messages of the web code are English. The engine keeps its Vietnamese messages.
+3. No fallback that hides a failure: missing data is reported, not replaced by a default.
+
+## 19.4 Safe by default
+
+The application is exposed through a public tunnel in demos.
+
+1. Every endpoint except `/healthz`, `/api/health` and `/api/auth/login` needs a token; admin endpoints need the admin role. Media and gallery images are the exception by design: they are fetched by `<img>` tags, so they are protected by a signed, expiring URL instead.
+2. There are no default accounts and no default secrets. Secrets come from `.env` (`make setup` generates them); passwords are created with `make reset-password` and printed once. Never commit `.env`, never log or print a secret or a password.
+3. Generated API docs (`/docs`, `/openapi.json`) are served only when `APP_ENV=dev`.
+4. Uploaded images are verified by decoding them (never trust `Content-Type`) and have a size limit.
+5. One open shift per account. Wrong passwords are rate-limited; the advanced password has its own limiter.
+6. The API has no CORS middleware: the SPA reaches it same-origin through the Vite proxy or nginx.
+
+## 19.5 Data rules
+
+1. **Business data changes are logged.** Every admin edit of prices, barcodes, names, evidence, colour references, POS settings or engine settings writes `change_log` rows (old value, new value, user) in the same transaction, through `audit.repository.record_changes`. A module that wants its changes revertible registers a reverter with `AuditService.register` in `app/main.py`.
+2. **Identifiers are stable.** `product_id` equals the benchmark `category_id` and is never renumbered, reused or edited through the UI.
+3. **Evidence is explicit.** The Reranker and every plugin use only evidence declared in the catalog (OCR keywords, colour code, barcode, confusable pairs, forced plugins), read through `CatalogRepository`. They must not infer evidence from a product name or folder name; undeclared evidence scores 0. See `docs/04_DATA_AND_CATALOG.md`.
+
+## 19.6 Frontend
+
+1. TypeScript strict. Routes are declared in code in `src/router.tsx`; one folder per feature under `src/features/`.
+2. Server data goes through TanStack Query with keys from `src/lib/query-keys.ts`; every request goes through `apiFetch` (`src/lib/api-client.ts`). The server is the source of truth: no client-side copy of an order.
+3. Error messages shown to the user are derived from the API error in `src/lib/errors.ts`, in one place.
+4. No new dependency without asking (decided: no global store, no i18n library, no file-based routing, no ESLint).
+
+## 19.7 Tests
+
+1. API tests (`backend/tests/api/`) run against a real Postgres database (`stocktaking_test`), with the fixtures of `tests/api/conftest.py` (`db_app`, `http`, `token_for`, `catalog_url`).
+2. Frontend tests (vitest) render through `renderApp` and stub the network with `stubFetchRoutes` (`src/test/test-utils.tsx`).
+3. `make smoke` drives a running API over real HTTP.
+
+## 19.8 Gates
+
+Run from the repo root before every push:
+
+| Change | Gate |
+|---|---|
+| any backend web code | `make format`, `make lint`, `make type-check`, `make test` |
+| any frontend code | `make type-check`, `make test-web`, `cd frontend && pnpm build` |
+| `backend/engine/`, pure refactor | engine tests, then the demo validation compared with `--exact`: zero differences |
+| `backend/engine/`, behaviour change | the real validation, not lower than the baseline, with every difference explained |
+
+Engine gates run from `backend/` with an environment that has the ML stack:
+
+```text
+python -m pytest -q --ignore=tests/api --ignore=tests/test_import_boundary.py
+python -m engine --mode validate --config configs/config.demo.yaml --benchmark-dir data_demo/benchmark
+python scripts/compare_validate.py data_demo/outputs data/baseline/demo/report.json --exact
+python -m engine --mode validate
+python scripts/compare_validate.py data/outputs data/baseline/report.json --exact --ignore crop_id
+```
+
+`make lint` and `mypy` cover the web code only (`app`, `entrypoints`, `migrations`, `tests/api`); the engine predates both gates.
+
+## 19.9 Git
+
+One branch per task, cut from the branch it builds on (`refactor/...`, `feature/...`, `opt/...`); small commits; push the **branch**; open a pull request; merge on GitHub after review. Never push `main`.
 
 ---
 

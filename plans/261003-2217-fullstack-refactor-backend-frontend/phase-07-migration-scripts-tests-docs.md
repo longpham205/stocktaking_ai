@@ -1,6 +1,6 @@
 # Phase 07 — Data migration, scripts, tests, docs, cleanup
 
-**Priority:** P1 · **Status:** in progress (7a dữ liệu + lệnh vận hành: done 2026-10-04; 7b tài liệu, 7c rà soát: pending)
+**Priority:** P1 · **Status:** in progress (7a dữ liệu + lệnh vận hành, 7b tài liệu: done 2026-10-04; 7c rà soát: pending)
 
 ## Các bước
 1. `entrypoints/import_legacy_sqlite.py --sqlite data_demo/db/app.db`: copy users (giữ hash scrypt), orders/items/captures, prices, settings, overrides, change_log, catalog → Postgres; `make import-legacy DATA_DIR=data_demo`.
@@ -16,7 +16,7 @@ Từ máy sạch: `make setup && make docker-up && make seed-demo` → demo ch�
 | PR | Nội dung | Trạng thái |
 |---|---|---|
 | 7a | `seed-demo`, `import-legacy`, `db-save`/`db-restore`, `purge-media`, `check-env` | **done** (2026-10-04) |
-| 7b | README, WEB.md, DEMO.md, luật phát triển, system-architecture, sơ đồ mới | pending |
+| 7b | README, WEB.md, DEMO.md, luật phát triển, system-architecture, sơ đồ mới | **done** (2026-10-04) |
 | 7c | tự review, dọn thừa, chạy mọi cổng, thử từ DB mới tinh | pending |
 Người dùng chốt: KHÔNG thêm Playwright (bước 3 của kế hoạch gốc): đã có `make smoke` (API qua HTTP thật) và test vitest cho UI.
 
@@ -31,3 +31,19 @@ Người dùng chốt: KHÔNG thêm Playwright (bước 3 của kế hoạch g�
 ## Chưa làm (7a)
 - `make db-restore` chưa chạy thử (thay toàn bộ DB dev; cần dừng `api` trước).
 - Chưa mở web trên dữ liệu thật đã nhập (database `stocktaking_import` còn đó: trỏ `DATABASE_URL` sang nó để xem).
+
+## Kết quả 7b (chỉ tài liệu, không đổi code)
+- `README.md`: bỏ băng "đang refactor"; viết lại mục 5 (cấu trúc), 6 (yêu cầu), 7 (cài đặt bằng `make`), 10 (chạy pipeline bằng `python -m engine`); sửa các lệnh và đường dẫn ở mục 4, 8, 9, 11, 12. Mục 1–3 và 12–16 (thuật toán, số đo) giữ nguyên.
+- `docs/WEB.md`, `docs/DEMO.md`: viết lại cho Docker + `make` (cổng 5173, không có mật khẩu mặc định, `db-save`/`db-restore` thay `db_snapshot.py`).
+- `docs/system-architecture.md` (mới): sơ đồ HLD và sequence chụp → hoá đơn → thanh toán bằng Mermaid (GitHub tự vẽ), module và bảng, ranh giới với engine, dữ liệu, frontend, điểm khác web v1. Không đụng sơ đồ Excalidraw ở nhánh `docs/diagrams`.
+- `docs/03_DEVELOPMENT_RULES.md`: luật 1–18 trỏ sang `backend/engine/`; luật 19 viết lại (ranh giới engine, lớp trong module, lỗi và ngôn ngữ, an toàn, dữ liệu, frontend, test, cổng kiểm, git).
+- `docs/01`, `docs/02`, `docs/04`: sửa chỗ lỗi thời (cây thư mục, mục 14–15, catalog trong Postgres và `--db-url`, lệnh `python -m engine.catalog.*`).
+
+## Khác kế hoạch (7b)
+- Sơ đồ mới dùng Mermaid trong file Markdown thay vì file Excalidraw riêng: không cần công cụ ngoài, sửa cùng chỗ với chữ.
+- Ngoài danh sách của kế hoạch, sửa thêm `docs/01`, `02`, `04` vì chúng còn dẫn tới `src/`, `run.py` và SQLite là nơi duy nhất của catalog.
+
+## Điều tài liệu ghi rõ là chưa kiểm (7b)
+- Sơ đồ Mermaid chưa xem bản vẽ trên GitHub.
+- `make docker-up-gpu`, `make docker-up-prod` đủ luồng, `make db-restore`, tunnel HTTPS trên điện thoại thật (và việc Vite bản dev có nhận tên miền tunnel không).
+- Quy trình sinh `data_demo/` từ máy sạch (`make_demo_dataset.py` → validate → `make seed-demo`) viết theo code, chưa chạy lại (không được chạy lại script sinh dữ liệu demo khi chưa hỏi).

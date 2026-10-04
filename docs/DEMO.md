@@ -1,56 +1,60 @@
 # Hướng dẫn ngày demo — Web POS
 
-> Kiến trúc thực tế: **một tiến trình, một cổng (8000), một URL** — backend tự phục vụ giao diện, nên tunnel chỉ cần **một** cổng và **không phải khởi động lại** khi URL tunnel đổi (cùng origin, không có CORS).
-> Chỉ có các bước làm; cách cài đặt và giải thích ở [`WEB.md`](WEB.md).
+> Chỉ có các bước làm; cách cài đặt và giải thích ở [`WEB.md`](WEB.md). Mọi lệnh `make` chạy ở gốc repo (Windows: Git Bash).
+> Giao diện và API đi chung **một** cổng 5173 (`web` chuyển tiếp `/api`), nên tunnel chỉ cần một cổng và không phải cấu hình lại khi URL tunnel đổi.
 
 ## A. Trước ngày demo
 
 **Kiểm chứng phần mềm**
-- [ ] `python -m pytest -q` đạt toàn bộ.
-- [ ] Nếu đã đổi code hoặc dữ liệu: `python run.py --mode validate` rồi `python scripts\compare_validate.py <report mới> data\baseline\report.json` phải `ĐẠT` (cổng G, dữ liệu thật).
-- [ ] `.\launch.bat` (dữ liệu thật) hoặc `.\launch.bat demo` (PowerShell bắt buộc có `.\`): bảng `check_env` **không còn dòng [FAIL]**.
+- [ ] `make lint`, `make type-check`, `make test`, `make test-web` đều đạt.
+- [ ] Nếu đã đổi `backend/engine/` hoặc dữ liệu: chạy cổng kiểm định của pipeline (`03_DEVELOPMENT_RULES.md` mục 19.8) và phải `ĐẠT`.
+- [ ] `make docker-up` rồi `make check-env`: **không còn dòng FAIL**; đọc kỹ các dòng WARN.
+- [ ] Chọn chế độ nhận diện cho buổi demo (`WEB.md` mục 3) và chạy thử đúng chế độ đó. Pipeline thật trong Docker (`make docker-up-gpu`) *chưa được chạy thử*: thử trước, không để tới ngày demo.
 
 **Dữ liệu**
-- [ ] Đăng nhập `admin` → **Sản phẩm** → lọc **Thiếu giá**: nhập giá cho mọi SKU sẽ bán. Nhập **barcode** cho các SKU cần quét (chỉ SKU có barcode mới quét được).
-- [ ] Thêm SKU mới: đặt ảnh vào `data\gallery_inbox\<tên>\`, chạy `python -m src.catalog.sync_gallery --db data\db\app.db --gallery-dir data\gallery --inbox-dir data\gallery_inbox` (cấp ID, chuyển thành `data\gallery\<ID>`), rồi `python run.py --mode validate` (build lại index vì fingerprint đổi) và so cổng G. Đặt tên + khai báo bằng chứng ở Admin → Sản phẩm (🧠). Chi tiết: `docs/04_DATA_AND_CATALOG.md`.
-- [ ] Dựng DB demo sạch (server **đã dừng**): `python scripts\db_snapshot.py purge-orders` → `python scripts\db_snapshot.py save demo_clean` → `python scripts\db_snapshot.py list`. (`--data-dir data_demo` nếu dùng dữ liệu demo.)
-- [ ] Mật khẩu `staff`/`admin` nằm trong `.env` (không commit, không ghi vào tài liệu). **`staff` chỉ đăng nhập trên điện thoại, `admin` trên laptop** — đăng nhập cùng tài khoản ở máy thứ hai sẽ đá máy thứ nhất ra.
+- [ ] Đăng nhập admin → **Sản phẩm** → lọc thiếu giá: nhập giá cho mọi SKU sẽ bán. Nhập **barcode** cho các SKU cần quét.
+- [ ] Thêm SKU mới (dữ liệu thật): quy trình ở [`04_DATA_AND_CATALOG.md`](04_DATA_AND_CATALOG.md) mục 6.2, rồi lập lại index và so cổng kiểm định. Đặt tên và khai báo bằng chứng ở Admin → Sản phẩm.
+- [ ] Dựng database demo sạch: huỷ hoặc thanh toán hết đơn thử, rồi `make db-save NAME=demo_clean`. Kiểm có file `backups/demo_clean.dump`.
+- [ ] Thử `make db-restore NAME=demo_clean` **một lần trước ngày demo** (lệnh này chưa từng được chạy thử): `docker compose stop api` → `make db-restore NAME=demo_clean` → `docker compose start api` → đăng nhập lại, kiểm dữ liệu.
+- [ ] Tài khoản: thu ngân chỉ đăng nhập trên điện thoại, admin trên laptop (đăng nhập cùng tài khoản ở máy thứ hai sẽ đá máy thứ nhất ra). Mật khẩu không nằm trong repo hay tài liệu; quên thì `make reset-password USER_NAME=<tên>`.
 
 **Thiết bị và mạng**
-- [ ] Thử **Android và iOS**: cấp quyền camera; iOS cần chạm nút "Bật cảm biến nghiêng"; iOS Safari không rung.
-- [ ] Thử tunnel qua **4G điện thoại thật** ít nhất một lần *(CHƯA LÀM)*: VS Code → tab **Ports** → forward `8000` → Visibility **Public**.
-- [ ] Thử thao tác thật trên điện thoại: chụp bằng camera, chọn ảnh lớn từ thư viện, tải lại trang khi đang có giỏ (đơn phải được khôi phục).
+- [ ] Thử **Android và iOS**: cấp quyền camera; iOS cần chạm nút bật cảm biến nghiêng.
+- [ ] Thử tunnel qua **4G điện thoại thật** ít nhất một lần *(CHƯA LÀM với bản này)*: VS Code → tab **Ports** → forward `5173` → Visibility **Public**. Nếu trang báo tên miền không được phép thì chạy `make docker-up-prod` thay cho `make docker-up`.
+- [ ] Thử thao tác thật trên điện thoại: chụp bằng camera, chọn ảnh lớn từ thư viện, tải lại trang khi đang có giỏ (đơn phải được khôi phục), quét mã vạch, in hoá đơn.
 - [ ] Quay **video** chạy trơn tru làm phương án lùi cuối.
 
 ## B. Ngay trước giờ demo (thứ tự cố định)
 
-1. Dừng server nếu đang chạy. Đăng xuất mọi thiết bị.
-2. `python scripts\db_snapshot.py restore demo_clean` (mọi phiên cũ bị vô hiệu, cần đăng nhập lại).
-3. `.\launch.bat` (hoặc `.\launch.bat demo`). Đợi dòng "Web POS đang chạy". Nếu có [FAIL] thì sửa rồi chạy lại.
-4. Mở `http://127.0.0.1:8000/api/health` trên laptop: phải thấy `{"status": "ready"}`.
-5. Mở tunnel (Ports → forward 8000 → Public), copy URL `https://…`.
-6. Mở URL đó trên điện thoại **qua đúng mạng 4G dùng lúc demo**, đăng nhập `staff`.
+1. Đăng xuất mọi thiết bị.
+2. `docker compose stop api` → `make db-restore NAME=demo_clean` → `make docker-up` (đúng chế độ nhận diện đã chọn).
+3. `make check-env`: không có FAIL.
+4. Mở `http://localhost:8000/api/health` trên laptop: phải thấy `"status": "ready"` và đúng tên bộ nhận diện (`fake` hoặc `local`).
+5. Mở tunnel (Ports → forward 5173 → Public), copy URL `https://…`.
+6. Mở URL đó trên điện thoại **qua đúng mạng 4G dùng lúc demo**, đăng nhập tài khoản thu ngân.
 7. Chạy thử **một giao dịch đầy đủ**: chụp → hoá đơn → (nhập giá tay nếu thiếu) → thanh toán → hoàn tất. Không demo thật nếu bước này chưa trơn.
-8. Xem trạng thái từ laptop bằng `admin` (không dùng `staff`).
-9. Xoá đơn thử: đăng xuất → dừng server → `db_snapshot.py restore demo_clean` → `.\launch.bat` lại. Tunnel còn sống thì giữ nguyên URL (không cần cấu hình lại).
+8. Xem trạng thái từ laptop bằng tài khoản admin (không dùng tài khoản thu ngân).
+9. Xoá đơn thử: lặp lại bước 1–2. Tunnel còn sống thì giữ nguyên URL.
 
 ## C. Trong lúc demo — nếu có sự cố
 
 | Tình huống | Làm gì |
 |---|---|
-| Banner "Phát hiện thêm N vật chưa nhận diện" hoặc thiếu sản phẩm | **Thêm món**: tìm theo tên (không cần dấu) hoặc nhập/quét mã vạch; hoặc **Chụp thêm** gần hơn, tách các món ra |
-| Nhận sai sản phẩm | Chạm dòng viền vàng → chọn đúng sản phẩm; hoặc chạm dòng thường để sửa số lượng/xoá |
+| Báo còn vật chưa nhận diện, hoặc thiếu sản phẩm | **Thêm món**: tìm theo tên (không cần dấu) hoặc nhập/quét mã vạch; hoặc **Chụp thêm** gần hơn, tách các món ra |
+| Nhận sai sản phẩm | Chạm dòng viền vàng → chọn đúng sản phẩm; hoặc chạm dòng thường để sửa số lượng / xoá |
 | Thiếu giá | Nhập giá tay ngay tại dòng; thanh toán bị chặn đến khi nhập đủ |
-| Banner "chụp thêm" (chồng lấp) | Dàn lại hàng, **Chụp thêm** (cộng dồn); hoặc **Bỏ qua** |
-| Camera không mở (mở trang bằng `http://` hoặc chưa cấp quyền) | Bấm **📷 Chụp bằng camera máy** ngay trong thẻ thông báo, hoặc **Chọn ảnh** từ thư viện |
+| Cảnh báo chồng lấp | Dàn lại hàng, **Chụp thêm** (cộng dồn); hoặc bỏ qua |
+| Camera không mở (trang mở bằng `http://` hoặc chưa cấp quyền) | Chụp bằng ứng dụng camera của máy, hoặc chọn ảnh từ thư viện |
 | "Hệ thống đang bận" (hàng đợi đầy) | Đợi vài giây rồi chụp lại |
-| "Xử lý quá lâu" / "Hệ thống quá tải" | Chụp lại; nếu lặp lại thì khởi động lại server |
-| Bị đưa về màn đăng nhập | Kiểm tra có ai đăng nhập cùng tài khoản ở máy khác không; đăng nhập lại — **đơn đang dở được khôi phục** |
+| Không chụp được vì đang kiểm định / đang áp dụng thiết lập | Đợi xong; không chạy kiểm định trong giờ demo |
+| "Máy chủ đã khởi động lại, hãy chụp lại" | Chụp lại; đơn và các dòng đã có vẫn còn |
+| Bị đưa về màn đăng nhập | Kiểm có ai đăng nhập cùng tài khoản ở máy khác không; đăng nhập lại — **đơn đang dở được khôi phục** |
+| API không trả lời | `make logs S=api` xem lỗi; `docker compose restart api`; kiểm `/api/health` |
 | Server/mạng lỗi không sửa kịp | Chuyển sang **video** đã quay |
 
-> **Không có** phương án lùi "GPU từ xa" (Colab/worker từ xa chưa được xây). Nếu máy chủ chết hoặc mất mạng thì dùng video.
+> **Không có** phương án lùi "GPU từ xa". Nếu máy chủ chết hoặc mất mạng thì dùng video.
 
 ## D. Sau demo
-- [ ] Tắt tunnel (Ports → dừng chia sẻ cổng 8000). `Ctrl+C` dừng server.
-- [ ] Nếu mật khẩu có thể đã lộ: Admin → Nhân viên → **Đặt lại MK**.
-- [ ] Quên mật khẩu (kể cả admin): `python scripts\reset_password.py <tài khoản> --data-dir <data|data_demo>` trên máy chủ (xem `docs/WEB.md`).
+- [ ] Tắt tunnel (Ports → dừng chia sẻ cổng 5173). `make docker-down`.
+- [ ] Nếu mật khẩu có thể đã lộ: Admin → Nhân viên → đặt lại mật khẩu; với admin: `make reset-password USER_NAME=admin`.
+- [ ] Ảnh chụp tích lại trong `MEDIA_DIR`: `make purge-media DAYS=30 DRY_RUN=1` để xem, bỏ `DRY_RUN` để xoá.

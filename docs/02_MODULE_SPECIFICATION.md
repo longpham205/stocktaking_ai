@@ -48,7 +48,7 @@ Only `InventoryPipeline` coordinates data flow between AI modules.
 
 # **1b\. catalog/**
 **Files**: `db.py`, `repository.py`, `snapshot.py`, `factory.py`, `validation.py`, `migrate.py`, `reconcile.py`, `sync_gallery.py`, `checks.py`
-**Responsibilities**: the product catalog (SKUs, recognition evidence, colour references) stored in SQLite, and the read-only `CatalogRepository` through which every pipeline module reads it. The source is chosen by `catalog.source` (`sqlite` | `snapshot`) with no silent fallback. Full description: `docs/04_DATA_AND_CATALOG.md`.
+**Responsibilities**: the product catalog (SKUs, recognition evidence, colour references) stored in a database (a SQLite file, or Postgres under the web POS), and the read-only `CatalogRepository` through which every pipeline module reads it. The source is chosen by `catalog.source` (`sqlite` | `snapshot` | `database`) with no silent fallback. Full description: `docs/04_DATA_AND_CATALOG.md`.
 **Forbidden**: no model inference; pipeline modules never open the database directly — only through `CatalogRepository`.
 # **2\. models/**
 **Files**: `models.py`
@@ -137,7 +137,7 @@ Loads a *pre-built* FAISS index; product data comes from the shared `CatalogRepo
 
 ## **6.3 gallery\_builder.py**
 
-Build-time only (invoked by `pipeline/build.py`). Never imported by runtime `Retriever`. Folder → `product_id` mapping comes from `CatalogRepository.folder_to_product_id()`; every build writes a fingerprint file next to the index (`src/retrieval/fingerprint.py`).
+Build-time only (invoked by `pipeline/build.py`). Never imported by runtime `Retriever`. Folder → `product_id` mapping comes from `CatalogRepository.folder_to_product_id()`; every build writes a fingerprint file next to the index (`engine/retrieval/fingerprint.py`).
 
 # **7\. decision/**
 
@@ -258,13 +258,13 @@ Computes one shared detection↔ground-truth match per image, reused by all 9 st
 
 Standalone registry of pure metric formulas (`precision`, `recall`, `f1`, `mrr`, `mean_rank`, `confusion_matrix`, `trigger_rate`, `correction_rate`, ...). Adding a new metric requires writing one function and registering it here — no changes to `evaluator.py`.
 
-# **14\. ui/app.py**
+# **14\. ui/app.py (removed)**
 
-**Forbidden**: never imports Detector/Retriever/any model class directly; communicates only via `InferenceRunner`/`ValidationRunner`.
+The Tkinter desktop UI is no longer part of the engine; its frozen copy is in `src_legacy/engine/ui/`. The admin pages of the web POS replace it.
 
-# **15\. Web POS (`backend/`, `frontend/`) — outside `src/`**
+# **15\. Web POS (`backend/app/`, `frontend/`) — outside the engine**
 
-Not a pipeline module. `backend/` (stdlib `http.server` + `sqlite3`) runs the pipeline only through `InferenceRunner`/`ValidationRunner` and reads the catalog through `SqliteCatalogRepository`; `src/` never imports `backend/`. Rules: `03_DEVELOPMENT_RULES.md` §19. Usage: `docs/WEB.md`.
+Not a pipeline module. The engine described in this document now lives in `backend/engine/` (formerly `src/`). `backend/app/` (FastAPI + Postgres) runs the pipeline only through `RecognizerPort` → `LocalRecognizer` → `InferenceRunner`/`ValidationRunner`; the engine never imports `app`. When the web runs, the pipeline reads its catalog from Postgres (`catalog.source: database`). Rules: `03_DEVELOPMENT_RULES.md` §19. Architecture: `docs/system-architecture.md`. Usage: `docs/WEB.md`.
 
 # **Dependency Rules Summary**
 
