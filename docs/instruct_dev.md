@@ -4,6 +4,30 @@
 
 Mọi lệnh `make` chạy ở **gốc repo**. Trên Windows dùng **Git Bash** (công thức trong `Makefile` là shell POSIX; PowerShell và cmd không chạy được).
 
+## 0. Cách nhanh nhất: một cú nhấp
+
+- **Windows:** nhấp đúp `run_e2e.bat` ở gốc repo (cần Git for Windows; file `.bat` tự tìm Git Bash).
+- **Linux / macOS / Git Bash:** `./run_e2e.sh`
+
+Script làm lần lượt mục 2 và mục 5 của tài liệu này, dừng ở bước đầu tiên bị lỗi:
+
+1. kiểm công cụ (`docker`, `uv`, `make`, `openssl`), Docker đang chạy, có `backend/data_demo/`;
+2. `make setup`;
+3. `make docker-up` với `RECOGNIZER=fake` và `PIPELINE_CONFIG=configs/config.demo.yaml`;
+4. `make seed-demo`;
+5. tạo (hoặc đặt lại mật khẩu) hai tài khoản thử `e2e_admin`, `e2e_staff`;
+6. `make check-env`;
+7. `make smoke` → in `E2E PASSED` rồi mở `http://localhost:5173`.
+
+Điều cần biết:
+
+- Lần đầu mất vài phút (build image); các lần sau khoảng một phút.
+- Mật khẩu của `e2e_admin` / `e2e_staff` sinh ngẫu nhiên mỗi lần chạy, chỉ dùng cho smoke và **không in ra**. Tài khoản của bạn không bị đụng. Để tự đăng nhập xem giao diện, tạo tài khoản riêng một lần: `make reset-password USER_NAME=admin ROLE=admin` (mục 4).
+- Mỗi lần chạy, smoke **thanh toán một đơn thật**: đơn đó ở lại trong database và báo cáo ngày.
+- `run_e2e.bat full` (hoặc `./run_e2e.sh full`): chạy thêm `make lint`, `make type-check`, `make test`, `make test-web` trước khi bật dịch vụ.
+- Đổi chế độ: đặt biến trước khi gọi, ví dụ `RECOGNIZER=local ./run_e2e.sh`. `NO_OPEN=1` để không mở trình duyệt.
+- Script chỉ gọi các target `make` có sẵn; khi một bước lỗi, chạy tay đúng lệnh đó theo các mục dưới để xem kỹ.
+
 ## 1. Chuẩn bị máy (một lần)
 
 | Cần | Kiểm bằng | Ghi chú |
