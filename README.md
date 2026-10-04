@@ -4,7 +4,7 @@
 
 > **Kiến trúc:** `backend/` (FastAPI + Postgres + engine nhận diện ở `backend/engine/`) và `frontend/` (Vite + React), chạy bằng `make` và Docker Compose. Web POS thế hệ đầu (stdlib `http.server` + SQLite) không còn trong cây thư mục; xem lại ở commit `f30710d` (`git worktree add ../stocktaking-legacy f30710d`).
 
-> **Hướng dẫn nhanh:** chạy web POS — [`docs/WEB.md`](docs/WEB.md) · kiến trúc và sơ đồ — [`docs/system-architecture.md`](docs/system-architecture.md) · ngày demo — [`docs/DEMO.md`](docs/DEMO.md) · dữ liệu và catalog — [`docs/04_DATA_AND_CATALOG.md`](docs/04_DATA_AND_CATALOG.md) · luật phát triển — [`docs/03_DEVELOPMENT_RULES.md`](docs/03_DEVELOPMENT_RULES.md).
+> **Hướng dẫn nhanh:** dev chạy thử đầu-cuối, tài khoản và mật khẩu — [`docs/instruct_dev.md`](docs/instruct_dev.md) · chạy web POS — [`docs/WEB.md`](docs/WEB.md) · kiến trúc và sơ đồ — [`docs/system-architecture.md`](docs/system-architecture.md) · ngày demo — [`docs/DEMO.md`](docs/DEMO.md) · dữ liệu và catalog — [`docs/04_DATA_AND_CATALOG.md`](docs/04_DATA_AND_CATALOG.md) · luật phát triển — [`docs/03_DEVELOPMENT_RULES.md`](docs/03_DEVELOPMENT_RULES.md).
 
 > Các mục đánh dấu **[Kế hoạch]** là hạng mục chưa triển khai.
 
