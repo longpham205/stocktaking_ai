@@ -18,7 +18,7 @@ from entrypoints.purge_media import purge
 from entrypoints.seed_demo import seed_prices
 from tests.api.conftest import http, login
 
-# the tables of web v1 (src_legacy/backend/db.py) and of its catalog (the engine's, on SQLite)
+# the tables of web v1 (backend/db.py at git commit f30710d) and of its catalog (the engine's, on SQLite)
 LEGACY_SCHEMA = """
 CREATE TABLE users(id INTEGER PRIMARY KEY, username TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL,
   full_name TEXT NOT NULL DEFAULT '', role TEXT NOT NULL DEFAULT 'staff', is_active INTEGER NOT NULL DEFAULT 1,

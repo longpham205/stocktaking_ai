@@ -37,8 +37,3 @@ export interface MeOut {
   shift: Shift;
   settings: PosSettings;
 }
-
-export interface Health {
-  status: string;
-  recognizer: string;
-}

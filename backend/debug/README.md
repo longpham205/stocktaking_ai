@@ -45,7 +45,7 @@ tool debug — là hạ tầng dùng chung, không chạy trực tiếp.
 | `debug.py` | Bản nháp, chức năng trùng `04_retrieval_selfcheck.py` |
 | `debug_benchmark.py` | Bản nháp thô của `12_benchmark_gt_viewer.py`, không tương tác |
 | `debug/__pycache__/*.pyc` | Rác build |
-| `check_requirements.py` | Không debug pipeline — đã xoá (2026-10-03); kiểm môi trường bằng `scripts/check_env.py` (nay ở `src_legacy/scripts/`, sẽ viết lại ở phase 7) |
+| `check_requirements.py` | Không debug pipeline — đã xoá (2026-10-03); kiểm môi trường bằng `make check-env` |
 | `generate_demo.py` | Sinh dữ liệu GIẢ LẬP cho demo — đã xoá (2026-10-03), thay bằng `scripts/make_demo_dataset.py` |
 
 ## Lỗi đã sửa khi dọn lại (đáng chú ý cho lần sau)

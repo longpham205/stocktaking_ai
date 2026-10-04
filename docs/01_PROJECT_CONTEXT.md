@@ -46,7 +46,7 @@ The complete inventory process consists of:
   production pipeline* — never a simplified parallel evaluation path —
   at the granularity of each individual stage, so regressions can be
   attributed to a specific stage rather than only observed end-to-end.
-- Provide a desktop UI (Tkinter) for demonstration and interactive validation
+- Provide a web POS (cashier and admin screens) for demonstration and interactive validation; the original Tkinter desktop UI was removed (last present in git commit `f30710d`)
   review.
 
 ---
@@ -134,55 +134,52 @@ roughly as many wrong decisions as it broke. The current `Reranker` instead:
 
 ```text
 stocktaking_ai/
-├── .env
-├── .gitignore
+├── .env                         # Web configuration and secrets (from .env.example, never committed)
+├── Makefile                     # Every day-to-day command
+├── docker-compose.yml           # postgres + migrate + api + web
 ├── README.md
-├── requirements.txt
-├── run.py                       # CLI entry point (Build -> Infer / Validate / UI)
-├── launch.bat                   # Web POS launcher for Windows
-├── bin/                         # setup.bat, setup.sh (Linux/macOS/WSL), setup_colab.sh, launch.sh
-├── configs/
-│   ├── assets_manifest.json     # Checksum and structure integrity manifest
-│   └── config.yaml              # Master runtime configuration
-├── data/
-│   ├── gallery/                 # Reference product images for vector indexing
-│   ├── metadata/                # SKU catalogs, color maps, and ID mappings
-│   ├── benchmark/               # COCO-formatted evaluation datasets
-│   ├── query/                   # Input checkout-counter images for inference
-│   ├── outputs/                 # Exported results (JSON, CSV, annotated visuals)
-│   └── cache/                   # Serialized FAISS vector index & metadata cache
-├── debug/                       # Standalone diagnostic and verification scripts
-├── docs/                        # Architecture specs, context, and developer guidelines
-├── notebooks/                   # Analytical and pipeline evaluation Jupyter notebooks
-├── scripts/
-│   ├── setup.py                 # Core environment and asset initialization logic
-│   ├── generate_manifest.py     # Asset manifest generation script
-│   └── verify_manifest.py       # Integrity verification script
-├── weights/                     # Model checkpoints (RF-DETR, SAM2, SigLIP2)
-│   ├── detector/                # Detection model weights
-│   ├── refinement/              # Segmentation model weights
-│   └── retriever/               # Vision encoder offline weights
-├── src/
-│   ├── catalog/                 # Metadata compilation and catalog indexing
-│   ├── core/                    # System configuration, logging, and common utilities
-│   ├── decision/                # Similarity thresholding & multi-evidence reranking
-│   ├── detection/               # Object detection backends and dual-crop generation
-│   ├── inference/               # Production batch/single-image inference engine
-│   ├── models/                  # Domain Data Transfer Objects (Pydantic / Dataclasses)
-│   ├── pipeline/                # Master orchestrator, overlap resolution, and offline build
-│   ├── plugins/                 # Secondary evidence plugins (OCR, Color, Barcode)
-│   ├── retrieval/               # SigLIP2 embedding extraction and FAISS indexer
-│   ├── segmentation/            # SAM2 instance mask boundary refinement
-│   ├── storage/                 # CSV/JSON output persistence and visualization overlay
-│   ├── ui/                      # Desktop Graphical Interface (Tkinter dashboard)
-│   └── validation/              # 9-stage evaluation suite and metric calculators
-└── tests/                       # Unit and integration pytest test suite
+├── backend/
+│   ├── pyproject.toml           # Dependencies (uv); `uv sync --extra ml` for the real models
+│   ├── app/                     # Web API (FastAPI): see docs/system-architecture.md
+│   ├── entrypoints/             # api.py and the operations commands
+│   ├── migrations/              # Alembic revisions
+│   ├── engine/                  # The recognition pipeline described in this document
+│   │   ├── __main__.py          # CLI entry point: python -m engine --mode infer|validate
+│   │   ├── catalog/             # Catalog database, repository, migrate, gallery sync
+│   │   ├── core/                # System configuration, logging, and common utilities
+│   │   ├── decision/            # Similarity thresholding & multi-evidence reranking
+│   │   ├── detection/           # Object detection backends and dual-crop generation
+│   │   ├── inference/           # Production batch/single-image inference engine
+│   │   ├── models/              # Domain Data Transfer Objects (Pydantic / Dataclasses)
+│   │   ├── pipeline/            # Master orchestrator, overlap resolution, and offline build
+│   │   ├── plugins/             # Secondary evidence plugins (OCR, Color, Barcode)
+│   │   ├── retrieval/           # SigLIP2 embedding extraction and FAISS indexer
+│   │   ├── segmentation/        # SAM2 instance mask boundary refinement
+│   │   ├── storage/             # CSV/JSON output persistence and visualization overlay
+│   │   └── validation/          # 9-stage evaluation suite and metric calculators
+│   ├── configs/
+│   │   ├── assets_manifest.json # Checksum and structure integrity manifest
+│   │   └── config.yaml          # Master pipeline configuration
+│   ├── data/
+│   │   ├── gallery/             # Reference product images for vector indexing
+│   │   ├── metadata/            # One-time seed inputs of the catalog migrate
+│   │   ├── benchmark/           # COCO-formatted evaluation datasets
+│   │   ├── query/               # Input checkout-counter images for inference
+│   │   ├── outputs/             # Exported results (JSON, CSV, annotated visuals)
+│   │   └── cache/               # Serialized FAISS vector index & metadata cache
+│   ├── debug/                   # Standalone diagnostic and verification scripts
+│   ├── notebooks/               # Analytical and pipeline evaluation Jupyter notebooks
+│   ├── scripts/                 # Manifest, gates (compare_validate, compare_golden), set_device
+│   ├── weights/                 # Model checkpoints (RF-DETR, SAM2, SigLIP2)
+│   └── tests/                   # Engine tests + tests/api/ (web API)
+├── frontend/                    # Web console (Vite + React)
+└── docs/                        # Architecture specs, context, and developer guidelines
 ```
 
 # 5. High-Level Architecture
 
 ```text
-Desktop UI / CLI
+Web API / CLI
                        │
                        ▼
              Inference / Validation Runner

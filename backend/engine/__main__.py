@@ -10,7 +10,7 @@ Usage:
     Validation:
         python -m engine --mode validate --benchmark-dir data/benchmark/
 
-Run from backend/. The tkinter desktop UI was retired to src_legacy/engine/ui (the web app replaces it).
+Run from backend/. The tkinter desktop UI was removed (the web app replaces it).
 
 By default, every mode first runs the offline build pipeline (product
 metadata + gallery FAISS index — see engine/pipeline/build.py) so the

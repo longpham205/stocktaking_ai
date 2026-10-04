@@ -1,5 +1,5 @@
 """Advanced engine settings, the benchmark validation and the evidence test (3e-4), with a stub
-recognizer. Ported from the legacy suite (src_legacy/tests/test_backend_api.py)."""
+recognizer. Ported from the legacy suite (tests/test_backend_api.py of web v1, git commit f30710d)."""
 
 import asyncio
 import io

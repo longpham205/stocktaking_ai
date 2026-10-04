@@ -4,7 +4,7 @@
     python scripts/set_device.py cpu      # máy không có GPU
     python scripts/set_device.py cuda
 
-Chỉ dùng thư viện chuẩn: chạy được TRƯỚC khi PyYAML được cài (trước đây `setup.py` và `bin/setup_colab.sh` gọi script này; nay ở src_legacy/).
+Chỉ dùng thư viện chuẩn: chạy được TRƯỚC khi PyYAML được cài (trước đây `setup.py` và `bin/setup_colab.sh` gọi script này; hai file đó thuộc web v1, đã gỡ).
 Chỉ sửa giá trị trên các dòng `device:` (giữ nguyên comment, thứ tự, kiểu xuống dòng). Số dòng `device:`
 khác EXPECTED_KEYS thì dừng và báo lỗi, tránh vá thiếu âm thầm khi config thêm/mất khoá.
 """

@@ -1,5 +1,5 @@
 """Basket photos: upload, the recognition queue, the job state, order lines from boxes, signed media.
-Ported from the legacy suite (src_legacy/tests/test_backend_api.py), with a scripted recognizer."""
+Ported from the legacy suite (tests/test_backend_api.py of web v1, git commit f30710d), with a scripted recognizer."""
 
 import asyncio
 import io

@@ -1,5 +1,5 @@
 """Product search of the POS screen, on the engine's catalog tables plus the web's prices.
-Ported from the legacy suite (src_legacy/tests/test_backend_api.py)."""
+Ported from the legacy suite (tests/test_backend_api.py of web v1, git commit f30710d)."""
 
 import json
 
