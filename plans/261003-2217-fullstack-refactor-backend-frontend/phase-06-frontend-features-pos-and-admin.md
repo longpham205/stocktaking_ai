@@ -59,5 +59,9 @@ Checklist parity đủ; vitest cho mỗi feature (stub API); smoke thủ công t
 - Nút "Lưu bằng chứng", "Áp dụng", "Bắt đầu" bị khoá cho tới khi tích ô xác nhận (bản cũ cho bấm rồi báo lỗi).
 - Bấm Huỷ ở hộp thoại áp dụng giữ nguyên các giá trị đang gõ.
 
+## Thêm theo yêu cầu người dùng (2026-10-04): xem ảnh gallery ở màn Sản phẩm
+- Nút 🖼 trên mỗi dòng mở `gallery-dialog.tsx`: ảnh lớn + dải ảnh nhỏ (tối đa 12 ảnh đầu của thư mục gallery, đã thu nhỏ, URL ký). Dùng lại `GET /admin/products/{id}/evidence` (trường `gallery`), không đổi backend. Test vitest (48 test). Chạy thật: SKU 1 hiện 6 ảnh.
+- Lưu ý: ảnh lấy từ `paths.gallery_dir` của `PIPELINE_CONFIG`. DB dev đang chứa catalog demo nên `api` phải chạy với `PIPELINE_CONFIG=configs/config.demo.yaml` mới có ảnh (config mặc định trỏ gallery thật, tên thư mục không khớp catalog demo).
+
 ## Phase 6: hoàn tất về code
 Còn "smoke thủ công trên điện thoại qua HTTPS forward" (camera trực tiếp, cảm biến nghiêng, máy quét, in): việc của người dùng.

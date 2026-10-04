@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Brain, ChevronLeft, ChevronRight, FlaskConical, History } from 'lucide-react';
+import { Brain, ChevronLeft, ChevronRight, FlaskConical, History, Images } from 'lucide-react';
 import { toast } from 'sonner';
 import { RoutePending } from '@/components/route-states';
 import { Badge } from '@/components/ui/badge';
@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { getAdminProducts, updateProduct, type ProductChange, type ProductFilter } from '@/features/admin-products/api';
 import { EvidenceDialog } from '@/features/admin-products/evidence-dialog';
 import { EvidenceTestDialog } from '@/features/admin-products/evidence-test-dialog';
+import { GalleryDialog } from '@/features/admin-products/gallery-dialog';
 import { ProductHistoryDialog } from '@/features/admin-products/product-history-dialog';
 import { parseMoney } from '@/features/pos/lib';
 import type { Product } from '@/features/pos/types';
@@ -22,11 +23,12 @@ interface RowProps {
   product: Product;
   saving: boolean;
   onSave: (change: ProductChange) => void;
+  onGallery: () => void;
   onEvidence: () => void;
   onHistory: () => void;
 }
 
-function ProductRow({ product, saving, onSave, onEvidence, onHistory }: RowProps) {
+function ProductRow({ product, saving, onSave, onGallery, onEvidence, onHistory }: RowProps) {
   const [name, setName] = useState(product.name);
   const [barcode, setBarcode] = useState(product.barcode);
   const [price, setPrice] = useState(product.price === null ? '' : String(product.price));
@@ -77,6 +79,9 @@ function ProductRow({ product, saving, onSave, onEvidence, onHistory }: RowProps
           <Button size="sm" disabled={saving} onClick={save}>
             Lưu
           </Button>
+          <Button size="icon" variant="outline" className="h-8 w-8" title="Ảnh gallery" aria-label={`Ảnh ${product.id}`} onClick={onGallery}>
+            <Images className="h-4 w-4" />
+          </Button>
           <Button size="icon" variant="outline" className="h-8 w-8" title="Bằng chứng nhận diện (AI)" aria-label={`Bằng chứng ${product.id}`} onClick={onEvidence}>
             <Brain className="h-4 w-4" />
           </Button>
@@ -89,7 +94,7 @@ function ProductRow({ product, saving, onSave, onEvidence, onHistory }: RowProps
   );
 }
 
-type Opened = { kind: 'evidence' | 'history'; productId: string } | { kind: 'test' } | null;
+type Opened = { kind: 'gallery' | 'evidence' | 'history'; productId: string } | { kind: 'test' } | null;
 
 /** The catalog on sale: names, barcodes, prices, and each product's recognition evidence and history. */
 export function ProductsPage() {
@@ -179,6 +184,7 @@ export function ProductsPage() {
                 product={product}
                 saving={save.isPending}
                 onSave={(change) => save.mutate({ productId: product.id, change })}
+                onGallery={() => setOpened({ kind: 'gallery', productId: product.id })}
                 onEvidence={() => setOpened({ kind: 'evidence', productId: product.id })}
                 onHistory={() => setOpened({ kind: 'history', productId: product.id })}
               />
@@ -197,6 +203,7 @@ export function ProductsPage() {
           <ChevronRight className="h-4 w-4" />
         </Button>
       </div>
+      {opened?.kind === 'gallery' && <GalleryDialog productId={opened.productId} onClose={() => setOpened(null)} />}
       {opened?.kind === 'evidence' && <EvidenceDialog productId={opened.productId} onClose={() => setOpened(null)} />}
       {opened?.kind === 'history' && <ProductHistoryDialog productId={opened.productId} onClose={() => setOpened(null)} />}
       {opened?.kind === 'test' && <EvidenceTestDialog onClose={() => setOpened(null)} />}

@@ -172,6 +172,35 @@ describe('admin products', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
 
+  it('shows the gallery photos of a product, one enlarged at a time', async () => {
+    const photos = ['/api/gallery/7/0?exp=1&sig=a', '/api/gallery/7/1?exp=1&sig=b'];
+    const view = (gallery: string[]): EvidenceView => ({
+      product: product('7', { name: 'Kem ABA' }),
+      evidence: { ocr_keywords: [], color_code: null, force_evidence: [], confusable_with: [] },
+      colors: [],
+      confirm_text: 'x',
+      ocr_min_length: 3,
+      gallery,
+      warnings: [],
+    });
+    stubFetchRoutes({
+      '/api/me': adminMe,
+      '/api/admin/products?': () => jsonResponse(listing([product('7', { name: 'Kem ABA' }), product('8')])),
+      '/api/admin/products/7/evidence': () => jsonResponse(view(photos)),
+      '/api/admin/products/8/evidence': () => jsonResponse(view([])),
+    });
+    await renderApp('/admin/products');
+    await userEvent.click(await screen.findByRole('button', { name: 'Ảnh 7' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Ảnh gallery · SKU 7 — Kem ABA' });
+    expect(await within(dialog).findByAltText('Ảnh 1 của SKU 7')).toHaveAttribute('src', photos[0]);
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Xem ảnh 2' }));
+    expect(within(dialog).getByAltText('Ảnh 2 của SKU 7')).toHaveAttribute('src', photos[1]);
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Đóng' }));
+
+    await userEvent.click(screen.getByRole('button', { name: 'Ảnh 8' }));
+    expect(await screen.findByText(/chưa có ảnh gallery/)).toBeInTheDocument();
+  });
+
   it('shows the history of a product, evidence included, and reverts an entry after asking', async () => {
     const calls: Call[] = [];
     const at = '2026-10-04T03:00:00+00:00';
