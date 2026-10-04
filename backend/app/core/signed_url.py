@@ -18,7 +18,8 @@ def sign(secret: str, rel_path: str, expires: int) -> str:
 def verify(secret: str, rel_path: str, expires: int, signature: str, now: float | None = None) -> bool:
     if expires < (time.time() if now is None else now):
         return False
-    return hmac.compare_digest(signature, sign(secret, rel_path, expires))
+    # bytes: compare_digest raises on a non-ASCII str, and the signature comes from the query string
+    return hmac.compare_digest(signature.encode(), sign(secret, rel_path, expires).encode())
 
 
 def signed_query(secret: str, rel_path: str, ttl_seconds: int, now: float | None = None) -> str:

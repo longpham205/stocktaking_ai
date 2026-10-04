@@ -85,6 +85,7 @@ def test_signed_url_round_trip_expiry_and_tampering() -> None:
     assert not signed_url.verify(secret, path, 1_000, signature, now=1_001)  # expired
     assert not signed_url.verify(secret, "12/other.jpg", 1_000, signature, now=999)  # another file
     assert not signed_url.verify("other", path, 1_000, signature, now=999)  # another secret
+    assert not signed_url.verify(secret, path, 1_000, "ch\u1eef k\u00fd", now=999)  # not ASCII: refused, not an error
     assert signed_url.signed_query(secret, path, ttl_seconds=60, now=940) == f"exp=1000&sig={signature}"
     with pytest.raises(ValueError, match="MEDIA_URL_SECRET"):
         signed_url.sign("", path, 1_000)

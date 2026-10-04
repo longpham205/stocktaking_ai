@@ -1,4 +1,4 @@
-# The backend: the FastAPI app (app/, from phase 1) and the recognition engine (engine/).
+# The backend: the FastAPI app (app/) and the recognition engine (engine/).
 # An application, not a library: `engine` and `app` are imported from this directory.
 #
 #   uv sync                 light install: mock backends on CPU (demo, tests, the web app)
