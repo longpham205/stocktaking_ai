@@ -137,3 +137,10 @@ _trash/
 # Tai lieu lam viec noi bo (chi tren may)
 CLAUDE.md
 docs/dev/
+
+# ==========================================
+# 9. PHASE 1: env template, tool caches
+# ==========================================
+!.env.example
+.mypy_cache/
+.ruff_cache/

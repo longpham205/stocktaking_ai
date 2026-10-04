@@ -1,0 +1,13 @@
+# Allowlist: the image gets the lock, the app, the engine and their configs, nothing else
+# (no .env, no data, no weights: those are mounted; no tests, notebooks or debug tools).
+*
+!pyproject.toml
+!uv.lock
+!alembic.ini
+!migrations
+!entrypoints
+!app
+!engine
+!configs
+!scripts
+**/__pycache__

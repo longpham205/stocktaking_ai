@@ -1,0 +1,15 @@
+# Override: no reload, no source bind mounts, JSON logs, no generated API docs.
+#
+#   make docker-up-prod    = docker compose -f docker-compose.yml -f docker-compose.prod.yml up
+#
+# The built web console (nginx) joins this file in phase 5.
+services:
+  api:
+    command: ["uvicorn", "entrypoints.api:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1", "--no-access-log"]
+    environment:
+      APP_ENV: prod
+      LOG_FORMAT: json
+    volumes: !override
+      - ./backend/data:/srv/data
+      - ./backend/data_demo:/srv/data_demo
+      - ./backend/weights:/srv/weights:ro
