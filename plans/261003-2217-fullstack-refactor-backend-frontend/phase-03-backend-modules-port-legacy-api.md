@@ -1,6 +1,6 @@
 # Phase 03 — Backend modules (port API legacy)
 
-**Priority:** P0 · **Status:** in progress (3a auth, 3b settings + catalog đọc, 3c orders, 3d captures: done 2026-10-04) · Context: design.md §2 mapping; nguồn: `src_legacy/backend/{service,admin,security}.py`
+**Priority:** P0 · **Status:** in progress (3a–3d, 3e-1 audit + settings + giá: done 2026-10-04) · Context: design.md §2 mapping; nguồn: `src_legacy/backend/{service,admin,security}.py`
 
 ## Thứ tự module (mỗi module: ports → config → repository → service → schemas → deps → router → tests)
 1. `auth`: login (mở shift, đóng shift cũ = đá máy cũ), logout, `GET /me`, onboarding-seen; scrypt giữ format hash cũ; JWT `{uid,sid,role,exp}` qua pyjwt; `CurrentUser` kiểm shift còn mở; `RequireAdmin`; limiter 5 lần/5 phút theo (username, IP) in-memory → 429 `RATE_LIMITED` + `retry_after`.
@@ -28,7 +28,10 @@ Bộ test API port từ `test_backend_api.py` (httpx ASGITransport + FakeRecogni
 | 3b | `pos_settings`, `catalog` (đọc + giá) | **done** (2026-10-04) |
 | 3c | `orders` | **done** (2026-10-04) |
 | 3d | `captures` (bộ nhận diện giả) | **done** (2026-10-04) |
-| 3e | `audit`, phần ghi của `catalog`, `users`, `reports`, `engine_config`, `validation` | pending |
+| 3e-1 | `audit` (nhật ký + hoàn tác), `PATCH /admin/settings`, mật khẩu nâng cao, ghi giá, `GET /admin/products` | **done** (2026-10-04) |
+| 3e-2 | ghi catalog (barcode, tên, bằng chứng, màu) theo hướng C, `GET /gallery/...` | pending |
+| 3e-3 | `users`, `reports` | pending |
+| 3e-4 | `engine_config`, `validation` (cùng phần reload/kiểm định của Phase 4) | pending |
 
 ## Quyết định cho phần ghi catalog (PR 3e)
 Engine cung cấp hàm ghi nhận kết nối từ bên gọi và KHÔNG commit (cùng kiểu `set_meta` đang có); module quản trị
@@ -85,3 +88,16 @@ Vẫn một đường ghi qua engine, và catalog + nhật ký nằm trong cùng
 - Ảnh xử lý bằng Pillow (không OpenCV: đường fake không được nạp `cv2`), xoay theo EXIF như OpenCV. Đường dẫn ảnh lưu tương đối so với `MEDIA_DIR` (mặc định `data/transactions`).
 - `FakeRecognizer` chọn SKU từ catalog đang bán trong DB ở mỗi ảnh (bản cũ nhận danh sách lúc khởi động).
 - Chưa làm: xoá ảnh cũ theo hạn lưu trữ (bản cũ dọn lúc khởi động; theo "Quy ước" sẽ là lệnh/cron riêng), `GET /gallery/...` (3e).
+
+## Kết quả 3e-1
+- Route: `GET /api/admin/change-log?table=&record=&limit=`, `POST /api/admin/change-log/{id}/revert`, `PATCH /api/admin/settings`, `GET /api/admin/products?search=&filter=&page=&size=`, `PATCH /api/admin/products/{id}` (chỉ `price`). Tất cả chỉ admin (403 `FORBIDDEN`).
+- `audit`: `record_changes(conn, ...)` ghi nhật ký trên kết nối của module đang sửa (dữ liệu + nhật ký cùng một giao dịch); hoàn tác qua module sở hữu dữ liệu, mỗi module đăng ký bộ hoàn tác cho bảng của mình (`AuditService.register`, nối ở `app.main`); hoàn tác chỉ khi trường còn giữ giá trị của lần sửa đó, không thì 409 `CHANGE_STALE`; lần hoàn tác cũng được ghi nhật ký.
+- Giữ hành vi cũ: kiểm `PATCH /admin/settings` (cờ phải true/false, ngưỡng trong khoảng hoặc null, khoá lạ bị bỏ qua, không có gì hợp lệ thì 422), nhật ký settings dạng JSON với `record_id = field = khoá`, nhật ký giá dạng chữ (`None` khi không có giá), giá không đổi thì không ghi, danh sách admin (tìm theo tên/id/barcode, lọc `missing_price|missing_barcode|needs_naming`, phân trang, ba bộ đếm), mật khẩu nâng cao (409 `ADVANCED_PASSWORD_NOT_SET`, 403 `ADVANCED_PASSWORD_INVALID`, khoá tạm 429 `RATE_LIMITED`).
+- `make reset-advanced-password` (`entrypoints.reset_password --advanced`): mật khẩu ngẫu nhiên in một lần, hash lưu ở `settings` và không vào nhật ký.
+- `make lint`, `make type-check` (82 file): đạt. `make test`: 280 passed, 25 skipped (7 test mới).
+
+## Khác với bản cũ / kế hoạch (3e-1)
+- `PATCH /admin/products/{id}` tạm chỉ nhận `price`; `barcode`/`name` trả 422 cho tới 3e-2 (ghi vào bảng của engine theo hướng C). Hoàn tác barcode/tên/bằng chứng/màu/thiết lập engine cũng trả 422 cho tới khi module tương ứng đăng ký bộ hoàn tác.
+- Mật khẩu nâng cao chưa có route dùng (3e-4: `admin/config/apply`, `admin/validation`); đã có `SettingsService.verify_advanced_password` và test ở mức service. Bộ đếm sai mật khẩu nâng cao dùng chung giới hạn với đăng nhập (`LOGIN_MAX_FAILED_ATTEMPTS`, `LOGIN_LOCKOUT_MINUTES`) nhưng đếm riêng.
+- Bản cũ seed mật khẩu nâng cao lúc khởi động từ cấu hình; giờ chỉ đặt bằng lệnh.
+- `MAX_PRICE` chuyển sang `catalog/schemas.py` (orders dùng lại).

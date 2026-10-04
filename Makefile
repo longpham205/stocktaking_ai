@@ -1,7 +1,8 @@
 # Stocktaking AI: every day-to-day command. Run from the repo root.
 # On Windows run it from Git Bash (the recipes are POSIX shell).
 .PHONY: help setup docker-up docker-up-gpu docker-up-prod docker-up-data docker-down logs \
-        migrate migration dev-api test lint format type-check check-env clean reset-password
+        migrate migration dev-api test lint format type-check check-env clean reset-password \
+        reset-advanced-password
 
 COMPOSE      := docker compose
 COMPOSE_GPU  := $(COMPOSE) -f docker-compose.yml -f docker-compose.gpu.yml
@@ -77,6 +78,9 @@ type-check:      ## mypy (strict) on app/, entrypoints/, migrations/
 reset-password: migrate  ## new random password for an account, created if missing: make reset-password USER_NAME=admin ROLE=admin
 	@test -n "$(USER_NAME)" || (echo 'usage: make reset-password USER_NAME=admin [ROLE=admin]' && exit 1)
 	cd backend && uv run python -m entrypoints.reset_password $(USER_NAME) $(if $(ROLE),--create --role $(ROLE),)
+
+reset-advanced-password: migrate  ## new random advanced password (guards the engine settings), printed once
+	cd backend && uv run python -m entrypoints.reset_password --advanced
 
 check-env:       ## what this machine has: tools, .env, the engine's device keys
 	@docker --version; docker compose version; uv --version
