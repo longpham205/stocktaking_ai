@@ -6,6 +6,8 @@ from app.modules.auth.deps import auth_service, bearer_token, current_user
 from app.modules.auth.ports import CurrentUser
 from app.modules.auth.schemas import LoginIn, LoginOut, MeOut, OkOut
 from app.modules.auth.service import AuthService
+from app.modules.pos_settings.deps import settings_service
+from app.modules.pos_settings.service import SettingsService
 
 router = APIRouter(tags=["auth"])
 
@@ -23,8 +25,12 @@ async def logout(token: str | None = Depends(bearer_token), service: AuthService
 
 
 @router.get("/me")
-async def me(current: CurrentUser = Depends(current_user), service: AuthService = Depends(auth_service)) -> MeOut:
-    return await service.me(current)
+async def me(
+    current: CurrentUser = Depends(current_user),
+    service: AuthService = Depends(auth_service),
+    settings: SettingsService = Depends(settings_service),
+) -> MeOut:
+    return await service.me(current, await settings.public())
 
 
 @router.post("/me/onboarding-seen")

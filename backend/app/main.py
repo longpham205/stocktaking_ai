@@ -20,6 +20,13 @@ from app.modules.auth.config import AuthSettings, get_auth_settings
 from app.modules.auth.repository import AuthRepository
 from app.modules.auth.router import router as auth_router
 from app.modules.auth.service import AuthService
+from app.modules.catalog.repository import CatalogRepository
+from app.modules.catalog.router import router as catalog_router
+from app.modules.catalog.service import CatalogService
+from app.modules.pos_settings.config import PosSettings, get_pos_settings
+from app.modules.pos_settings.repository import SettingsRepository
+from app.modules.pos_settings.router import router as settings_router
+from app.modules.pos_settings.service import SettingsService
 from app.modules.recognition.ports import RecognizerPort
 
 logger = logging.getLogger("app.main")
@@ -36,7 +43,12 @@ def build_recognizer(settings: CoreSettings) -> RecognizerPort:
     return LocalRecognizer(settings.pipeline_config, sync_database_url(settings.database_url))
 
 
-def _build(settings: CoreSettings, recognizer: RecognizerPort | None, auth_settings: AuthSettings) -> Backends:
+def _build(
+    settings: CoreSettings,
+    recognizer: RecognizerPort | None,
+    auth_settings: AuthSettings,
+    pos_settings: PosSettings,
+) -> Backends:
     engine = make_engine(settings.database_url, settings.db_pool_size, settings.db_max_overflow)
     built = Backends(settings=settings, engine=engine)
     built.closers.append(engine.dispose)
@@ -44,6 +56,8 @@ def _build(settings: CoreSettings, recognizer: RecognizerPort | None, auth_setti
         # nobody could log in: stop at startup instead of failing every login with a 500
         raise RuntimeError("JWT_SECRET is not set: run `make setup` (it fills the secrets in .env)")
     built.auth = AuthService(AuthRepository(engine), auth_settings)
+    built.pos_settings = SettingsService(SettingsRepository(engine), pos_settings)
+    built.catalog = CatalogService(CatalogRepository(engine))
     built.recognizer = recognizer or build_recognizer(settings)
     return built
 
@@ -67,15 +81,17 @@ def create_app(
     settings: CoreSettings | None = None,
     recognizer: RecognizerPort | None = None,
     auth_settings: AuthSettings | None = None,
+    pos_settings: PosSettings | None = None,
 ) -> FastAPI:
     settings = settings or get_settings()
     auth_settings = auth_settings or get_auth_settings()
+    pos_settings = pos_settings or get_pos_settings()
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         configure_logging(settings.log_level, settings.log_format)
         # the schema is Alembic's (`make migrate`, compose's `migrate` job), never created here
-        built = _build(settings, recognizer, auth_settings)
+        built = _build(settings, recognizer, auth_settings, pos_settings)
         app.state.backends = built
         logger.info("ready", extra={"env": settings.app_env, "recognizer": settings.recognizer})
         yield
@@ -104,5 +120,7 @@ def create_app(
 
     app.include_router(api, prefix="/api")
     app.include_router(auth_router, prefix="/api")
+    app.include_router(settings_router, prefix="/api")
+    app.include_router(catalog_router, prefix="/api")
     app.add_middleware(RequestLog)
     return app
