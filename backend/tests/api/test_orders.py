@@ -235,6 +235,12 @@ async def test_history_and_void_of_an_open_order(
     # history is the caller's own; an admin sees everyone's through /admin/orders
     assert (await admin.get("/api/history")).json()["items"] == []
     assert [x["id"] for x in (await admin.get("/api/admin/orders")).json()["items"]] == [second, first]
+    # a cashier without a full name appears under the username
+    await db_app.state.backends.auth.repo.create_user("khongten", hash_password("password222"), "staff", "")
+    async with http(db_app, await token_for(db_app, "khongten", "password222")) as nameless:
+        voided = (await nameless.post("/api/orders")).json()["id"]
+        await nameless.post(f"/api/orders/{voided}/void")
+    assert (await admin.get("/api/admin/orders")).json()["items"][0]["cashier"] == "khongten"
     forbidden = await staff.get("/api/admin/orders")
     assert forbidden.status_code == 403 and forbidden.json()["code"] == "FORBIDDEN"
 

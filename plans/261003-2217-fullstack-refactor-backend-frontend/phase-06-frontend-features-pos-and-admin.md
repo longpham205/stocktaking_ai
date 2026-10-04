@@ -44,5 +44,6 @@ Checklist parity đủ; vitest cho mỗi feature (stub API); smoke thủ công t
 ## Khác bản cũ (6b-1)
 - Cài đặt chỉ gửi các khoá thật sự đổi (bản cũ gửi cả 5 khoá mỗi lần lưu, nên mỗi lần lưu sinh 5 dòng nhật ký); không đổi gì thì báo "Không có gì thay đổi".
 
-## Chưa làm (6b-1)
-- Chưa thử trong trình duyệt trên Docker: Docker Desktop đang tắt lúc làm xong. Cần `make docker-up` rồi đăng nhập `e2e_admin` xem bốn màn.
+## Chạy thật 6b-1 (2026-10-04, sau khi Docker bật lại)
+- `make docker-up`, đăng nhập `e2e_admin` ở http://localhost:5173: vào thẳng `/admin/reports` (KPI thật, biểu đồ 7 cột, thẻ SKU thiếu giá đỏ, top 5), `/admin/orders` (7 đơn hôm nay), `/admin/users` (2 tài khoản, đang trong ca). Chưa bấm thử khoá/đặt lại mật khẩu và lưu cài đặt trong trình duyệt (người dùng đang tự thao tác trên cùng khung; các thao tác đó có test vitest + test API).
+- Lỗi thấy khi chạy thật, đã sửa ở backend: cột "Thu ngân" trống với tài khoản chưa có họ tên -> `history`/`admin/orders` trả tên tài khoản thay thế (`orders/repository.py`, có test).

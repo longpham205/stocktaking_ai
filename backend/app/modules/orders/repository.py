@@ -170,7 +170,12 @@ class OrdersUnit:
             select(func.coalesce(func.sum(_I.quantity), 0)).where(_I.order_id == _O.id).scalar_subquery()
         ).label("item_count")
         query = (
-            select(_O, UserRow.full_name.label("cashier_name"), item_count)
+            # an account without a full name is shown by its username, never as a blank cell
+            select(
+                _O,
+                func.coalesce(func.nullif(UserRow.full_name, ""), UserRow.username).label("cashier_name"),
+                item_count,
+            )
             .join(UserRow, UserRow.id == _O.cashier_id)
             .where(_O.status.in_(("paid", "void")))
         )
