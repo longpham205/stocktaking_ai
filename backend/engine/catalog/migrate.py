@@ -547,10 +547,14 @@ def main(argv: list[str] | None = None) -> int:
     for stream in (sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(encoding="utf-8", errors="replace")
-    ap = argparse.ArgumentParser(description="Migrate catalog JSON/config cũ vào DB SQLite (idempotent).")
+    ap = argparse.ArgumentParser(description="Migrate catalog JSON/config cũ vào DB catalog (idempotent).")
     ap.add_argument("--seed-dir", required=True, type=Path)
     ap.add_argument("--legacy-config", required=True, type=Path)
-    ap.add_argument("--db", required=True, type=Path)
+    target = ap.add_mutually_exclusive_group(required=True)
+    target.add_argument("--db", type=Path, help="file SQLite")
+    target.add_argument(
+        "--db-url", help="URL SQLAlchemy (vd postgresql+psycopg://...); bảng phải đã có (alembic upgrade head)"
+    )
     ap.add_argument("--gallery-dir", type=Path)
     ap.add_argument("--benchmark-labels", type=Path)
     ap.add_argument("--expected-evidence", type=Path)
@@ -581,9 +585,9 @@ def main(argv: list[str] | None = None) -> int:
             print(f"  {pid}: {json.dumps(types, ensure_ascii=False)}")
         return 0
 
-    from engine.catalog.db import make_engine
+    from engine.catalog.db import make_engine, make_engine_from_url
 
-    engine = make_engine(args.db)
+    engine = make_engine_from_url(args.db_url) if args.db_url else make_engine(args.db)
     try:
         res = apply_plan(engine, plan)
     finally:

@@ -111,19 +111,21 @@ def main(argv: list[str] | None = None) -> int:
     for stream in (sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(encoding="utf-8", errors="replace")
-    ap = argparse.ArgumentParser(description="Đồng bộ thư mục gallery vào catalog SQLite.")
-    ap.add_argument("--db", required=True, type=Path)
+    ap = argparse.ArgumentParser(description="Đồng bộ thư mục gallery vào catalog DB.")
+    target = ap.add_mutually_exclusive_group(required=True)
+    target.add_argument("--db", type=Path, help="file SQLite")
+    target.add_argument("--db-url", help="URL SQLAlchemy (vd postgresql+psycopg://...)")
     ap.add_argument("--gallery-dir", required=True, type=Path)
     ap.add_argument("--inbox-dir", type=Path, help="Thư mục chứa ảnh SKU mới chưa có ID")
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args(argv)
-    if not args.db.is_file():
+    if args.db is not None and not args.db.is_file():
         print(f"Không thấy DB catalog: {args.db} (chạy migrate trước).", file=sys.stderr)
         return 2
 
-    from engine.catalog.db import make_engine
+    from engine.catalog.db import make_engine, make_engine_from_url
 
-    engine = make_engine(args.db)
+    engine = make_engine_from_url(args.db_url) if args.db_url else make_engine(args.db)
     try:
         res = sync_gallery(engine, args.gallery_dir, args.inbox_dir, dry_run=args.dry_run)
     finally:

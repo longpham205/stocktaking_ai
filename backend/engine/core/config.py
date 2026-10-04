@@ -68,12 +68,15 @@ _CATALOG_MOVED = "catalog đã chuyển vào DB (python -m engine.catalog.migrat
 class CatalogSection(BaseModel):
     """Nguồn catalog sản phẩm của pipeline (engine/catalog/factory.py).
 
-    ``sqlite``: đọc ``db_path`` (máy chính). ``snapshot``: đọc ``snapshot_path``
-    (Colab/Kaggle, xuất bằng ``scripts/export_catalog_snapshot.py``). Không tự chuyển nguồn khi lỗi.
+    ``sqlite``: đọc file ``db_path`` (CLI, notebook). ``database``: đọc DB theo ``db_url``
+    (Postgres của web; tiến trình API tự truyền URL, không ghi vào YAML). ``snapshot``: đọc
+    ``snapshot_path`` (Colab/Kaggle, xuất bằng ``scripts/export_catalog_snapshot.py``).
+    Không tự chuyển nguồn khi lỗi; khai báo thừa nguồn cũng là lỗi.
     """
 
-    source: Literal["sqlite", "snapshot"]
+    source: Literal["sqlite", "database", "snapshot"]
     db_path: str | None = None
+    db_url: str | None = None
     snapshot_path: str | None = None
 
     @model_validator(mode="before")
@@ -89,6 +92,12 @@ class CatalogSection(BaseModel):
     def _check_source_path(self) -> "CatalogSection":
         if self.source == "sqlite" and not self.db_path:
             raise ValueError("catalog.source='sqlite' cần catalog.db_path.")
+        if self.source == "database" and not self.db_url:
+            raise ValueError("catalog.source='database' cần catalog.db_url.")
+        if self.db_url and (self.source != "database" or self.db_path):
+            raise ValueError(
+                "catalog.db_url chỉ dùng với catalog.source='database' và không đi cùng catalog.db_path."
+            )
         if self.source == "snapshot" and not self.snapshot_path:
             raise ValueError("catalog.source='snapshot' cần catalog.snapshot_path.")
         return self
@@ -678,11 +687,16 @@ def read_raw_config(config_path: str | Path) -> dict[str, Any]:
         return yaml.safe_load(file_handle) or {}
 
 
-def build_config(config_path: str | Path, overrides: dict[str, Any] | None = None) -> AppConfig:
+def build_config(
+    config_path: str | Path, overrides: dict[str, Any] | None = None, catalog_db_url: str | None = None
+) -> AppConfig:
     """Dựng AppConfig từ YAML + giá trị ghi đè dạng ``{"a.b.c": value}`` (không cache).
 
     Dùng cho thiết lập nâng cao của web: YAML là giá trị gốc, ghi đè lưu trong DB. Khoá ghi đè phải
     đã tồn tại trong YAML (tránh gõ sai đường dẫn mà bị bỏ qua âm thầm). Lỗi schema -> ValueError rõ ràng.
+
+    ``catalog_db_url``: thay cả khối ``catalog`` bằng nguồn ``database`` với URL này (tiến trình API
+    truyền ``DATABASE_URL`` của nó, để URL và mật khẩu không nằm trong YAML).
     """
     resolved_path = Path(config_path).resolve()
     raw_data = read_raw_config(resolved_path)
@@ -696,6 +710,8 @@ def build_config(config_path: str | Path, overrides: dict[str, Any] | None = Non
         if parts[-1] not in node:
             raise ValueError(f"Khoá ghi đè không tồn tại trong {resolved_path.name}: {dotted}")
         node[parts[-1]] = value
+    if catalog_db_url is not None:
+        raw_data["catalog"] = {"source": "database", "db_url": catalog_db_url}
     raw_data["project_root"] = str(resolved_path.parent.parent)
     try:
         return AppConfig(**raw_data)

@@ -1,4 +1,7 @@
-"""Schema SQLite của catalog sản phẩm (định nghĩa MỘT lần, dùng chung pipeline + backend).
+"""Schema của catalog sản phẩm (định nghĩa MỘT lần, dùng chung pipeline + backend).
+
+Chạy trên SQLite (file, ``make_engine``) hoặc trên DB bất kỳ theo URL (``make_engine_from_url``,
+ví dụ Postgres của web: bảng do Alembic tạo, cùng định nghĩa này).
 
 Bốn bảng: ``product``, ``product_evidence``, ``color_reference``, ``catalog_meta``.
 Module thuần, không chạm GPU: import được ở mọi nơi có ``sqlmodel``.
@@ -42,12 +45,14 @@ class Product(SQLModel, table=True):
             "barcode",
             unique=True,
             sqlite_where=text("barcode IS NOT NULL AND barcode <> ''"),
+            postgresql_where=text("barcode IS NOT NULL AND barcode <> ''"),
         ),
         Index(
             "ux_product_gallery_folder",
             "gallery_folder",
             unique=True,
             sqlite_where=text("gallery_folder IS NOT NULL AND gallery_folder <> ''"),
+            postgresql_where=text("gallery_folder IS NOT NULL AND gallery_folder <> ''"),
         ),
         CheckConstraint("image_count >= 0", name="ck_product_image_count"),
     )
@@ -135,6 +140,18 @@ def make_engine(db_path: str | Path) -> Engine:
     return engine
 
 
+def make_engine_from_url(db_url: str) -> Engine:
+    """Engine cho catalog theo URL SQLAlchemy (``postgresql+psycopg://...`` hoặc ``sqlite:///...``).
+
+    SQLite vẫn được bật WAL/foreign_keys/busy_timeout như ``make_engine``; DB khác dùng mặc định của driver.
+    """
+    if db_url.startswith("sqlite"):
+        engine = create_engine(db_url, connect_args={"check_same_thread": False, "timeout": 5})
+        event.listen(engine, "connect", _set_sqlite_pragmas)
+        return engine
+    return create_engine(db_url, pool_pre_ping=True)
+
+
 def create_all(engine: Engine) -> None:
     """Tạo bảng catalog nếu chưa có và ghi ``schema_version``. Idempotent.
 
@@ -180,6 +197,7 @@ __all__ = [
     "CatalogMeta",
     "CATALOG_TABLES",
     "make_engine",
+    "make_engine_from_url",
     "create_all",
     "get_meta",
     "set_meta",
