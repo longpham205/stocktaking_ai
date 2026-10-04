@@ -83,11 +83,15 @@ services:
 
   web:
     # dev: Vite with hot reload on the bind-mounted source; it proxies /api to the api service
+    # (its own tag: the prod build of the same Dockerfile must not replace it)
+    image: stocktaking-ai-web:dev
     build:
       context: ./frontend
       target: dev
     environment:
       API_PROXY_TARGET: http://api:8000
+      # edits on the host reach Vite through the bind mount only by polling (Docker Desktop)
+      VITE_USE_POLLING: "1"
     ports:
       - "5173:5173"
     volumes:

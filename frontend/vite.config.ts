@@ -21,6 +21,8 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: { '/api': apiProxy },
+    // in docker compose on Windows/macOS, file events do not cross the bind mount: poll instead
+    watch: process.env.VITE_USE_POLLING ? { usePolling: true, interval: 300 } : undefined,
   },
   preview: {
     port: 4173,

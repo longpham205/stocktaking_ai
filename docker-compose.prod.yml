@@ -15,6 +15,7 @@ services:
       - ./backend/weights:/srv/weights:ro
 
   web:
+    image: stocktaking-ai-web:prod
     build:
       target: prod
     environment: !reset {}
