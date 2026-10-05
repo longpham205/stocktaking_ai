@@ -49,6 +49,7 @@ function Photo({ capture, items, focusItem, onFocus, onAddRejected }: PhotoProps
             type="button"
             data-testid="capture-box"
             data-state={state}
+            data-focused={focused || undefined}
             aria-label={label}
             className={cn(
               'absolute rounded-sm border-2 transition-opacity',
@@ -91,7 +92,11 @@ export function CaptureOverlay({ order, focusItem, onFocus, onAddRejected }: Cap
   const [selected, setSelected] = useState<number | null>(null);
   const [zoom, setZoom] = useState<number | null>(null);
   if (order.captures.length === 0) return null;
-  const index = selected === null || selected >= order.captures.length ? order.captures.length - 1 : selected;
+  const chosen = selected === null || selected >= order.captures.length ? order.captures.length - 1 : selected;
+  // a marked line shows the photo it is on, when the photo on screen does not have it
+  const holds = (k: number) => order.captures[k].boxes.some((box) => box.item_id === focusItem);
+  const withFocus = focusItem === null || holds(chosen) ? -1 : order.captures.findIndex((_, k) => holds(k));
+  const index = withFocus === -1 ? chosen : withFocus;
   const capture = order.captures[index];
   const items = new Map(order.items.map((item) => [item.id, item]));
   const photo = { capture, items, focusItem, onFocus, onAddRejected };
@@ -101,7 +106,16 @@ export function CaptureOverlay({ order, focusItem, onFocus, onAddRejected }: Cap
       {order.captures.length > 1 && (
         <div className="flex flex-wrap gap-1">
           {order.captures.map((c, k) => (
-            <Button key={c.id} size="sm" variant={k === index ? 'default' : 'outline'} onClick={() => setSelected(k)}>
+            <Button
+              key={c.id}
+              size="sm"
+              variant={k === index ? 'default' : 'outline'}
+              onClick={() => {
+                setSelected(k);
+                // the marked line is not on that photo: drop the mark, or it would pull the view back
+                if (focusItem !== null && !holds(k)) onFocus(focusItem);
+              }}
+            >
               Lượt {k + 1}
             </Button>
           ))}
