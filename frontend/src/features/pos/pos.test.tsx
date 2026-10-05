@@ -119,8 +119,42 @@ describe('capture -> recognition -> invoice', () => {
     expect(screen.getByTestId('order-total')).toHaveTextContent('30.000đ');
 
     // a box and its line are highlighted together
+    const focused = () => screen.getAllByTestId('capture-box').map((b) => b.dataset.focused === 'true');
     fireEvent.click(screen.getAllByTestId('capture-box')[0]);
     expect(screen.getByTestId('line-11').className).toMatch(/ring-2/);
+    expect(focused()).toEqual([true, true, false, false]); // both objects of the line
+    fireEvent.click(screen.getAllByTestId('capture-box')[0]);
+    expect(focused()).toEqual([false, false, false, false]); // the same box again clears the mark
+
+    // and the other way: tapping a line marks its boxes on the photo, tapping it again clears them
+    fireEvent.click(screen.getByTestId('line-11'));
+    expect(focused()).toEqual([true, true, false, false]);
+    expect(screen.getByTestId('line-11').className).toMatch(/ring-2/);
+    expect(screen.getAllByTestId('capture-box')[2].className).toMatch(/opacity-35/); // the others fade
+    fireEvent.click(screen.getByTestId('line-11'));
+    expect(focused()).toEqual([false, false, false, false]);
+    expect(screen.getByTestId('line-11').className).not.toMatch(/ring-2/);
+  });
+
+  it('a marked line switches the photo to the capture that shows it', async () => {
+    const box = (itemId: number) => ({ item_id: itemId, product_id: String(itemId), status: 'accepted' as const, bbox: [10, 20, 100, 120] as [number, number, number, number] });
+    const photo = (id: number, itemId: number) => ({
+      id,
+      created_at: '2026-10-04T02:01:00+00:00',
+      image_url: `/api/media/5/capture_${id}.jpg?exp=1&sig=x`,
+      width: 320,
+      height: 240,
+      boxes: [box(itemId)],
+    });
+    const twoPhotos = order({ items: [item(11), item(12)], captures: [photo(1, 11), photo(2, 12)] });
+    stubFetchRoutes({ '/api/me': staffMe, '/api/orders/open': () => jsonResponse({ order: twoPhotos }), '/api/orders/5': () => jsonResponse(twoPhotos) });
+    await renderApp('/pos/orders/5');
+
+    const shown = () => screen.getAllByTestId('capture-box').map((b) => `${b.getAttribute('aria-label')}:${b.dataset.focused ?? 'false'}`);
+    await screen.findByTestId('line-11');
+    expect(shown()).toEqual([`${item(12).product_name}:false`]); // the latest photo by default
+    fireEvent.click(screen.getByTestId('line-11')); // a line of the first photo
+    expect(shown()).toEqual([`${item(11).product_name}:true`]);
   });
 });
 

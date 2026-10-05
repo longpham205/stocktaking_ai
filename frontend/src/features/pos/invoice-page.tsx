@@ -124,8 +124,14 @@ export function InvoicePage({ orderId, jobId, resumed }: InvoicePageProps) {
   const unrecognised = !dismissed.unrecognised && unrecognisedWarning?.type === 'unrecognized_objects' ? unrecognisedWarning.count : 0;
   const blocked = order.missing_price_count > 0 && !settings?.allow_checkout_without_price;
 
-  function focusLine(itemId: number) {
+  /** Mark a line and its boxes on the photo; the same one again clears the mark. */
+  function toggleFocus(itemId: number) {
     setFocusItem((current) => (current === itemId ? null : itemId));
+  }
+
+  /** A box was tapped: mark it, and bring its line into view. */
+  function focusLine(itemId: number) {
+    toggleFocus(itemId);
     document.querySelector(`[data-line-id="${itemId}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
   }
 
@@ -218,9 +224,10 @@ export function InvoicePage({ orderId, jobId, resumed }: InvoicePageProps) {
               item={item}
               focused={focusItem === item.id}
               onOpen={() => {
-                setFocusItem(item.id);
-                if (item.flagged) setPicker({ item });
-                else focusLine(item.id);
+                if (item.flagged) {
+                  setFocusItem(item.id);
+                  setPicker({ item });
+                } else toggleFocus(item.id);
               }}
               onQuantity={(quantity) => void changeQuantity(item, quantity)}
               onPrice={(price) => actions.update.mutate({ itemId: item.id, change: { manual_price: price } })}
