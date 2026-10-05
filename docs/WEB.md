@@ -37,9 +37,10 @@ Hai biến trong `.env` (hoặc đặt trước lệnh) quyết định API nh�
 | `local` | `configs/config.yaml` | Pipeline thật (RF-DETR, SAM2, SigLIP2), dữ liệu `data/`, cần `weights/` và GPU. |
 
 - Catalog demo đi với `PIPELINE_CONFIG=configs/config.demo.yaml`: nếu để config mặc định thì ảnh gallery ở màn Sản phẩm không khớp. Ví dụ: `PIPELINE_CONFIG=configs/config.demo.yaml docker compose up -d --wait api`.
-- Pipeline thật trên GPU trong Docker: `make docker-up-gpu` (image CUDA vài GB, cần NVIDIA Container Toolkit). **Chưa chạy thử trên máy phát triển.**
+- **Nhận diện thật trên GPU của máy:** nhấp đúp `run_real.bat` (hoặc `./run_real.sh`): API chạy trên máy bằng môi trường Python có model, Postgres vẫn trong Docker. Chi tiết và số đo: [`instruct_dev.md`](instruct_dev.md) mục 6.
+- Pipeline thật trong Docker: `make docker-up-gpu`. **Đang hỏng** (lần chạy thử làm Docker Desktop ngừng hẳn, xem `instruct_dev.md` mục 6): đừng chạy cho tới khi `backend/Dockerfile` được sửa.
 - Bản không có hot reload, log JSON, không có `/docs`, giao diện đã build do nginx phục vụ: `make docker-up-prod`. **Mới kiểm tới bước build image web; chưa chạy đủ luồng.**
-- Chạy API ngay trên máy (không qua container): `make docker-up-data` (chỉ Postgres, cổng 5437) rồi `make dev-api`. Pipeline thật cần `cd backend && uv sync --extra ml`.
+- Chạy API ngay trên máy với bộ nhận diện giả (để sửa code backend): `make docker-up-data` (chỉ Postgres, cổng 5437) rồi `make dev-api`.
 
 **Sinh dữ liệu demo** (khi `backend/data_demo/` chưa có): `cd backend && uv run python scripts/make_demo_dataset.py`, chạy pipeline một lần để lập index FAISS (`uv run python -m engine --mode validate --config configs/config.demo.yaml --benchmark-dir data_demo/benchmark`), rồi `make seed-demo`. Script ghi đè `configs/config.demo.yaml`: sau khi chạy hãy `git checkout backend/configs/config.demo.yaml` để giữ bản đã commit. Ảnh sinh ra không giống hệt giữa các máy, nên đừng chạy lại khi đã có dữ liệu.
 

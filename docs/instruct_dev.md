@@ -259,25 +259,24 @@ make type-check
 
 | Muốn | Làm |
 |---|---|
-| Thử giao diện, không cần model (mặc định) | `RECOGNIZER=fake` |
-| Pipeline thật, backend mock, CPU, dữ liệu demo | image có OpenCV/FAISS + `RECOGNIZER=local` + `PIPELINE_CONFIG=configs/config.demo.yaml` |
-| Pipeline thật, model thật, GPU | `make docker-up-gpu` (image CUDA vài GB), cần `backend/weights/` và `backend/data/` |
+| Thử giao diện, không cần model (mặc định) | `RECOGNIZER=fake` (bản Docker: `make docker-up`) |
+| **Nhận diện thật trên GPU của máy** | nhấp đúp `run_real.bat` (hoặc `./run_real.sh`) |
+| Pipeline thật trong Docker | `make docker-up-gpu` — **đang hỏng, đừng chạy** (xem dưới) |
 
-Hai dòng dưới **chưa được chạy thử trong Docker** trên máy phát triển. Cách còn lại là chạy API thẳng trên máy (viết theo `Makefile`, cũng chưa chạy thử đủ luồng với model thật):
+### Nhận diện thật: `run_real.bat`
 
-```bash
-make docker-up-data
-```
+Chạy API ngay trên máy bằng một môi trường Python có sẵn model, Postgres vẫn trong Docker, giao diện là Vite trên máy. Script làm lần lượt: kiểm Python (torch thấy GPU + đủ thư viện web) → bật Postgres, dừng `api` và `web` của Docker (trùng cổng) → chạy migration → bật API với `RECOGNIZER=local`, `PIPELINE_CONFIG=configs/config.yaml` và chờ nạp model (1–2 phút) → bật giao diện, mở `http://localhost:5173`.
 
-```bash
-cd backend && uv sync --extra ml
-```
+- **Giữ cửa sổ mở** trong lúc dùng. Ctrl+C dừng cả API lẫn giao diện (Postgres vẫn chạy). Quay về bản Docker với bộ nhận diện giả: `docker compose up -d --wait api web`.
+- **Python nào:** biến `ML_PYTHON` trỏ tới `python.exe` của môi trường có model; không đặt thì script tìm `../stocktaking_ai_mini/venv` cạnh repo. Môi trường đó cần torch bản CUDA, cộng thêm `fastapi uvicorn asyncpg "psycopg[binary]" alembic pyjwt`. Thiếu gì script báo đúng tên gói.
+- **Không tạo tài khoản hay dữ liệu:** dùng database đang có. Quên mật khẩu thì xem mục "Quên mật khẩu", nhưng lúc này container `api` đang dừng nên chạy lệnh bằng chính Python đó, từ thư mục `backend`: `python -m entrypoints.reset_password admin`.
+- **Tốc độ đã đo trên RTX 3050 Ti 4 GB:** 12–15 giây mỗi ảnh; VRAM lên tới 3,6 / 4 GB khi đang nhận diện, nên đừng chạy thứ khác dùng GPU cùng lúc.
+- Log của API: `backups/run_real_api.log`.
+- Đã chạy thử: script bật được, `/api/health` trả `"recognizer":"local"`, dừng thì API tắt theo. Chưa thử nhấp đúp bằng chuột và chưa thử trên Linux/macOS.
 
-```bash
-RECOGNIZER=local make dev-api
-```
+### Docker GPU: đang hỏng
 
-Khi đó dừng `api` của Docker trước (`docker compose stop api`) vì cùng dùng cổng 8000; `web` trong Docker cần `API_PROXY_TARGET` trỏ ra máy, hoặc chạy frontend trên máy bằng `cd frontend && pnpm dev`.
+`make docker-up-gpu` đã chạy thử một lần (2026-10-05): bước cài thư viện trong image tải bộ gói CUDA nhiều lần, chết với `Bus error` sau khoảng 27 phút, làm Docker Desktop ngừng hẳn và ngốn 15 GB đĩa. Nguyên nhân chưa xác định. Đừng chạy lại cho tới khi `backend/Dockerfile` được sửa. Nếu lỡ chạy và ổ C đầy: `docker builder prune -af`, rồi nén file `docker_data.vhdx` (chạy `fstrim` trong máy ảo Docker trước, nếu không file không co).
 
 Kiểm đang chạy chế độ nào:
 
