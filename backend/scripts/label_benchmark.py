@@ -124,7 +124,9 @@ def propose(images_dir: Path, out_dir: Path, config_path: Path | None) -> int:
         existing = {image["file_name"]: image for image in load_labels(out_dir)["images"]}
     (out_dir / "images").mkdir(parents=True, exist_ok=True)
 
-    # nhập muộn: bước duyệt và các test không cần torch
+    # nhập muộn: bước duyệt và các test không cần torch. `python scripts/...` chỉ đưa scripts/ vào
+    # sys.path, nên thêm backend/ để thấy gói `engine`.
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
     from engine.catalog.factory import open_catalog_repository
     from engine.core.config import build_config, load_config
     from engine.inference.infer import InferenceRunner
