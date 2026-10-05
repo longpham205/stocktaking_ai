@@ -3,7 +3,8 @@
 # run_real.bat). The API runs on the host, in a Python environment that has both the ML stack and
 # the web libraries; Postgres stays in Docker; the frontend is Vite on the host.
 #
-#   ./run_real.sh
+#   ./run_real.sh          this machine only (http://localhost:5173)
+#   ./run_real.sh lan      also reachable from a phone on the same network (run_real_phone.bat)
 #
 # The window stays open while it runs. Ctrl+C stops the API and the frontend (Postgres keeps running).
 #
@@ -14,6 +15,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 ROOT="$(pwd)"
+MODE="${1:-}"
 
 export RECOGNIZER=local
 export PIPELINE_CONFIG="${PIPELINE_CONFIG:-configs/config.yaml}"
@@ -92,4 +94,11 @@ if [ -z "${NO_OPEN:-}" ]; then
   esac
 fi
 cd frontend
-./node_modules/.bin/vite --port 5173 --strictPort
+if [ "$MODE" = "lan" ]; then
+  # every interface: a phone on the same Wi-Fi or hotspot opens the "Network" address Vite prints.
+  # The API itself stays on 127.0.0.1; the phone reaches it through this server's /api proxy.
+  echo "PHONE: open the http://<Network address>:5173 printed below (not localhost). Windows may ask to allow Node.js through the firewall: allow it."
+  ./node_modules/.bin/vite --port 5173 --strictPort --host 0.0.0.0
+else
+  ./node_modules/.bin/vite --port 5173 --strictPort
+fi

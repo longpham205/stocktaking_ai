@@ -272,6 +272,7 @@ Chạy API ngay trên máy bằng một môi trường Python có sẵn model, P
 - **Không tạo tài khoản hay dữ liệu:** dùng database đang có. Quên mật khẩu thì xem mục "Quên mật khẩu", nhưng lúc này container `api` đang dừng nên chạy lệnh bằng chính Python đó, từ thư mục `backend`: `python -m entrypoints.reset_password admin`.
 - **Tốc độ đã đo trên RTX 3050 Ti 4 GB:** 12–15 giây mỗi ảnh; VRAM lên tới 3,6 / 4 GB khi đang nhận diện, nên đừng chạy thứ khác dùng GPU cùng lúc.
 - Log của API: `backups/run_real_api.log`.
+- **Dùng trên điện thoại:** nhấp đúp `run_real_phone.bat` (= `./run_real.sh lan`) thay cho `run_real.bat`. Trên điện thoại mở địa chỉ **Network** mà cửa sổ in ra, dạng `http://172.20.10.7:5173` — KHÔNG phải `localhost` (trên điện thoại, `localhost` là chính cái điện thoại). Điện thoại và laptop phải chung mạng (cùng Wi-Fi, hoặc laptop bắt hotspot của điện thoại). Lần đầu Windows hỏi cho Node.js qua tường lửa: bấm Allow, tích cả mạng Public nếu đang dùng hotspot. Mở bằng `http://` nên không có khung ngắm camera trong trang: bấm chụp bằng camera của máy hoặc chọn ảnh.
 - Đã chạy thử: script bật được, `/api/health` trả `"recognizer":"local"`, dừng thì API tắt theo. Chưa thử nhấp đúp bằng chuột và chưa thử trên Linux/macOS.
 
 ### Docker GPU: đang hỏng
