@@ -89,7 +89,7 @@ python -m engine.catalog.migrate --seed-dir data/metadata --legacy-config config
 - Chuyển cả database web v1 (catalog + đơn + tài khoản) sang Postgres: `make import-legacy DATA_DIR=...` (xem `docs/WEB.md` mục 8).
 
 ### 6.2 Thêm SKU mới
-1. Bỏ ảnh vào `data/gallery_inbox/<tên bất kỳ>/`.
+1. Bỏ ảnh vào `data/gallery_inbox/<tên bất kỳ>/`. Ảnh còn lẫn lộn trong một thư mục thì phân loại bằng tay với `python scripts/sort_gallery_images.py --source <thư mục ảnh>`: cửa sổ hiện từng ảnh, chọn hoặc tạo thư mục, ảnh được sao chép vào `data/gallery_inbox/<thư mục>/0001.jpg, 0002.jpg, ...` (ảnh gốc giữ nguyên; `--dest data/gallery` để thêm ảnh cho SKU đã có; làm dở chạy lại sẽ tiếp tục).
 2. `python -m engine.catalog.sync_gallery --db data/db/app.db --gallery-dir data/gallery --inbox-dir data/gallery_inbox` (Postgres: `--db-url ...` thay cho `--db`) → cấp ID từ `next_product_id`, chuyển thành `data/gallery/<ID 4 chữ số>/`, tạo SKU `needs_naming=true` (DB ghi trước, rồi mới chuyển thư mục).
 3. Chạy build (`python -m engine --mode validate` hoặc `infer`): `BuildPipeline` đồng bộ gallery vào catalog rồi build lại FAISS **chỉ khi fingerprint đổi**.
 
