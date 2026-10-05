@@ -104,6 +104,12 @@ Hash nội dung từng ảnh + ánh xạ thư mục→ID + backend/model/weights
 ### 6.5 Kiểm nhất quán (`engine/catalog/checks.py`)
 Lỗi: `product_id` trong index không có trong catalog; số vector ≠ số dòng metadata; dim index ≠ `embedding_dim`; `category_id` benchmark thiếu; bằng chứng vi phạm luật. Cảnh báo: thiếu màu tham chiếu; SKU có thư mục nhưng chưa có vector.
 
+### 6.6 Gán nhãn ảnh benchmark mới (`scripts/label_benchmark.py`)
+Pipeline đề xuất khung + sản phẩm, người duyệt sửa chỗ sai; kết quả là một thư mục benchmark riêng (không đụng `data/benchmark`, baseline cũ vẫn so được).
+1. `python scripts/label_benchmark.py propose --images data/benchmark_inbox --out data/benchmark_new` — cần GPU; tắt web nhận diện thật trước (4 GB không chứa được hai pipeline). Chạy lại không ghi đè ảnh đã sửa hoặc đã duyệt.
+2. `python scripts/label_benchmark.py review --dir data/benchmark_new` — cửa sổ duyệt: chạm khung để chọn, gõ tìm sản phẩm + Enter để gán, kéo để vẽ khung mới, Delete xoá, `A` duyệt ảnh và sang ảnh sau. Khung đỏ (chưa có sản phẩm) phải gán hoặc xoá mới duyệt được.
+3. `python -m engine --mode validate --benchmark-dir data/benchmark_new` — đo trên bộ mới. `_annotations.coco.json` chỉ chứa ảnh đã duyệt; `category_id` = `product_id`.
+
 ## 7. Quy ước đặt tên thư mục gallery
 SKU mới: thư mục = ID đệm 4 chữ số (`0029`) — ASCII, ổn định khi đổi tên hiển thị, khớp `category_id`. 22 thư mục cũ giữ tên hiện tại (đổi tên cần script có log + build lại FAISS; chưa làm).
 
