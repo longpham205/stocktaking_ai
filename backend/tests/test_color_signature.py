@@ -23,6 +23,14 @@ def _crop_image(color: tuple[int, int, int], background: tuple[int, int, int] = 
     return image
 
 
+def _colour_catalog(*declared: str):
+    """In-memory catalog where only the given product ids declare a colour code."""
+    from engine.catalog.repository import CatalogData, InMemoryCatalogRepository, ProductRecord
+
+    products = [ProductRecord(product_id=str(i), product_name=f"P{i}") for i in range(1, 4)]
+    return InMemoryCatalogRepository(CatalogData.build(products, {pid: {"color_code": f"C{pid}"} for pid in declared}, {}))
+
+
 def _signature_config(test_config, tmp_path, exemplars: dict[str, np.ndarray]):
     path = tmp_path / "color_signatures.npz"
     ColorSignatureStore(exemplars).save(path)
@@ -92,16 +100,30 @@ def test_missing_signature_file_is_an_error(test_config, test_catalog, tmp_path)
         Reranker(config, DecisionEngine(config, test_catalog), lambda pid: None, catalog=test_catalog)
 
 
-def test_reranker_colour_signature_switches_to_the_matching_sku(test_config, test_catalog, tmp_path) -> None:
+def test_reranker_colour_signature_switches_to_the_matching_sku(test_config, tmp_path) -> None:
     """Rank 2 wins when the crop's colours match its gallery and not rank 1's."""
     pink, _ = compute_signature(_crop_image(PINK))
     blue, _ = compute_signature(_crop_image(BLUE))
     config = _signature_config(test_config, tmp_path, {"1": np.stack([blue]), "2": np.stack([pink])})
-    reranker = Reranker(config, DecisionEngine(config, test_catalog), lambda pid: None, catalog=test_catalog)
+    catalog = _colour_catalog("1", "2")
+    reranker = Reranker(config, DecisionEngine(config, catalog), lambda pid: None, catalog=catalog)
 
     result = reranker.rerank(_retrieval(("1", 0.90), ("2", 0.88)), _color_result(ColorPlugin(config), _crop_image(PINK)))
 
     assert result.product_id == "2"
+
+
+def test_reranker_colour_signature_needs_a_declared_colour_code(test_config, tmp_path) -> None:
+    """Colour is opt-in: without a color_code on the favoured SKU the crop's colour is ignored."""
+    pink, _ = compute_signature(_crop_image(PINK))
+    blue, _ = compute_signature(_crop_image(BLUE))
+    config = _signature_config(test_config, tmp_path, {"1": np.stack([blue]), "2": np.stack([pink])})
+    catalog = _colour_catalog("1")
+    reranker = Reranker(config, DecisionEngine(config, catalog), lambda pid: None, catalog=catalog)
+
+    result = reranker.rerank(_retrieval(("1", 0.90), ("2", 0.88)), _color_result(ColorPlugin(config), _crop_image(PINK)))
+
+    assert result.product_id == "1"
 
 
 def test_reranker_colour_signature_is_silent_on_a_white_box(test_config, test_catalog, tmp_path) -> None:
@@ -109,7 +131,8 @@ def test_reranker_colour_signature_is_silent_on_a_white_box(test_config, test_ca
     pink, _ = compute_signature(_crop_image(PINK))
     blue, _ = compute_signature(_crop_image(BLUE))
     config = _signature_config(test_config, tmp_path, {"1": np.stack([blue]), "2": np.stack([pink])})
-    reranker = Reranker(config, DecisionEngine(config, test_catalog), lambda pid: None, catalog=test_catalog)
+    catalog = _colour_catalog("1", "2")
+    reranker = Reranker(config, DecisionEngine(config, catalog), lambda pid: None, catalog=catalog)
 
     result = reranker.rerank(_retrieval(("1", 0.90), ("2", 0.88)), _color_result(ColorPlugin(config), _crop_image(WHITE)))
 
@@ -121,7 +144,8 @@ def test_reranker_colour_signature_abstains_when_a_candidate_has_no_signature(te
     """A SKU without gallery signatures cannot be compared fairly, so nobody gets colour evidence."""
     pink, _ = compute_signature(_crop_image(PINK))
     config = _signature_config(test_config, tmp_path, {"2": np.stack([pink])})
-    reranker = Reranker(config, DecisionEngine(config, test_catalog), lambda pid: None, catalog=test_catalog)
+    catalog = _colour_catalog("1", "2")
+    reranker = Reranker(config, DecisionEngine(config, catalog), lambda pid: None, catalog=catalog)
 
     result = reranker.rerank(_retrieval(("1", 0.90), ("2", 0.88)), _color_result(ColorPlugin(config), _crop_image(PINK)))
 

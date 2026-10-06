@@ -872,6 +872,10 @@ class Reranker:
         gets a non-zero strength, and only when it beats the runner-up by more than
         `signature_min_margin`. If any candidate SKU has no signature the comparison would be
         unfair to it, so no candidate gets colour evidence.
+
+        Colour is opt-in per SKU: the favoured SKU must have a `color_code` declared in the
+        catalog. Pale packs take on the colour cast of the lighting, and on new basket photos
+        (2026-10-06) undeclared colour evidence flipped a white pack to its light-blue sibling.
         """
         if self._color_signatures is None or not self._color_enabled:
             return None
@@ -894,6 +898,8 @@ class Reranker:
         ranked = sorted(similarities.items(), key=lambda item: item[1], reverse=True)
         margin = ranked[0][1] - ranked[1][1]
         if margin <= self._signature_min_margin:
+            return {}
+        if not self._catalog.color_code(ranked[0][0]):
             return {}
         strength = float(np.clip((margin - self._signature_min_margin) / self._signature_margin_scale, 0.0, 1.0))
         logger.debug("Colour signature favours product_id='%s' (margin=%.3f strength=%.3f)", ranked[0][0], margin, strength)
