@@ -66,6 +66,25 @@ class OcrPlugin:
     MIN_AMBIGUOUS_INFORMATION_SCORE = 0.05
     MIN_AMBIGUOUS_USEFUL_CHARS = 3
 
+    # Shared detection (plugins.ocr.shared_detection): same values EasyOCR 1.7.2 uses in readtext()
+    DETECT_OPTIONS = {
+        "mag_ratio": 1.0,
+        "text_threshold": 0.7,
+        "link_threshold": 0.4,
+        "low_text": 0.4,
+        "poly": False,
+        "optimal_num_chars": None,
+        "threshold": 0.2,
+        "bbox_min_score": 0.2,
+        "bbox_min_size": 3,
+        "max_candidates": 0,
+    }
+    GROUP_OPTIONS = {"slope_ths": 0.1, "ycenter_ths": 0.5, "height_ths": 0.5, "width_ths": 0.5, "add_margin": 0.1}
+    DETECT_MIN_BOX_SIZE = 20
+    # A box much taller than wide holds text that runs along the other axis: it is read in the
+    # orientations where it lies flat, so reading it here only costs time and adds noise.
+    SHARED_DETECTION_MIN_ASPECT = 0.8
+
     # ------------------------------------------------------------------
     # INITIALIZATION & SETUP
     # ------------------------------------------------------------------
@@ -74,6 +93,8 @@ class OcrPlugin:
         """Initialize the OCR plugin and load EasyOCR once."""
         self._config = config.plugins.ocr
         self._reader = self._load_reader() if self._config.enabled else None
+        # Per-crop scratch for shared detection: the preprocessed crop and the boxes found so far.
+        self._shared: Optional[Dict[str, Any]] = None
 
         logger.info(
             "OcrPlugin initialized (enabled=%s language=%s device=%s)",
@@ -120,6 +141,7 @@ class OcrPlugin:
                 return self._empty_result()
 
             processed = self._preprocess(image)
+            self._shared = {"image": processed, "boxes": {}} if self._config.shared_detection else None
             orientation_results: List[Dict[str, Any]] = []
 
             for rotation in self._get_rotations():
@@ -343,14 +365,17 @@ class OcrPlugin:
     def _run_ocr(self, image: np.ndarray, rotation: int) -> Dict[str, Any]:
         """Run EasyOCR and evaluate every OCR fragment."""
         try:
-            # canvas_size only shrinks the image for text detection; the boxes are mapped back
-            # and recognition crops them from the full-resolution image.
-            results = self._reader.readtext(
-                image,
-                detail=1,
-                paragraph=False,
-                canvas_size=int(self._config.detect_canvas_size),
-            )
+            if self._shared is not None and int(rotation) % 360 in (0, 90, 180, 270):
+                results = self._read_with_shared_detection(image, int(rotation) % 360, self._shared)
+            else:
+                # canvas_size only shrinks the image for text detection; the boxes are mapped back
+                # and recognition crops them from the full-resolution image.
+                results = self._reader.readtext(
+                    image,
+                    detail=1,
+                    paragraph=False,
+                    canvas_size=int(self._config.detect_canvas_size),
+                )
         except Exception:
             logger.exception("EasyOCR failed during rotation=%d", rotation)
             return self._empty_orientation_result(rotation=rotation, image_shape=image.shape)
@@ -414,6 +439,69 @@ class OcrPlugin:
             "image_shape": list(image.shape[:2]),
             "score": 0.0,
         }
+
+    @staticmethod
+    def _flip_boxes(boxes: List[Any], height: int, width: int) -> List[np.ndarray]:
+        """Map detector quadrilaterals into the frame of the same image rotated by 180 degrees.
+
+        Each box is 8 numbers (4 corners, clockwise). The corner with the smallest x + y comes
+        first, which is the order the detector itself produces.
+        """
+        flipped: List[np.ndarray] = []
+        for box in boxes:
+            points = np.asarray(box, dtype=np.float64).reshape(4, 2)
+            points = np.stack([width - points[:, 0], height - points[:, 1]], axis=1)
+            points = np.roll(points, 4 - int(points.sum(axis=1).argmin()), axis=0)
+            flipped.append(np.round(points).astype(np.int32).reshape(-1))
+        return flipped
+
+    def _read_with_shared_detection(self, image: np.ndarray, rotation: int, shared: Dict[str, Any]) -> List[Any]:
+        """Recognize one orientation, reusing text boxes detected at 0 or 90 degrees.
+
+        Text detection was ~70% of the OCR time and ran once per rotation. A box found at 0
+        degrees is the same box at 180 (and 90 the same as 270), only upside down, so the
+        detector runs on two orientations and the other two get the boxes rotated by 180.
+        Detecting only once is not enough: on text that runs vertically the boxes are poor and
+        products lying sideways lost their OCR evidence. Line grouping and recognition still run
+        for every orientation, as EasyOCR does inside readtext().
+        """
+        from easyocr.utils import diff, group_text_box, reformat_input
+
+        base = 90 if rotation in (90, 270) else 0
+        if base not in shared["boxes"]:
+            base_image, _ = reformat_input(self._rotate(shared["image"], base))
+            detected = self._reader.get_textbox(
+                self._reader.detector,
+                base_image,
+                canvas_size=int(self._config.detect_canvas_size),
+                device=self._reader.device,
+                **self.DETECT_OPTIONS,
+            )
+            shared["boxes"][base] = list(detected[0])
+
+        boxes = shared["boxes"][base]
+        if rotation != base:
+            boxes = self._flip_boxes(boxes, image.shape[0], image.shape[1])
+
+        horizontal, free = group_text_box(boxes, **self.GROUP_OPTIONS)
+        min_aspect = self.SHARED_DETECTION_MIN_ASPECT
+        horizontal = [
+            box
+            for box in horizontal
+            if max(box[1] - box[0], box[3] - box[2]) > self.DETECT_MIN_BOX_SIZE
+            and (box[1] - box[0]) >= min_aspect * (box[3] - box[2])
+        ]
+        free = [
+            box
+            for box in free
+            if max(diff([c[0] for c in box]), diff([c[1] for c in box])) > self.DETECT_MIN_BOX_SIZE
+            and np.linalg.norm(np.subtract(box[1], box[0])) >= min_aspect * np.linalg.norm(np.subtract(box[3], box[0]))
+        ]
+        if not horizontal and not free:
+            return []
+
+        _, grey = reformat_input(image)
+        return self._reader.recognize(grey, horizontal, free, detail=1, paragraph=False, reformat=False)
 
     def _calculate_ocr_confidence(self, useful_fragments: List[Dict[str, Any]], mean_confidence: float) -> float:
         """Calculate OCR evidence quality."""

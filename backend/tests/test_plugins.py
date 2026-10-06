@@ -303,3 +303,28 @@ def test_make_crop_preserves_raw_resolution() -> None:
     assert crop.raw_image_array.shape == (480, 320, 3)
     assert crop.image_array.shape == (224, 224, 3)
     assert crop.source_bbox == BoundingBox(0, 0, 320, 480)
+
+
+def test_ocr_flip_boxes_matches_a_180_degree_rotation() -> None:
+    """A box mapped into the 180-degree frame keeps its size and starts at its new top-left corner."""
+    box = np.array([10, 20, 110, 20, 110, 50, 10, 50], dtype=np.int32)
+
+    flipped = OcrPlugin._flip_boxes([box], height=100, width=200)
+
+    assert flipped[0].tolist() == [90, 50, 190, 50, 190, 80, 90, 80]
+
+
+def test_ocr_shared_detection_reads_upright_and_upside_down_text(test_config) -> None:
+    """Shared detection finds the same text whether the crop is upright or upside down."""
+    ocr_config = test_config.plugins.ocr.model_copy(update={"shared_detection": True})
+    plugins_config = test_config.plugins.model_copy(update={"ocr": ocr_config})
+    plugin = OcrPlugin(test_config.model_copy(update={"plugins": plugins_config}))
+
+    image = np.full((200, 640, 3), 255, dtype=np.uint8)
+    cv2.putText(image, "SPONGE 12345", (20, 125), cv2.FONT_HERSHEY_SIMPLEX, 2.5, (0, 0, 0), 6)
+
+    for crop_image in (image, cv2.rotate(image, cv2.ROTATE_180)):
+        output = plugin.run(_make_crop(crop_image))
+        texts = " ".join(str(candidate["text"]).upper() for candidate in output["orientation_candidates"])
+        assert "SPONGE" in texts
+        assert len(output["orientation_scores"]) == 4

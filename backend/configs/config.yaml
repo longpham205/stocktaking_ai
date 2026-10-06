@@ -147,6 +147,10 @@ plugins:
     # Cạnh dài tối đa của ảnh vào bước PHÁT HIỆN chữ (nhận dạng vẫn đọc ảnh gốc). Mặc định của
     # EasyOCR là 2560. Đo 2026-10-06 trên val: 1600 giữ nguyên F1/fusion; 1280 làm tệ cặp SKU 7/8.
     detect_canvas_size: 1600
+    # true: phát hiện chữ 2 lần (hướng 0 và 90), hướng 180/270 dùng lại hộp đã xoay 180 độ; vẫn
+    # nhận dạng và chấm điểm đủ 4 hướng. false: cách cũ, phát hiện lại ở cả 4 hướng.
+    # Đo 2026-10-06 trên val: F1 0,8927 -> 0,8995, không crop nào sai thêm, OCR nhanh gần gấp đôi.
+    shared_detection: true
   color:
     enabled: true
     roi_enabled: true

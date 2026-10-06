@@ -262,6 +262,9 @@ class OcrPluginSection(BaseModel):
     rotation_angles: list[int] = Field(default_factory=lambda: [90, 180, 270])
     # Longest side fed to the text DETECTION network; recognition still reads the full-size crop.
     detect_canvas_size: int = Field(default=2560, ge=320)
+    # True: detect text twice (0 and 90 degrees) and reuse the boxes for 180/270, instead of
+    # running the detection network once per rotation.
+    shared_detection: bool = False
 
 
 class ColorPluginSection(BaseModel):
