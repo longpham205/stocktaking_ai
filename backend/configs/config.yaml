@@ -45,7 +45,9 @@ catalog:
 detection:
   backend: "rf_detr" # mock_contour | rf_detr
   weights_path: "weights/detector/model.pt"
-  confidence_threshold: 0.50
+  # Đo 2026-10-06 trên val (sau lọc khung trùng): 0,50 sót 13 / thừa 10; 0,40 sót 10 / thừa 13;
+  # 0,30 sót 6 / thừa 17. Chốt 0,40: bỏ sót là lỗi đắt nhất; dưới 0,40 dòng thừa tăng nhanh.
+  confidence_threshold: 0.40
   min_box_area_ratio: 0.001
   max_box_area_ratio: 0.60
   min_aspect_ratio: 0.15
