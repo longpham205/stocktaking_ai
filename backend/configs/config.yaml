@@ -54,6 +54,16 @@ detection:
   canny_threshold_2: 120
   blur_kernel_size: 5
   max_detections: 50
+  # Lọc khung thừa sau detect (RF-DETR không tự lọc): một vật ra hai khung là bị tính tiền hai lần.
+  suppression:
+    enabled: true
+    # Hai khung có IoU >= ngưỡng là cùng một vật: bỏ khung tin cậy thấp hơn. Đo 2026-10-06 trên
+    # val: bỏ 4 khung, không vật nào mất khung, precision 0,898 -> 0,910.
+    duplicate_iou: 0.6
+    # Bỏ khung chứa >= N khung khác (khung quanh cả túi/cụm hàng). 0 = tắt. ĐANG TẮT: trên val nó
+    # bỏ 2 khung cụm nhưng cũng bỏ khung của một sản phẩm thật bị hai vật khác đè lên.
+    container_min_boxes: 0
+    containment_ratio: 0.8
   rf_detr:
     variant: "base" # nano | small | medium | base | large
     weights_path: "weights/detector/checkpoint_best_ema.pth"

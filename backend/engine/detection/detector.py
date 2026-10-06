@@ -33,6 +33,7 @@ from engine.core.config import AppConfig
 from engine.core.logger import get_logger
 from engine.core.utils import timer
 from engine.detection.backends.base import DetectionBackend
+from engine.detection.postprocess import suppress_redundant
 from engine.models.models import DetectionResult, ImageData
 
 logger = get_logger(__name__)
@@ -103,6 +104,23 @@ class Detector:
 
         detections.sort(key=lambda item: item.confidence, reverse=True)
         detections = detections[: self._config.max_detections]
+
+        suppression = self._config.suppression
+        if suppression.enabled:
+            detections, dropped = suppress_redundant(
+                detections,
+                duplicate_iou=suppression.duplicate_iou,
+                container_min_boxes=suppression.container_min_boxes,
+                containment_ratio=suppression.containment_ratio,
+            )
+            for detection, reason in dropped:
+                logger.info(
+                    "Detector dropped a redundant box (%s) in image_id='%s': bbox=%s confidence=%.3f",
+                    reason,
+                    image_data.image_id,
+                    [round(value) for value in detection.bbox.as_list()],
+                    detection.confidence,
+                )
 
         logger.info(
             "Detector found %d region(s) in image_id='%s' (%.2f ms)",
