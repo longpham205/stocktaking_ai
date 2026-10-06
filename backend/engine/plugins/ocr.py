@@ -127,6 +127,7 @@ class OcrPlugin:
                 result = self._run_ocr(rotated, rotation)
                 result["score"] = self._score_result(result)
                 orientation_results.append(result)
+                self._release_gpu_cache()
 
                 logger.debug(
                     "OCR orientation=%d score=%.4f confidence=%.4f "
@@ -339,6 +340,21 @@ class OcrPlugin:
     # ------------------------------------------------------------------
     # OCR ENGINE & EVALUATION
     # ------------------------------------------------------------------
+
+    def _release_gpu_cache(self) -> None:
+        """Return PyTorch's cached GPU blocks to the driver after one orientation.
+
+        Every crop and every rotation has a different size, so the caching allocator keeps a
+        separate block for each one and never reuses them: `reserved` grew to 7 GB on a 4 GB
+        card and spilled into shared system memory, which slowed every later call. Releasing
+        the cache does not touch live tensors, so the OCR output is unchanged.
+        """
+        if str(self._config.device).lower().strip() != "cuda":
+            return
+        import torch
+
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
 
     def _run_ocr(self, image: np.ndarray, rotation: int) -> Dict[str, Any]:
         """Run EasyOCR and evaluate every OCR fragment."""
