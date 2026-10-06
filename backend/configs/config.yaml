@@ -165,6 +165,15 @@ plugins:
     shared_detection: true
   color:
     enabled: true
+    # "signature": so phân bố màu của cả crop với chữ ký màu học từ ảnh gallery (không ROI theo sản
+    # phẩm, không màu gõ tay). "roi": cách cũ (màu trội của một vùng, so với bảng color_reference).
+    # Đo 2026-10-06 trên val: "signature" sửa cả 4 ca SKU 6 -> 5, không làm sai ca nào
+    # (F1 0,9066 -> 0,9202). Cần file chữ ký: python scripts/build_color_signatures.py
+    # (chạy lại mỗi khi thêm/đổi ảnh gallery).
+    mode: "signature"
+    signatures_path: "data/cache/color_signatures.npz"
+    # Crop có ít hơn tỉ lệ này điểm ảnh có màu (hộp trắng ~0,01) thì màu không lên tiếng.
+    min_colored_fraction: 0.05
     roi_enabled: true
     clustering_size: 96
     blur_kernel_size: 3
@@ -312,6 +321,10 @@ rerank:
     min_margin: 1.0
     margin_scale: 5.0
     l_weight: 0.1
+    # Chế độ "signature": SKU giống nhất phải hơn SKU thứ nhì quá mức này (độ giao biểu đồ, 0..1)
+    # mới được cộng bằng chứng; bằng chứng đạt tối đa ở min_margin + margin_scale.
+    signature_min_margin: 0.10
+    signature_margin_scale: 0.20
 
 # --- Storage ---
 storage:
