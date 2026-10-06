@@ -343,7 +343,14 @@ class OcrPlugin:
     def _run_ocr(self, image: np.ndarray, rotation: int) -> Dict[str, Any]:
         """Run EasyOCR and evaluate every OCR fragment."""
         try:
-            results = self._reader.readtext(image, detail=1, paragraph=False)
+            # canvas_size only shrinks the image for text detection; the boxes are mapped back
+            # and recognition crops them from the full-resolution image.
+            results = self._reader.readtext(
+                image,
+                detail=1,
+                paragraph=False,
+                canvas_size=int(self._config.detect_canvas_size),
+            )
         except Exception:
             logger.exception("EasyOCR failed during rotation=%d", rotation)
             return self._empty_orientation_result(rotation=rotation, image_shape=image.shape)

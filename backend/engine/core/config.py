@@ -260,6 +260,8 @@ class OcrPluginSection(BaseModel):
     clahe_tile_grid_size: int = Field(default=8, ge=1)
     rotation_enabled: bool = True
     rotation_angles: list[int] = Field(default_factory=lambda: [90, 180, 270])
+    # Longest side fed to the text DETECTION network; recognition still reads the full-size crop.
+    detect_canvas_size: int = Field(default=2560, ge=320)
 
 
 class ColorPluginSection(BaseModel):

@@ -144,6 +144,9 @@ plugins:
       - 90
       - 180
       - 270
+    # Cạnh dài tối đa của ảnh vào bước PHÁT HIỆN chữ (nhận dạng vẫn đọc ảnh gốc). Mặc định của
+    # EasyOCR là 2560. Đo 2026-10-06 trên val: 1600 giữ nguyên F1/fusion; 1280 làm tệ cặp SKU 7/8.
+    detect_canvas_size: 1600
   color:
     enabled: true
     roi_enabled: true
