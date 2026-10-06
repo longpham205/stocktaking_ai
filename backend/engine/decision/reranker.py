@@ -33,6 +33,7 @@ import numpy as np
 
 from engine.catalog.factory import open_catalog_repository
 from engine.catalog.repository import BaseCatalogRepository
+from engine.core.color_signature import ColorSignatureStore
 from engine.core.config import AppConfig
 from engine.core.logger import get_logger
 from engine.core.utils import clip_coordinate, timer
@@ -101,6 +102,14 @@ class Reranker:
         self._color_min_margin = color.min_margin
         self._color_margin_scale = color.margin_scale
         self._color_l_weight = color.l_weight
+        self._signature_min_margin = float(color.signature_min_margin)
+        self._signature_margin_scale = float(color.signature_margin_scale)
+        # Signature mode fails at start-up when the file is missing, not on the first basket.
+        self._color_signatures: ColorSignatureStore | None = (
+            ColorSignatureStore.load(config.resolve_path(config.plugins.color.signatures_path))
+            if config.plugins.color.enabled and config.plugins.color.mode == "signature"
+            else None
+        )
         # Confusable Pairs
         self._confusable_min_agree = config.rerank.confusable_min_agreeing_plugins
 
@@ -163,6 +172,10 @@ class Reranker:
         plugin_confidence = self._extract_plugin_confidences(plugin_result)
 
         retrieval_guard = self._build_retrieval_guard(retrieval_result.candidates)
+        # Signature mode replaces the reference-colour comparison; the two never add up.
+        signature_strengths = self._signature_match_strengths(retrieval_result.candidates, plugin_result)
+        if signature_strengths is not None:
+            query_lab = None
         color_distances = self._calculate_color_distances(retrieval_result.candidates, query_lab)
         color_context = self._build_color_context(color_distances)
 
@@ -183,7 +196,10 @@ class Reranker:
             ocr_confidence = float(ocr_evidence["plugin_confidence"])
 
             # Color
-            color_match_strength = self._color_match_strength(product_id, color_distances, color_context)
+            if signature_strengths is not None:
+                color_match_strength = signature_strengths.get(product_id, 0.0)
+            else:
+                color_match_strength = self._color_match_strength(product_id, color_distances, color_context)
 
             # Retrieval Protection
             barcode_ratio = self._plugin_boost_ratio(product_id, retrieval_guard, "barcode")
@@ -843,6 +859,51 @@ class Reranker:
     # ----------------------------------------------------------------------
     # COLOR MATCHING & CIEDE2000
     # ----------------------------------------------------------------------
+
+    def _signature_match_strengths(
+        self,
+        candidates: list[RetrievalCandidate],
+        plugin_result: PluginResult,
+    ) -> dict[str, float] | None:
+        """Colour evidence per candidate SKU from gallery colour signatures.
+
+        Returns None when signature mode is off or the plugin produced no signature, so the
+        caller falls back to the reference-colour path. Otherwise only the best-matching SKU
+        gets a non-zero strength, and only when it beats the runner-up by more than
+        `signature_min_margin`. If any candidate SKU has no signature the comparison would be
+        unfair to it, so no candidate gets colour evidence.
+
+        Colour is opt-in per SKU: the favoured SKU must have a `color_code` declared in the
+        catalog. Pale packs take on the colour cast of the lighting, and on new basket photos
+        (2026-10-06) undeclared colour evidence flipped a white pack to its light-blue sibling.
+        """
+        if self._color_signatures is None or not self._color_enabled:
+            return None
+        color_evidence = plugin_result.evidence.get("color")
+        if not isinstance(color_evidence, dict) or "signature" not in color_evidence:
+            return None
+
+        product_ids = list(dict.fromkeys(str(candidate.product_id) for candidate in candidates))
+        query = np.asarray(color_evidence["signature"], dtype=np.float32)
+        similarities: dict[str, float] = {}
+        for product_id in product_ids:
+            similarity = self._color_signatures.similarity(query, product_id)
+            if similarity is None:
+                logger.debug("No colour signature for product_id='%s'; colour evidence skipped.", product_id)
+                return {}
+            similarities[product_id] = similarity
+        if len(similarities) < 2:
+            return {}
+
+        ranked = sorted(similarities.items(), key=lambda item: item[1], reverse=True)
+        margin = ranked[0][1] - ranked[1][1]
+        if margin <= self._signature_min_margin:
+            return {}
+        if not self._catalog.color_code(ranked[0][0]):
+            return {}
+        strength = float(np.clip((margin - self._signature_min_margin) / self._signature_margin_scale, 0.0, 1.0))
+        logger.debug("Colour signature favours product_id='%s' (margin=%.3f strength=%.3f)", ranked[0][0], margin, strength)
+        return {ranked[0][0]: strength}
 
     def _color_reference_labs(self) -> dict[str, list[float]]:
         """Màu tham chiếu của catalog (RGB) đổi sang OpenCV 8-bit Lab; cache theo catalog.version()."""

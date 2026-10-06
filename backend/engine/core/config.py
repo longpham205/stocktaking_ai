@@ -283,6 +283,14 @@ class ColorPluginSection(BaseModel):
     """Color extraction plugin configuration."""
 
     enabled: bool = True
+    # "roi": dominant colour of a detected/fixed region, compared with catalog reference colours.
+    # "signature": colour histogram of the whole crop, compared with signatures learned from the
+    # gallery (engine/core/color_signature.py); needs `signatures_path` to exist.
+    mode: Literal["roi", "signature"] = "roi"
+    signatures_path: str = "data/cache/color_signatures.npz"
+    # Signature mode: below this share of coloured pixels the crop gives no colour evidence
+    # (white boxes score about 0.01).
+    min_colored_fraction: float = Field(default=0.05, ge=0.0, le=1.0)
 
     # ROI detection & preprocessing
     roi_enabled: bool = True
@@ -482,6 +490,10 @@ class RerankColorSection(BaseModel):
     min_margin: float = Field(default=1.0, ge=0.0)
     margin_scale: float = Field(default=5.0, gt=0.0)
     l_weight: float = Field(default=0.1, gt=0.0, le=1.0)
+    # Signature mode: the best candidate must beat the runner-up by more than `signature_min_margin`
+    # (histogram intersection, 0..1); evidence is full at min_margin + margin_scale.
+    signature_min_margin: float = Field(default=0.10, ge=0.0, le=1.0)
+    signature_margin_scale: float = Field(default=0.20, gt=0.0, le=1.0)
 
     @model_validator(mode="before")
     @classmethod

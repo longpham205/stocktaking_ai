@@ -3,6 +3,7 @@ from __future__ import annotations
 import cv2
 import numpy as np
 
+from engine.core.color_signature import compute_signature
 from engine.core.config import AppConfig
 from engine.core.logger import get_logger
 from engine.core.utils import timer
@@ -236,7 +237,7 @@ class ColorPlugin:
             elapsed["elapsed_ms"],
         )
 
-        return {
+        output = {
             "dominant_color": dominant_color,
             "dominant_rgb": dominant_rgb,
             "representative_lab": [
@@ -249,6 +250,22 @@ class ColorPlugin:
             "roi": roi_info,
             "debug": debug_info,
             "latency_ms": elapsed["elapsed_ms"],
+        }
+        if self._config.mode == "signature":
+            output.update(self._signature_evidence(image))
+        return output
+
+    def _signature_evidence(self, image: np.ndarray) -> dict:
+        """Colour signature of the whole crop, the evidence the Reranker uses in signature mode.
+
+        `confidence` is all-or-nothing: a crop with too few coloured pixels (a white box) says
+        nothing about colour, and its histogram would be noise.
+        """
+        histogram, colored_fraction = compute_signature(image)
+        return {
+            "signature": histogram.round(5).tolist(),
+            "colored_fraction": round(colored_fraction, 4),
+            "confidence": 1.0 if colored_fraction >= float(self._config.min_colored_fraction) else 0.0,
         }
 
     # ------------------------------------------------------------------
