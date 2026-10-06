@@ -94,3 +94,32 @@ def test_boxes_are_ordered_and_kept_inside_the_image(box, expected):
 def test_review_needs_the_propose_step_first(tmp_path):
     with pytest.raises(ValueError, match="propose"):
         lb.load_labels(tmp_path)
+
+
+@pytest.mark.parametrize(
+    ("point", "expected"),
+    [
+        ((200, 150), "move"),  # bên trong
+        ((101, 150), "w"),
+        ((300, 52), "ne"),  # góc: hai cạnh cùng lúc
+        ((200, 304), "s"),  # ngay ngoài viền vẫn bắt được
+        ((320, 150), None),  # ngoài hẳn
+    ],
+)
+def test_the_part_of_a_box_under_the_pointer(point, expected):
+    assert lb.grab_handle([100.0, 50.0, 300.0, 300.0], *point, tolerance=5) == expected
+
+
+@pytest.mark.parametrize(
+    ("handle", "delta", "expected"),
+    [
+        ("move", (30, -20), [130.0, 30.0, 330.0, 280.0]),
+        ("move", (900, -900), [800.0, 0.0, 1000.0, 250.0]),  # dời tới mép ảnh thì dừng, giữ kích thước
+        ("e", (50, 999), [100.0, 50.0, 350.0, 300.0]),  # kéo cạnh phải: chỉ x2 đổi
+        ("nw", (-20, 10), [80.0, 60.0, 300.0, 300.0]),
+        ("w", (500, 0), [300.0 - lb.MIN_BOX, 50.0, 300.0, 300.0]),  # không kéo lật qua cạnh đối diện
+        ("s", (0, 5000), [100.0, 50.0, 300.0, 800.0]),
+    ],
+)
+def test_dragging_moves_or_resizes_a_box_inside_the_image(handle, delta, expected):
+    assert lb.drag_box([100.0, 50.0, 300.0, 300.0], handle, *delta, width=1000, height=800) == expected

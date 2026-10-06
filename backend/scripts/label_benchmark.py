@@ -19,6 +19,7 @@ Thư mục riêng, không đụng ``data/benchmark`` (baseline cũ vẫn so đư
 
 Cửa sổ duyệt:
     chạm khung để chọn · kéo trên vùng trống để vẽ khung mới · Delete xoá khung đang chọn
+    kéo bên trong khung để dời nó · kéo viền hoặc góc của khung đang chọn để đổi kích thước
     gõ vào ô tìm để lọc sản phẩm, Enter hoặc nhấp đúp để gán cho khung đang chọn
     A = ảnh này đúng hết, sang ảnh sau (đánh dấu ĐÃ DUYỆT) · U bỏ duyệt · ←/→ chuyển ảnh · Esc thoát
 Khung vàng = pipeline chưa chắc, đỏ = chưa có sản phẩm (phải gán hoặc xoá mới duyệt được).
@@ -66,6 +67,38 @@ def clamp_box(box: list[float], width: int, height: int) -> list[float] | None:
     y1, y2 = sorted((max(0.0, min(float(height), box[1])), max(0.0, min(float(height), box[3]))))
     if x2 - x1 < MIN_BOX or y2 - y1 < MIN_BOX:
         return None
+    return [round(x1, 2), round(y1, 2), round(x2, 2), round(y2, 2)]
+
+
+def grab_handle(bbox: list[float], x: float, y: float, tolerance: float) -> str | None:
+    """Phần của khung nằm dưới con trỏ: cạnh/góc ("n", "s", "w", "e", "nw", ...), "move" nếu ở bên
+    trong, None nếu ở ngoài. `tolerance` là bề dày vùng bắt viền (pixel ảnh gốc)."""
+    x1, y1, x2, y2 = bbox
+    if not (x1 - tolerance <= x <= x2 + tolerance and y1 - tolerance <= y <= y2 + tolerance):
+        return None
+    vertical = min((abs(y - y1), "n"), (abs(y - y2), "s"))
+    horizontal = min((abs(x - x1), "w"), (abs(x - x2), "e"))
+    edges = (vertical[1] if vertical[0] <= tolerance else "") + (horizontal[1] if horizontal[0] <= tolerance else "")
+    return edges or "move"
+
+
+def drag_box(bbox: list[float], handle: str, dx: float, dy: float, width: int, height: int) -> list[float]:
+    """Khung sau khi kéo `handle` đi (dx, dy): "move" dời cả khung (giữ kích thước), cạnh/góc thì
+    đổi kích thước. Luôn nằm trong ảnh và không nhỏ hơn MIN_BOX."""
+    x1, y1, x2, y2 = bbox
+    if handle == "move":
+        dx = max(-x1, min(width - x2, dx))
+        dy = max(-y1, min(height - y2, dy))
+        x1, y1, x2, y2 = x1 + dx, y1 + dy, x2 + dx, y2 + dy
+    else:
+        if "w" in handle:
+            x1 = max(0.0, min(x2 - MIN_BOX, x1 + dx))
+        if "e" in handle:
+            x2 = min(float(width), max(x1 + MIN_BOX, x2 + dx))
+        if "n" in handle:
+            y1 = max(0.0, min(y2 - MIN_BOX, y1 + dy))
+        if "s" in handle:
+            y2 = min(float(height), max(y1 + MIN_BOX, y2 + dy))
     return [round(x1, 2), round(y1, 2), round(x2, 2), round(y2, 2)]
 
 
@@ -172,6 +205,9 @@ def propose(images_dir: Path, out_dir: Path, config_path: Path | None) -> int:
 # ---------------------------------------------------------------- bước 2: duyệt
 
 COLORS = {"ok": "#10b981", "unsure": "#f59e0b", "missing": "#ef4444"}
+GRAB_PX = 7  # pixel màn hình: bề dày vùng bắt viền khung đang chọn
+MOVE_PX = 4  # pixel màn hình: kéo ngắn hơn coi như chỉ bấm chọn
+CURSORS = {"move": "fleur", "n": "sb_v_double_arrow", "s": "sb_v_double_arrow", "w": "sb_h_double_arrow", "e": "sb_h_double_arrow", "nw": "size_nw_se", "se": "size_nw_se", "ne": "size_ne_sw", "sw": "size_ne_sw"}
 
 
 def box_kind(box: dict) -> str:
@@ -192,7 +228,8 @@ def review(directory: Path) -> int:
         print("Không có ảnh nào để duyệt.")
         return 0
     order = sorted(products, key=lambda pid: (len(pid), pid))
-    state = {"index": next((i for i, im in enumerate(images) if not im.get("reviewed")), 0), "selected": None, "photo": None, "scale": 1.0, "drag": None, "shown": []}
+    # drag: điểm bắt đầu khi vẽ khung mới; edit: (handle, x0, y0, khung gốc) khi dời/đổi cỡ khung đang chọn
+    state = {"index": next((i for i, im in enumerate(images) if not im.get("reviewed")), 0), "selected": None, "photo": None, "scale": 1.0, "drag": None, "edit": None, "shown": []}
 
     root = tk.Tk()
     root.title("Gán nhãn benchmark")
@@ -332,27 +369,71 @@ def review(directory: Path) -> int:
     def at(event: object) -> tuple[float, float]:
         return getattr(event, "x") / state["scale"], getattr(event, "y") / state["scale"]
 
+    def edge_under(x: float, y: float) -> str | None:
+        """Viền/góc của khung ĐANG CHỌN dưới con trỏ (không tính phần bên trong)."""
+        if state["selected"] is None:
+            return None
+        handle = grab_handle(current()["boxes"][state["selected"]]["bbox"], x, y, GRAB_PX / state["scale"])
+        return None if handle == "move" else handle
+
+    def rubber(bbox: list[float]) -> None:
+        canvas.delete("rubber")
+        canvas.create_rectangle(*(v * state["scale"] for v in bbox), outline="#38bdf8", dash=(4, 3), width=2, tags="rubber")
+
     def press(event: object) -> None:
         x, y = at(event)
-        hits = [i for i, box in enumerate(current()["boxes"]) if box["bbox"][0] <= x <= box["bbox"][2] and box["bbox"][1] <= y <= box["bbox"][3]]
+        boxes = current()["boxes"]
+        state["drag"] = state["edit"] = None
+        edge = edge_under(x, y)
+        if edge:
+            state["edit"] = (edge, x, y, list(boxes[state["selected"]]["bbox"]))
+            return
+        hits = [i for i, box in enumerate(boxes) if box["bbox"][0] <= x <= box["bbox"][2] and box["bbox"][1] <= y <= box["bbox"][3]]
         if hits:
             # khung nhỏ nhất chứa điểm bấm: chọn được vật nằm trong khung lớn hơn
-            state["selected"] = min(hits, key=lambda i: (current()["boxes"][i]["bbox"][2] - current()["boxes"][i]["bbox"][0]) * (current()["boxes"][i]["bbox"][3] - current()["boxes"][i]["bbox"][1]))
-            state["drag"] = None
+            state["selected"] = min(hits, key=lambda i: (boxes[i]["bbox"][2] - boxes[i]["bbox"][0]) * (boxes[i]["bbox"][3] - boxes[i]["bbox"][1]))
+            state["edit"] = ("move", x, y, list(boxes[state["selected"]]["bbox"]))
             root.focus_set()
             draw()
         else:
             state["drag"] = (x, y)
 
+    def edited(event: object) -> list[float] | None:
+        """Khung đang dời/đổi cỡ tại vị trí con trỏ; None khi mới nhích chuột (coi như bấm chọn)."""
+        handle, x0, y0, origin = state["edit"]
+        x, y = at(event)
+        if max(abs(x - x0), abs(y - y0)) * state["scale"] < MOVE_PX:
+            return None
+        image = current()
+        return drag_box(origin, handle, x - x0, y - y0, image["width"], image["height"])
+
+    def hover(event: object) -> None:
+        x, y = at(event)
+        canvas.configure(cursor=CURSORS.get(edge_under(x, y) or "", "tcross"))
+
     def motion(event: object) -> None:
+        if state["edit"] is not None:
+            bbox = edited(event)
+            if bbox:
+                canvas.configure(cursor=CURSORS[state["edit"][0]])
+                rubber(bbox)
+            return
         if state["drag"] is None:
             return
         x, y = at(event)
-        x0, y0 = state["drag"]
-        canvas.delete("rubber")
-        canvas.create_rectangle(x0 * state["scale"], y0 * state["scale"], x * state["scale"], y * state["scale"], outline="#38bdf8", dash=(4, 3), width=2, tags="rubber")
+        rubber([*state["drag"], x, y])
 
     def release(event: object) -> None:
+        if state["edit"] is not None:
+            bbox = edited(event)
+            state["edit"] = None
+            if bbox:
+                current()["boxes"][state["selected"]]["bbox"] = bbox
+                touch()
+                persist("Đã sửa khung")
+                draw()
+            hover(event)
+            return
         if state["drag"] is None:
             return
         x, y = at(event)
@@ -389,6 +470,7 @@ def review(directory: Path) -> int:
     prev_button.configure(command=lambda: go(-1))
     next_button.configure(command=lambda: go(1))
     canvas.bind("<ButtonPress-1>", press)
+    canvas.bind("<Motion>", hover)
     canvas.bind("<B1-Motion>", motion)
     canvas.bind("<ButtonRelease-1>", release)
     canvas.bind("<Configure>", lambda _event: draw())
