@@ -122,6 +122,17 @@ class RfDetrSection(BaseModel):
     inference: RfDetrInferenceSection = Field(default_factory=RfDetrInferenceSection)
 
 
+class DetectionSuppressionSection(BaseModel):
+    """Removal of redundant detector boxes (engine/detection/postprocess.py)."""
+
+    enabled: bool = False
+    # Two boxes with IoU at or above this are one object; the less confident one is dropped.
+    duplicate_iou: float = Field(default=0.6, gt=0.0, le=1.0)
+    # A box enclosing this many other boxes is dropped as a box around a group; 0 = rule off.
+    container_min_boxes: int = Field(default=0, ge=0)
+    containment_ratio: float = Field(default=0.8, gt=0.0, le=1.0)
+
+
 class DetectionSection(BaseModel):
     """Object detection module configuration."""
 
@@ -137,6 +148,7 @@ class DetectionSection(BaseModel):
     blur_kernel_size: int
     max_detections: int
     rf_detr: RfDetrSection = Field(default_factory=RfDetrSection)
+    suppression: DetectionSuppressionSection = Field(default_factory=DetectionSuppressionSection)
 
 
 class RefinementTriggerSection(BaseModel):
