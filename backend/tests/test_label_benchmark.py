@@ -141,3 +141,32 @@ def test_a_box_counts_as_edited_once_a_person_touched_it():
     assert not lb.was_edited({"bbox": [0, 0, 9, 9], "product_id": "7", "source": "accepted"})
     assert lb.was_edited({"bbox": [0, 0, 9, 9], "product_id": "7", "source": "manual"})  # gán nhãn hoặc tự vẽ
     assert lb.was_edited({"bbox": [0, 0, 9, 9], "product_id": "7", "source": "accepted", "edited": True})  # dời / đổi cỡ
+
+
+def test_cropping_shifts_clips_and_drops_boxes():
+    boxes = [
+        {"bbox": [300.0, 300.0, 400.0, 380.0], "product_id": "7"},  # nằm trọn trong vùng cắt
+        {"bbox": [150.0, 250.0, 290.0, 350.0], "product_id": "7"},  # thò ra mép trái: bị xén
+        {"bbox": [10.0, 20.0, 110.0, 220.0], "product_id": "29"},  # tâm nằm ngoài: bỏ
+    ]
+    assert lb.crop_boxes(boxes, [200, 200, 700, 600]) == [
+        {"bbox": [100.0, 100.0, 200.0, 180.0], "product_id": "7"},
+        {"bbox": [0.0, 50.0, 90.0, 150.0], "product_id": "7"},
+    ]
+
+
+def test_cropping_a_photo_rewrites_the_file_and_keeps_the_original(tmp_path):
+    from PIL import Image
+
+    (tmp_path / "images").mkdir()
+    Image.new("RGB", (1000, 800), "gray").save(tmp_path / "images" / "0001.jpg")
+    image = _labels()["images"][0]
+    removed = lb.crop_photo(tmp_path, image, [200.4, 200.0, 700.0, 600.0])
+    assert removed == 1
+    assert (image["width"], image["height"], image["reviewed"], image["touched"]) == (500, 400, False, True)
+    assert [box["bbox"] for box in image["boxes"]] == [[100.0, 100.0, 200.5, 180.0]]
+    with Image.open(tmp_path / "images" / "0001.jpg") as cropped, Image.open(tmp_path / "_originals" / "0001.jpg") as original:
+        assert (cropped.size, original.size) == ((500, 400), (1000, 800))
+    lb.crop_photo(tmp_path, image, [0, 0, 300, 300])  # cắt lần hai: bản gốc không bị ghi đè
+    with Image.open(tmp_path / "_originals" / "0001.jpg") as original:
+        assert original.size == (1000, 800)

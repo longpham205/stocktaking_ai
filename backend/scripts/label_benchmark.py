@@ -22,6 +22,8 @@ Cửa sổ duyệt:
     kéo bên trong khung để dời nó · kéo viền hoặc góc của khung đang chọn để đổi kích thước
     cột bên phải liệt kê các khung của ảnh và nhãn của chúng (bấm một dòng để chọn khung đó);
     dấu ✔ = khung bạn đã sửa (gán nhãn, dời, đổi cỡ hoặc tự vẽ)
+    C rồi kéo một vùng = cắt ảnh, chỉ giữ vùng đó (bỏ sản phẩm lọt vào mép ảnh); khung nằm ngoài
+    bị xoá, ảnh gốc được giữ ở <dir>/_originals/; Esc huỷ thao tác cắt
     gõ vào ô tìm để lọc sản phẩm, Enter hoặc nhấp đúp để gán cho khung đang chọn
     A = ảnh này đúng hết, sang ảnh sau (đánh dấu ĐÃ DUYỆT) · U bỏ duyệt · ←/→ chuyển ảnh · Esc thoát
 Khung vàng = pipeline chưa chắc hoặc sản phẩm nằm ngoài --only, đỏ = chưa có sản phẩm (phải gán
@@ -40,7 +42,9 @@ from pathlib import Path
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp", ".bmp"}
 LABELS_NAME = "_labels.json"
 COCO_NAME = "_annotations.coco.json"
+ORIGINALS_NAME = "_originals"  # ảnh trước khi cắt (không nằm trong images/, validate không đọc)
 MIN_BOX = 8  # pixel ảnh gốc: khung nhỏ hơn coi như bấm nhầm
+MIN_CROP = 64  # pixel ảnh gốc: vùng cắt nhỏ hơn coi như kéo nhầm
 
 
 # ---------------------------------------------------------------- trạng thái + xuất COCO (không cần GPU, không cần màn hình)
@@ -114,6 +118,45 @@ def parse_only(text: str) -> set[str]:
             raise ValueError(f"--only không hiểu được '{part.strip()}': viết dạng 21-39 hoặc 21,24,29-32")
         chosen.update(str(pid) for pid in range(int(first), int(last or first) + 1))
     return chosen
+
+
+def crop_boxes(boxes: list[dict], crop: list[int]) -> list[dict]:
+    """Các khung sau khi cắt ảnh theo `crop` [x1, y1, x2, y2]: toạ độ tính lại từ góc mới, phần thò ra
+    ngoài bị xén. Khung có tâm nằm ngoài vùng cắt (vật bị cắt bỏ) thì bỏ."""
+    cx1, cy1, cx2, cy2 = crop
+    kept = []
+    for box in boxes:
+        x1, y1, x2, y2 = box["bbox"]
+        if not (cx1 <= (x1 + x2) / 2 <= cx2 and cy1 <= (y1 + y2) / 2 <= cy2):
+            continue
+        bbox = clamp_box([x1 - cx1, y1 - cy1, x2 - cx1, y2 - cy1], cx2 - cx1, cy2 - cy1)
+        if bbox:
+            kept.append({**box, "bbox": bbox})
+    return kept
+
+
+def crop_photo(directory: Path, image: dict, crop: list[float]) -> int:
+    """Cắt file ảnh theo `crop` và sửa `image` (kích thước, khung) cho khớp; trả số khung bị bỏ.
+    Ảnh trước lần cắt đầu tiên được giữ ở ``<directory>/_originals/``."""
+    from PIL import Image, ImageOps
+
+    area = [int(round(v)) for v in crop]
+    path = directory / "images" / image["file_name"]
+    backup = directory / ORIGINALS_NAME / image["file_name"]
+    if not backup.is_file():
+        backup.parent.mkdir(exist_ok=True)
+        shutil.copy2(path, backup)
+    with Image.open(path) as opened:
+        fmt = opened.format or "JPEG"
+        # xoay theo EXIF trước: vùng cắt tính trên ảnh đã xoay, và file ghi ra không còn thẻ xoay
+        picture = ImageOps.exif_transpose(opened).convert("RGB").crop(tuple(area))
+    tmp = path.with_name(path.name + ".tmp")
+    picture.save(tmp, format=fmt, **({"quality": 95, "subsampling": 0} if fmt == "JPEG" else {}))
+    tmp.replace(path)
+    boxes = crop_boxes(image["boxes"], area)
+    removed = len(image["boxes"]) - len(boxes)
+    image.update(boxes=boxes, width=area[2] - area[0], height=area[3] - area[1], touched=True, reviewed=False)
+    return removed
 
 
 def was_edited(box: dict) -> bool:
@@ -252,7 +295,7 @@ def review(directory: Path, only: set[str] | None = None) -> int:
     if not order:
         raise ValueError("--only không khớp sản phẩm nào trong danh sách")
     # drag: điểm bắt đầu khi vẽ khung mới; edit: (handle, x0, y0, khung gốc) khi dời/đổi cỡ khung đang chọn
-    state = {"index": next((i for i, im in enumerate(images) if not im.get("reviewed")), 0), "selected": None, "photo": None, "scale": 1.0, "drag": None, "edit": None, "shown": []}
+    state = {"index": next((i for i, im in enumerate(images) if not im.get("reviewed")), 0), "selected": None, "photo": None, "scale": 1.0, "drag": None, "edit": None, "crop": False, "shown": []}
 
     root = tk.Tk()
     root.title("Gán nhãn benchmark")
@@ -284,6 +327,8 @@ def review(directory: Path, only: set[str] | None = None) -> int:
     approve_button.pack(fill="x", pady=1)
     delete_button = tk.Button(side, text="Xoá khung đang chọn (Delete)")
     delete_button.pack(fill="x", pady=1)
+    crop_button = tk.Button(side, text="Cắt ảnh: kéo vùng giữ lại (C)")
+    crop_button.pack(fill="x", pady=1)
     nav = tk.Frame(side)
     nav.pack(fill="x", pady=1)
     prev_button = tk.Button(nav, text="← Ảnh trước")
@@ -351,6 +396,8 @@ def review(directory: Path, only: set[str] | None = None) -> int:
         image["reviewed"] = False  # sửa xong phải duyệt lại
 
     def go(step: int) -> None:
+        if state["crop"]:
+            crop_mode(False)
         state["index"] = (state["index"] + step) % len(images)
         state["selected"] = None
         status.configure(text="")
@@ -417,6 +464,9 @@ def review(directory: Path, only: set[str] | None = None) -> int:
         x, y = at(event)
         boxes = current()["boxes"]
         state["drag"] = state["edit"] = None
+        if state["crop"]:
+            state["drag"] = (x, y)
+            return
         edge = edge_under(x, y)
         if edge:
             state["edit"] = (edge, x, y, list(boxes[state["selected"]]["bbox"]))
@@ -441,6 +491,8 @@ def review(directory: Path, only: set[str] | None = None) -> int:
         return drag_box(origin, handle, x - x0, y - y0, image["width"], image["height"])
 
     def hover(event: object) -> None:
+        if state["crop"]:
+            return
         x, y = at(event)
         canvas.configure(cursor=CURSORS.get(edge_under(x, y) or "", "tcross"))
 
@@ -474,6 +526,24 @@ def review(directory: Path, only: set[str] | None = None) -> int:
         state["drag"] = None
         image = current()
         bbox = clamp_box([x0, y0, x, y], image["width"], image["height"])
+        if state["crop"]:
+            crop_mode(False)
+            if bbox is None or bbox[2] - bbox[0] < MIN_CROP or bbox[3] - bbox[1] < MIN_CROP:
+                status.configure(text="Vùng cắt quá nhỏ: đã huỷ", fg="#c00")
+            else:
+                area = [int(round(v)) for v in bbox]
+                lost = len(image["boxes"]) - len(crop_boxes(image["boxes"], area))
+                question = f"Cắt ảnh còn {area[2] - area[0]} x {area[3] - area[1]} px?\n{lost} khung nằm ngoài vùng này sẽ bị xoá.\nẢnh gốc được giữ trong {ORIGINALS_NAME}/."
+                if messagebox.askyesno("Cắt ảnh", question):
+                    try:
+                        crop_photo(directory, image, area)
+                    except OSError as exc:
+                        status.configure(text=f"Không cắt được ảnh: {exc}", fg="#c00")
+                    else:
+                        state["selected"] = None
+                        persist(f"Đã cắt ảnh, bỏ {lost} khung")
+            draw()
+            return
         if bbox is None:
             state["selected"] = None  # bấm vào vùng trống: bỏ chọn
         else:
@@ -483,6 +553,14 @@ def review(directory: Path, only: set[str] | None = None) -> int:
             persist("Khung mới: chọn sản phẩm cho nó")
             search.focus_set()
         draw()
+
+    def crop_mode(on: bool = True) -> None:
+        state["crop"] = on
+        state["drag"] = state["edit"] = None
+        canvas.delete("rubber")
+        canvas.configure(cursor="sizing" if on else "tcross")
+        crop_button.configure(relief="sunken" if on else "raised")
+        status.configure(text="Kéo trên ảnh vùng muốn GIỮ LẠI (Esc để huỷ)" if on else "", fg="#06c")
 
     def pick_row(_event: object = None) -> None:
         picked = box_list.curselection()
@@ -498,6 +576,9 @@ def review(directory: Path, only: set[str] | None = None) -> int:
         return lambda event: None if typing() else action(event)
 
     def close(_event: object = None) -> None:
+        if state["crop"] and _event is not None:  # Esc khi đang cắt: chỉ huỷ thao tác cắt
+            crop_mode(False)
+            return
         save_labels(directory, labels)
         root.destroy()
 
@@ -508,6 +589,8 @@ def review(directory: Path, only: set[str] | None = None) -> int:
     box_list.bind("<<ListboxSelect>>", pick_row)
     approve_button.configure(command=approve)
     delete_button.configure(command=delete)
+    crop_button.configure(command=lambda: crop_mode(not state["crop"]))
+    root.bind("<c>", unless_typing(lambda _event: crop_mode(not state["crop"])))
     prev_button.configure(command=lambda: go(-1))
     next_button.configure(command=lambda: go(1))
     canvas.bind("<ButtonPress-1>", press)
