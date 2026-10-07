@@ -135,3 +135,9 @@ def test_a_box_of_a_product_outside_only_is_shown_as_unsure():
     box = {"bbox": [0, 0, 9, 9], "product_id": "7", "source": "accepted"}
     assert lb.box_kind(box) == "ok"
     assert lb.box_kind(box, {"21"}) == "unsure"
+
+
+def test_a_box_counts_as_edited_once_a_person_touched_it():
+    assert not lb.was_edited({"bbox": [0, 0, 9, 9], "product_id": "7", "source": "accepted"})
+    assert lb.was_edited({"bbox": [0, 0, 9, 9], "product_id": "7", "source": "manual"})  # gán nhãn hoặc tự vẽ
+    assert lb.was_edited({"bbox": [0, 0, 9, 9], "product_id": "7", "source": "accepted", "edited": True})  # dời / đổi cỡ

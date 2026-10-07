@@ -20,6 +20,8 @@ Thư mục riêng, không đụng ``data/benchmark`` (baseline cũ vẫn so đư
 Cửa sổ duyệt:
     chạm khung để chọn · kéo trên vùng trống để vẽ khung mới · Delete xoá khung đang chọn
     kéo bên trong khung để dời nó · kéo viền hoặc góc của khung đang chọn để đổi kích thước
+    cột bên phải liệt kê các khung của ảnh và nhãn của chúng (bấm một dòng để chọn khung đó);
+    dấu ✔ = khung bạn đã sửa (gán nhãn, dời, đổi cỡ hoặc tự vẽ)
     gõ vào ô tìm để lọc sản phẩm, Enter hoặc nhấp đúp để gán cho khung đang chọn
     A = ảnh này đúng hết, sang ảnh sau (đánh dấu ĐÃ DUYỆT) · U bỏ duyệt · ←/→ chuyển ảnh · Esc thoát
 Khung vàng = pipeline chưa chắc hoặc sản phẩm nằm ngoài --only, đỏ = chưa có sản phẩm (phải gán
@@ -112,6 +114,11 @@ def parse_only(text: str) -> set[str]:
             raise ValueError(f"--only không hiểu được '{part.strip()}': viết dạng 21-39 hoặc 21,24,29-32")
         chosen.update(str(pid) for pid in range(int(first), int(last or first) + 1))
     return chosen
+
+
+def was_edited(box: dict) -> bool:
+    """Khung đã qua tay người: gán nhãn, dời, đổi cỡ hoặc tự vẽ."""
+    return bool(box.get("edited")) or box.get("source") == "manual"
 
 
 def unlabeled(image: dict) -> int:
@@ -263,6 +270,9 @@ def review(directory: Path, only: set[str] | None = None) -> int:
     info.pack(fill="x", pady=(0, 6))
     chosen = tk.Label(side, anchor="w", wraplength=330, justify="left", font=("Segoe UI", 10, "bold"))
     chosen.pack(fill="x", pady=(0, 6))
+    tk.Label(side, text="Khung của ảnh này (✔ = bạn đã sửa):", anchor="w").pack(fill="x")
+    box_list = tk.Listbox(side, font=("Segoe UI", 10), height=9, activestyle="none", exportselection=False)
+    box_list.pack(fill="x", pady=(2, 6))
     tk.Label(side, text="Tìm sản phẩm (mã hoặc tên), Enter để gán:", anchor="w").pack(fill="x")
     search = tk.Entry(side, font=("Segoe UI", 11))
     search.pack(fill="x", pady=(2, 4))
@@ -320,11 +330,18 @@ def review(directory: Path, only: set[str] | None = None) -> int:
             picked = i == state["selected"]
             color = COLORS[box_kind(box, only)]
             canvas.create_rectangle(x1, y1, x2, y2, outline="#ffffff" if picked else color, width=4 if picked else 2)
-            tag = canvas.create_text(x1 + 3, y1 + 2, anchor="nw", fill="white", font=("Segoe UI", 9, "bold"), text=box.get("product_id") or "?")
+            tag = canvas.create_text(x1 + 3, y1 + 2, anchor="nw", fill="white", font=("Segoe UI", 9, "bold"), text=(box.get("product_id") or "?") + (" ✔" if was_edited(box) else ""))
             canvas.tag_lower(canvas.create_rectangle(canvas.bbox(tag), fill=color, outline=""), tag)
         done = sum(1 for im in images if im.get("reviewed"))
         title.configure(text=f"Ảnh {state['index'] + 1}/{len(images)} · đã duyệt {done}" + ("  ✔" if image.get("reviewed") else ""))
         info.configure(text=f"{image['file_name']} — {len(image['boxes'])} khung, {unlabeled(image)} chưa có sản phẩm")
+        box_list.delete(0, "end")
+        for i, box in enumerate(image["boxes"]):
+            box_list.insert("end", f"{'✔' if was_edited(box) else '    '} {i + 1}. {name_of(box.get('product_id'))}")
+            box_list.itemconfigure(i, foreground=COLORS[box_kind(box, only)])
+        if state["selected"] is not None:
+            box_list.selection_set(state["selected"])
+            box_list.see(state["selected"])
         picked_box = image["boxes"][state["selected"]] if state["selected"] is not None else None
         chosen.configure(text="Khung đang chọn: " + name_of(picked_box.get("product_id")) if picked_box else "Chưa chọn khung nào")
 
@@ -365,7 +382,7 @@ def review(directory: Path, only: set[str] | None = None) -> int:
         if not picked:
             return
         box = current()["boxes"][state["selected"]]
-        box["product_id"], box["source"] = state["shown"][picked[0]], "manual"
+        box["product_id"], box["source"], box["edited"] = state["shown"][picked[0]], "manual", True
         touch()
         persist(f"Đã gán: {name_of(box['product_id'])}")
         search.delete(0, "end")
@@ -444,7 +461,7 @@ def review(directory: Path, only: set[str] | None = None) -> int:
             bbox = edited(event)
             state["edit"] = None
             if bbox:
-                current()["boxes"][state["selected"]]["bbox"] = bbox
+                current()["boxes"][state["selected"]].update(bbox=bbox, edited=True)
                 touch()
                 persist("Đã sửa khung")
                 draw()
@@ -467,6 +484,13 @@ def review(directory: Path, only: set[str] | None = None) -> int:
             search.focus_set()
         draw()
 
+    def pick_row(_event: object = None) -> None:
+        picked = box_list.curselection()
+        if picked:
+            state["selected"] = picked[0]
+            root.focus_set()
+            draw()
+
     def typing() -> bool:
         return root.focus_get() is search
 
@@ -481,6 +505,7 @@ def review(directory: Path, only: set[str] | None = None) -> int:
     search.bind("<Return>", assign)
     listbox.bind("<Double-Button-1>", assign)
     listbox.bind("<Return>", assign)
+    box_list.bind("<<ListboxSelect>>", pick_row)
     approve_button.configure(command=approve)
     delete_button.configure(command=delete)
     prev_button.configure(command=lambda: go(-1))
