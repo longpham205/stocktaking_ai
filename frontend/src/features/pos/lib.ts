@@ -5,8 +5,11 @@ import type { HistoryItem } from '@/features/pos/types';
 export const TILT_LIMIT = 15;
 /** Below the API's ceiling (MAX_PRICE x 10). */
 export const MAX_CASH = 999_999_999;
-/** A photo larger than this is scaled down before upload (slow over 4G, and the API caps the size). */
-export const MAX_SIDE = 2048;
+/**
+ * A photo larger than this is scaled down before upload (the API caps the size). A 12 MP phone photo
+ * (4032 px) goes up whole: at 2048 px the small print the recognition reads is lost.
+ */
+export const MAX_SIDE = 4032;
 export const MAX_BYTES = 3 * 1024 * 1024;
 
 export function tiltAngle(beta: number | null, gamma: number | null): number {
@@ -71,9 +74,9 @@ export function groupByDay(items: HistoryItem[], now = new Date()): HistoryDay[]
 }
 
 /**
- * A photo from the phone's library (12 MP, several MB) is slow over 4G and may exceed the upload
- * limit: scaled down to `MAX_SIDE`, turned as its EXIF says. Returned as is when already small, or
- * when the browser cannot decode it here (the API then judges it).
+ * A photo too large for the upload limit is scaled down to `MAX_SIDE` or, when only its file is
+ * heavy, encoded again at its own size; either way turned as its EXIF says. Returned as is when
+ * already small, or when the browser cannot decode it here (the API then judges it).
  */
 export async function preparePhoto(photo: Blob): Promise<Blob> {
   if (typeof createImageBitmap !== 'function') return photo;
