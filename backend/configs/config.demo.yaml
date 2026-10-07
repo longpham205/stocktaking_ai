@@ -292,6 +292,8 @@ rerank:
     weight: 0.60
     min_text_length: 2
     fuzzy_threshold: 0.80
+    # Khớp đúng từ khoá: độ tin cậy = đoạn chữ chứa từ khoá, không thấp hơn sàn này (0 = tắt).
+    keyword_confidence_floor: 0.0
 
   color:
     enabled: true

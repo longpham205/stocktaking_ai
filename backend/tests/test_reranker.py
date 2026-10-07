@@ -150,3 +150,48 @@ def test_reranker_never_matches_ocr_against_product_name(test_config, test_catal
         evidence={"ocr": {"text": "Milk Carton", "text_length": 11, "confidence": 1.0}},
     )
     assert reranker.rerank(retrieval_result, plugin_result).product_id == "1"
+
+
+def _keyword_case(test_config, floor: float):
+    """Rank-2 SKU whose keyword OCR read clearly, inside a low-confidence orientation full of junk."""
+    rerank = test_config.rerank.model_copy(
+        update={"ocr": test_config.rerank.ocr.model_copy(update={"keyword_confidence_floor": floor})}
+    )
+    config = test_config.model_copy(update={"rerank": rerank})
+    catalog = _ocr_catalog({"1": ["ABA"], "2": ["ABC"]})
+    reranker = Reranker(config, DecisionEngine(config, catalog), _catalog({}), catalog=catalog)
+    retrieval_result = RetrievalResult(
+        crop_id="c1",
+        candidates=[
+            RetrievalCandidate(product_id="1", product_name="P1", similarity_score=0.80, rank=1),
+            RetrievalCandidate(product_id="2", product_name="P2", similarity_score=0.78, rank=2),
+            RetrievalCandidate(product_id="1", product_name="P1", similarity_score=0.77, rank=3),
+        ],
+        detection_confidence=0.9,
+    )
+    orientation = {
+        "rotation": 0,
+        "text": "XQ7 ABC LT4",
+        "confidence": 0.10,
+        "fragments": [
+            {"text": "XQ7", "confidence": 0.02},
+            {"text": "ABC", "confidence": 0.93},
+            {"text": "LT4", "confidence": 0.03},
+        ],
+    }
+    plugin_result = PluginResult(
+        crop_id="c1",
+        executed_plugins=["ocr"],
+        evidence={"ocr": {"text": orientation["text"], "confidence": 0.10, "orientation_candidates": [orientation]}},
+    )
+    return reranker.rerank(retrieval_result, plugin_result)
+
+
+def test_reranker_keyword_fragment_confidence_off_keeps_old_behaviour(test_config) -> None:
+    """keyword_confidence_floor = 0: a keyword read in a junk-heavy orientation is too weak to switch."""
+    assert _keyword_case(test_config, 0.0).product_id == "1"
+
+
+def test_reranker_keyword_fragment_confidence_lets_clear_keyword_switch(test_config) -> None:
+    """With the floor on, the confidence of the fragment holding the keyword decides the evidence."""
+    assert _keyword_case(test_config, 0.5).product_id == "2"
