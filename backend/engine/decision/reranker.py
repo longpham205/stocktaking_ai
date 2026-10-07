@@ -93,6 +93,7 @@ class Reranker:
         self._ocr_weight = float(ocr.weight)
         self._ocr_min_text_length = int(ocr.min_text_length)
         self._ocr_fuzzy_threshold = float(ocr.fuzzy_threshold)
+        self._ocr_keyword_confidence_floor = float(ocr.keyword_confidence_floor)
 
         color = config.rerank.color
         self._color_enabled = color.enabled
@@ -531,6 +532,12 @@ class Reranker:
             orientation_confidence = self._resolve_ocr_orientation_confidence(
                 orientation, global_plugin_confidence
             )
+            if self._ocr_keyword_confidence_floor > 0.0 and match_strength >= 1.0:
+                orientation_confidence = max(
+                    orientation_confidence,
+                    self._keyword_fragment_confidence(candidate, orientation),
+                    self._ocr_keyword_confidence_floor,
+                )
             effective_evidence = match_strength * orientation_confidence
 
             orientation_matches.append({
@@ -596,6 +603,18 @@ class Reranker:
             pass
 
         return float(np.clip(global_plugin_confidence, 0.0, 1.0))
+
+    def _keyword_fragment_confidence(self, candidate: RetrievalCandidate, orientation: dict[str, Any]) -> float:
+        """Highest confidence among OCR fragments of this orientation that contain a catalog keyword."""
+        tokens = [self._normalize_text(token) for token in self._catalog.ocr_keywords(candidate.product_id)]
+        best = 0.0
+        for fragment in orientation.get("fragments") or []:
+            if not isinstance(fragment, dict):
+                continue
+            text = self._normalize_text(str(fragment.get("text", "")))
+            if any(token and token in text for token in tokens):
+                best = max(best, float(np.clip(self._safe_float(fragment.get("confidence", 0.0), 0.0), 0.0, 1.0)))
+        return best
 
     def _ocr_text_match_strength(
         self,

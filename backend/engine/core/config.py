@@ -504,6 +504,9 @@ class RerankOcrSection(BaseModel):
     weight: float = Field(default=0.60, ge=0.0, le=1.0)
     min_text_length: int = Field(default=2, ge=1)
     fuzzy_threshold: float = Field(default=0.80, ge=0.0, le=1.0)
+    # Khớp đúng từ khoá: độ tin cậy lấy theo đoạn chữ chứa từ khoá (độ tin cậy cả hướng đọc bị đoạn
+    # rác kéo xuống) và không thấp hơn sàn này. 0 = tắt (như cũ).
+    keyword_confidence_floor: float = Field(default=0.0, ge=0.0, le=1.0)
 
 
 class RerankColorSection(BaseModel):
