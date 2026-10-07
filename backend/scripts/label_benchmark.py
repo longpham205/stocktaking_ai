@@ -5,8 +5,8 @@ Hai bước, chạy từ backend/:
     # 1. Đề xuất (GPU; tắt web nhận diện thật trước, 4 GB không chứa được hai pipeline)
     python scripts/label_benchmark.py propose --images data/benchmark_inbox --out data/benchmark_new
 
-    # 2. Duyệt trong cửa sổ (không cần GPU)
-    python scripts/label_benchmark.py review --dir data/benchmark_new
+    # 2. Duyệt trong cửa sổ (không cần GPU); --only thu gọn danh sách sản phẩm để chọn
+    python scripts/label_benchmark.py review --dir data/benchmark_new [--only 21-39]
 
 Kết quả là một thư mục benchmark đúng định dạng của ``python -m engine --mode validate``:
 
@@ -22,7 +22,8 @@ Cửa sổ duyệt:
     kéo bên trong khung để dời nó · kéo viền hoặc góc của khung đang chọn để đổi kích thước
     gõ vào ô tìm để lọc sản phẩm, Enter hoặc nhấp đúp để gán cho khung đang chọn
     A = ảnh này đúng hết, sang ảnh sau (đánh dấu ĐÃ DUYỆT) · U bỏ duyệt · ←/→ chuyển ảnh · Esc thoát
-Khung vàng = pipeline chưa chắc, đỏ = chưa có sản phẩm (phải gán hoặc xoá mới duyệt được).
+Khung vàng = pipeline chưa chắc hoặc sản phẩm nằm ngoài --only, đỏ = chưa có sản phẩm (phải gán
+hoặc xoá mới duyệt được).
 """
 
 from __future__ import annotations
@@ -100,6 +101,17 @@ def drag_box(bbox: list[float], handle: str, dx: float, dy: float, width: int, h
         if "s" in handle:
             y2 = min(float(height), max(y1 + MIN_BOX, y2 + dy))
     return [round(x1, 2), round(y1, 2), round(x2, 2), round(y2, 2)]
+
+
+def parse_only(text: str) -> set[str]:
+    """"21-39" hoặc "21,24,29-32" -> tập mã sản phẩm (chuỗi)."""
+    chosen: set[str] = set()
+    for part in text.split(","):
+        first, _, last = part.strip().partition("-")
+        if not first.isdigit() or (last and not last.isdigit()):
+            raise ValueError(f"--only không hiểu được '{part.strip()}': viết dạng 21-39 hoặc 21,24,29-32")
+        chosen.update(str(pid) for pid in range(int(first), int(last or first) + 1))
+    return chosen
 
 
 def unlabeled(image: dict) -> int:
@@ -210,13 +222,15 @@ MOVE_PX = 4  # pixel màn hình: kéo ngắn hơn coi như chỉ bấm chọn
 CURSORS = {"move": "fleur", "n": "sb_v_double_arrow", "s": "sb_v_double_arrow", "w": "sb_h_double_arrow", "e": "sb_h_double_arrow", "nw": "size_nw_se", "se": "size_nw_se", "ne": "size_ne_sw", "sw": "size_ne_sw"}
 
 
-def box_kind(box: dict) -> str:
+def box_kind(box: dict, only: set[str] | None = None) -> str:
     if not box.get("product_id"):
         return "missing"
+    if only is not None and box["product_id"] not in only:
+        return "unsure"  # sản phẩm ngoài bộ đang gán: đáng xem lại
     return "unsure" if box.get("source") == "uncertain" else "ok"
 
 
-def review(directory: Path) -> int:
+def review(directory: Path, only: set[str] | None = None) -> int:
     import tkinter as tk
     from tkinter import messagebox
 
@@ -227,7 +241,9 @@ def review(directory: Path) -> int:
     if not images:
         print("Không có ảnh nào để duyệt.")
         return 0
-    order = sorted(products, key=lambda pid: (len(pid), pid))
+    order = sorted((pid for pid in products if only is None or pid in only), key=lambda pid: (len(pid), pid))
+    if not order:
+        raise ValueError("--only không khớp sản phẩm nào trong danh sách")
     # drag: điểm bắt đầu khi vẽ khung mới; edit: (handle, x0, y0, khung gốc) khi dời/đổi cỡ khung đang chọn
     state = {"index": next((i for i, im in enumerate(images) if not im.get("reviewed")), 0), "selected": None, "photo": None, "scale": 1.0, "drag": None, "edit": None, "shown": []}
 
@@ -302,7 +318,7 @@ def review(directory: Path) -> int:
         for i, box in enumerate(image["boxes"]):
             x1, y1, x2, y2 = (v * scale for v in box["bbox"])
             picked = i == state["selected"]
-            color = COLORS[box_kind(box)]
+            color = COLORS[box_kind(box, only)]
             canvas.create_rectangle(x1, y1, x2, y2, outline="#ffffff" if picked else color, width=4 if picked else 2)
             tag = canvas.create_text(x1 + 3, y1 + 2, anchor="nw", fill="white", font=("Segoe UI", 9, "bold"), text=box.get("product_id") or "?")
             canvas.tag_lower(canvas.create_rectangle(canvas.bbox(tag), fill=color, outline=""), tag)
@@ -502,13 +518,14 @@ def main(argv: list[str] | None = None) -> int:
     step1.add_argument("--config", type=Path, help="file config của pipeline (mặc định configs/config.yaml)")
     step2 = commands.add_parser("review", help="mở cửa sổ duyệt và sửa nhãn")
     step2.add_argument("--dir", required=True, type=Path, help="thư mục benchmark mới (đã chạy propose)")
+    step2.add_argument("--only", help="chỉ liệt kê các sản phẩm này để chọn, ví dụ 21-39 hoặc 21,24,29-32")
     args = parser.parse_args(argv)
     try:
         if args.command == "propose":
             if not args.images.is_dir():
                 raise ValueError(f"Không thấy thư mục ảnh: {args.images}")
             return propose(args.images, args.out, args.config)
-        return review(args.dir)
+        return review(args.dir, parse_only(args.only) if args.only else None)
     except ValueError as exc:
         print(f"LỖI: {exc}", file=sys.stderr)
         return 2

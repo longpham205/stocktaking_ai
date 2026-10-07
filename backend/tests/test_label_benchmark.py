@@ -123,3 +123,15 @@ def test_the_part_of_a_box_under_the_pointer(point, expected):
 )
 def test_dragging_moves_or_resizes_a_box_inside_the_image(handle, delta, expected):
     assert lb.drag_box([100.0, 50.0, 300.0, 300.0], handle, *delta, width=1000, height=800) == expected
+
+
+def test_only_takes_ranges_and_single_ids():
+    assert lb.parse_only("21, 24,29-31") == {"21", "24", "29", "30", "31"}
+    with pytest.raises(ValueError, match="--only"):
+        lb.parse_only("21-x")
+
+
+def test_a_box_of_a_product_outside_only_is_shown_as_unsure():
+    box = {"bbox": [0, 0, 9, 9], "product_id": "7", "source": "accepted"}
+    assert lb.box_kind(box) == "ok"
+    assert lb.box_kind(box, {"21"}) == "unsure"
