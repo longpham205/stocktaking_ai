@@ -1,7 +1,7 @@
 """Dấu vân tay (fingerprint) của gallery index: build lại FAISS CHỈ khi đầu vào thật sự đổi.
 
 Thành phần: nội dung ảnh gallery (hash từng file) + ánh xạ thư mục -> product_id + backend
-embedding (tên, model, weights) + ``embedding_dim``. Lưu cạnh index ở
+embedding (tên, model, weights) + ``embedding_dim`` + ``retrieval.augment`` (khi bật). Lưu cạnh index ở
 ``<gallery_index_path>.fingerprint.json`` để không đổi định dạng ``gallery_metadata.json``.
 """
 
@@ -62,6 +62,8 @@ def compute_fingerprint(config: "AppConfig", folder_to_product_id: dict[str, str
         "mapping": dict(sorted(folder_to_product_id.items())),
         "images": dict(sorted(images.items())),
     }
+    if config.retrieval.augment.enabled:  # tắt thì giữ nguyên digest cũ (không build lại vô cớ)
+        payload["augment"] = config.retrieval.augment.model_dump()
     digest = hashlib.sha256(json.dumps(payload, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
     return {"format": FINGERPRINT_FORMAT, "digest": digest, "model": payload["model"], "image_count": len(images)}
 
