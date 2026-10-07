@@ -62,7 +62,8 @@ def compute_fingerprint(config: "AppConfig", folder_to_product_id: dict[str, str
         "mapping": dict(sorted(folder_to_product_id.items())),
         "images": dict(sorted(images.items())),
     }
-    if config.retrieval.augment.enabled:  # tắt thì giữ nguyên digest cũ (không build lại vô cớ)
+    # Chỉ thêm khi bật: tắt thì giữ nguyên digest cũ (không build lại vô cớ).
+    if config.retrieval.augment.enabled:
         payload["augment"] = config.retrieval.augment.model_dump()
     digest = hashlib.sha256(json.dumps(payload, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
     return {"format": FINGERPRINT_FORMAT, "digest": digest, "model": payload["model"], "image_count": len(images)}
