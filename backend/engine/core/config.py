@@ -231,28 +231,28 @@ class Siglip2Section(BaseModel):
 
 
 class GalleryAugmentSection(BaseModel):
-    """Thêm vector cho bản biến đổi của ảnh gallery (chỉ lúc lập index; truy vấn không đổi).
+    """Cân bằng số vector của từng SKU trong index gallery (chỉ lúc lập index; truy vấn không đổi).
 
-    Hàng trong rổ nằm đủ hướng còn ảnh gallery chủ yếu chụp thẳng: bản xoay giúp khớp hướng.
-    Cắt giữa ảnh (tỉ lệ cạnh giữ lại) bớt nền quanh sản phẩm. Không lật gương, không đổi màu
-    (làm sai chữ và màu bao bì).
+    SKU ít ảnh được thêm bản xoay (hàng trong rổ nằm đủ hướng, ảnh gallery chủ yếu chụp thẳng)
+    cho tới khi đạt ``target_vectors``; SKU quá nhiều vector bị bỏ bớt vector gần trùng nhau.
+    Không lật gương, không đổi màu (làm sai chữ và màu bao bì).
     """
 
     enabled: bool = False
-    rotations: list[Literal[90, 180, 270]] = Field(default_factory=lambda: [90, 180, 270])
-    center_crops: list[float] = Field(default_factory=list)
-    # Chỉ augment SKU có <= max_images ảnh gốc (0 = mọi SKU): tăng ảnh cho nhóm ít ảnh.
-    max_images: int = Field(default=0, ge=0)
+    # Thứ tự dùng khi chỉ cần một phần số góc xoay.
+    rotations: list[Literal[90, 180, 270]] = Field(default_factory=lambda: [90, 270, 180])
+    # Số vector mong muốn mỗi SKU; "auto" = trung vị số ảnh gốc của các SKU.
+    target_vectors: int | Literal["auto"] = "auto"
+    # Trần số vector mỗi SKU (0 = không trần): SKU vượt trần giữ lại các vector khác nhau nhất.
+    max_vectors: int = Field(default=0, ge=0)
 
     @model_validator(mode="after")
-    def _check_crops(self) -> "GalleryAugmentSection":
-        if any(not 0.0 < c < 1.0 for c in self.center_crops):
-            raise ValueError("retrieval.augment.center_crops: mỗi tỉ lệ phải nằm trong (0, 1)")
+    def _check_values(self) -> "GalleryAugmentSection":
+        if isinstance(self.target_vectors, int) and self.target_vectors < 1:
+            raise ValueError("retrieval.augment.target_vectors phải >= 1 hoặc 'auto'")
+        if len(set(self.rotations)) != len(self.rotations):
+            raise ValueError("retrieval.augment.rotations không được trùng góc")
         return self
-
-    def applies_to(self, image_count: int) -> bool:
-        """SKU có ``image_count`` ảnh gốc có được augment không."""
-        return self.enabled and (self.max_images == 0 or image_count <= self.max_images)
 
 
 class RetrievalSection(BaseModel):
@@ -267,6 +267,9 @@ class RetrievalSection(BaseModel):
     build_gallery_index: bool = True
     siglip2: Siglip2Section = Field(default_factory=Siglip2Section)
     augment: GalleryAugmentSection = Field(default_factory=GalleryAugmentSection)
+    # Cắt ảnh gallery trước khi nhúng: "none" = cả ảnh (như cũ); "detector" = khung detect tin cậy
+    # nhất + cropping.padding_pixels, giống cách crop lúc nhận diện (ảnh gallery chụp cả nền).
+    gallery_crop: Literal["none", "detector"] = "none"
 
 
 class DecisionSection(BaseModel):

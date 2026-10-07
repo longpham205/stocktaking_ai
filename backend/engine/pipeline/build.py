@@ -20,9 +20,15 @@ produced.
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
+import numpy as np
+
 from engine.catalog.factory import open_catalog_repository
 from engine.core.config import AppConfig, load_config
 from engine.core.logger import get_logger
+from engine.core.utils import generate_id
+from engine.models.models import ImageData
 from engine.retrieval.backends.base import EmbeddingBackend
 from engine.retrieval.fingerprint import compute_fingerprint, index_is_current
 from engine.retrieval.gallery_builder import GalleryIndexBuilder
@@ -103,11 +109,38 @@ class BuildPipeline:
         logger.info("Building gallery embedding index...")
         try:
             backend = self._create_embedding_backend()
-            GalleryIndexBuilder(config=self._config, backend=backend, catalog=catalog).build()
+            cropper = self._create_gallery_cropper()
+            GalleryIndexBuilder(config=self._config, backend=backend, catalog=catalog, cropper=cropper).build()
             logger.info("Gallery embedding index built successfully.")
         except Exception as exc:
             logger.exception("Gallery index build failed.")
             raise RuntimeError("Gallery index build failed.") from exc
+
+    def _create_gallery_cropper(self) -> Callable[[np.ndarray], np.ndarray | None] | None:
+        """Hàm cắt sản phẩm khỏi ảnh gallery theo ``retrieval.gallery_crop`` (None = không cắt)."""
+        if self._config.retrieval.gallery_crop == "none":
+            return None
+        from engine.detection.detector import Detector
+
+        detector = Detector(self._config)
+        padding = self._config.cropping.padding_pixels
+
+        def crop(image_array: np.ndarray) -> np.ndarray | None:
+            height, width = image_array.shape[:2]
+            image = ImageData(
+                image_id=generate_id(prefix="gal_"), source_path="", image_array=image_array, width=width, height=height
+            )
+            detections = detector.detect(image).detections
+            if not detections:
+                return None
+            box = detections[0].bbox  # tin cậy nhất (Detector đã sắp giảm dần)
+            x1, y1 = max(0, int(box.x1) - padding), max(0, int(box.y1) - padding)
+            x2, y2 = min(width, int(box.x2) + padding), min(height, int(box.y2) + padding)
+            if x2 <= x1 or y2 <= y1:
+                return None
+            return image_array[y1:y2, x1:x2].copy()
+
+        return crop
 
     def _create_embedding_backend(self) -> EmbeddingBackend:
         """Creates the configured embedding backend.

@@ -123,11 +123,12 @@ retrieval:
     model_name: "google/siglip2-base-patch16-224"
     weights_path: "weights/retriever/siglip2"
     device: "cuda"
-  augment: # thêm vector cho bản biến đổi của ảnh gallery lúc lập index (tắt = như cũ)
+  gallery_crop: "none" # none | detector: cắt sản phẩm khỏi ảnh gallery trước khi nhúng
+  augment: # cân bằng số vector mỗi SKU lúc lập index (tắt = như cũ)
     enabled: false
-    rotations: [90, 180, 270]
-    center_crops: [] # tỉ lệ cạnh giữ lại khi cắt giữa ảnh, vd [0.8]
-    max_images: 0 # chỉ augment SKU có <= N ảnh gốc; 0 = mọi SKU
+    rotations: [90, 270, 180] # thứ tự dùng khi chỉ cần một phần số góc
+    target_vectors: "auto" # số vector mong muốn mỗi SKU; "auto" = trung vị số ảnh gốc
+    max_vectors: 0 # trần số vector mỗi SKU, bỏ vector gần trùng; 0 = không trần
 
 # --- Decision Engine ---
 decision:
