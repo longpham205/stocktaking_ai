@@ -598,8 +598,10 @@ def review(directory: Path, only: set[str] | None = None) -> int:
     canvas.bind("<B1-Motion>", motion)
     canvas.bind("<ButtonRelease-1>", release)
     canvas.bind("<Configure>", lambda _event: draw())
-    root.bind("<a>", unless_typing(approve))
-    root.bind("<u>", unless_typing(unapprove))
+    for key in ("a", "A"):  # chữ hoa: Caps Lock đang bật
+        root.bind(f"<{key}>", unless_typing(approve))
+    for key in ("u", "U"):
+        root.bind(f"<{key}>", unless_typing(unapprove))
     root.bind("<Delete>", unless_typing(delete))
     root.bind("<Left>", unless_typing(lambda _event: go(-1)))
     root.bind("<Right>", unless_typing(lambda _event: go(1)))
