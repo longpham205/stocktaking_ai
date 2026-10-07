@@ -230,6 +230,31 @@ class Siglip2Section(BaseModel):
     device: str = "cpu"
 
 
+class GalleryAugmentSection(BaseModel):
+    """Thêm vector cho bản biến đổi của ảnh gallery (chỉ lúc lập index; truy vấn không đổi).
+
+    Hàng trong rổ nằm đủ hướng còn ảnh gallery chủ yếu chụp thẳng: bản xoay giúp khớp hướng.
+    Cắt giữa ảnh (tỉ lệ cạnh giữ lại) bớt nền quanh sản phẩm. Không lật gương, không đổi màu
+    (làm sai chữ và màu bao bì).
+    """
+
+    enabled: bool = False
+    rotations: list[Literal[90, 180, 270]] = Field(default_factory=lambda: [90, 180, 270])
+    center_crops: list[float] = Field(default_factory=list)
+    # Chỉ augment SKU có <= max_images ảnh gốc (0 = mọi SKU): tăng ảnh cho nhóm ít ảnh.
+    max_images: int = Field(default=0, ge=0)
+
+    @model_validator(mode="after")
+    def _check_crops(self) -> "GalleryAugmentSection":
+        if any(not 0.0 < c < 1.0 for c in self.center_crops):
+            raise ValueError("retrieval.augment.center_crops: mỗi tỉ lệ phải nằm trong (0, 1)")
+        return self
+
+    def applies_to(self, image_count: int) -> bool:
+        """SKU có ``image_count`` ảnh gốc có được augment không."""
+        return self.enabled and (self.max_images == 0 or image_count <= self.max_images)
+
+
 class RetrievalSection(BaseModel):
     """Image retrieval module configuration."""
 
@@ -241,6 +266,7 @@ class RetrievalSection(BaseModel):
     color_hist_bins: int
     build_gallery_index: bool = True
     siglip2: Siglip2Section = Field(default_factory=Siglip2Section)
+    augment: GalleryAugmentSection = Field(default_factory=GalleryAugmentSection)
 
 
 class DecisionSection(BaseModel):

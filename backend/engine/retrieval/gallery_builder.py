@@ -48,18 +48,47 @@ import json
 from collections import Counter
 from pathlib import Path
 
+import cv2
 import faiss
 import numpy as np
 
 from engine.catalog.factory import open_catalog_repository
 from engine.catalog.repository import BaseCatalogRepository
-from engine.core.config import AppConfig
+from engine.core.config import AppConfig, GalleryAugmentSection
 from engine.retrieval.fingerprint import compute_fingerprint, write_fingerprint
 from engine.core.logger import get_logger
 from engine.core.utils import ensure_dir, list_image_files, load_image_bgr
 from engine.retrieval.backends.base import EmbeddingBackend
 
 logger = get_logger(__name__)
+
+_ROTATE_CODES = {90: cv2.ROTATE_90_CLOCKWISE, 180: cv2.ROTATE_180, 270: cv2.ROTATE_90_COUNTERCLOCKWISE}
+
+
+def augment_views(image_array: np.ndarray, augment: GalleryAugmentSection) -> list[np.ndarray]:
+    """Các bản biến đổi của một ảnh gallery (không gồm ảnh gốc), theo thứ tự cố định.
+
+    Args:
+        image_array: Ảnh gallery BGR.
+        augment: Cấu hình ``retrieval.augment``.
+
+    Returns:
+        Mỗi góc xoay một ảnh, rồi mỗi tỉ lệ cắt giữa một ảnh.
+    """
+    views = [cv2.rotate(image_array, _ROTATE_CODES[angle]) for angle in augment.rotations]
+    height, width = image_array.shape[:2]
+    for ratio in augment.center_crops:
+        crop_h, crop_w = max(1, round(height * ratio)), max(1, round(width * ratio))
+        top, left = (height - crop_h) // 2, (width - crop_w) // 2
+        views.append(image_array[top : top + crop_h, left : left + crop_w].copy())
+    return views
+
+
+def views_per_image(augment: GalleryAugmentSection, image_count: int) -> int:
+    """Số vector mỗi ảnh gốc của một SKU có ``image_count`` ảnh (1 = không augment)."""
+    if not augment.applies_to(image_count):
+        return 1
+    return 1 + len(augment.rotations) + len(augment.center_crops)
 
 
 class GalleryIndexBuilder:
@@ -122,11 +151,16 @@ class GalleryIndexBuilder:
         total_images = sum(len(list_image_files(product_dir)) for product_dir in product_dirs)
         processed = 0
         skipped = 0
+        augment = self._config.augment
 
         for product_dir in product_dirs:
             product_id = folder_to_product_id[product_dir.name]
             image_paths = list_image_files(product_dir)
-            logger.info("Product ID %s | folder='%s' | images=%d", product_id, product_dir.name, len(image_paths))
+            augmented = augment.applies_to(len(image_paths))
+            logger.info(
+                "Product ID %s | folder='%s' | images=%d | augmented=%s",
+                product_id, product_dir.name, len(image_paths), augmented,
+            )
 
             for image_path in image_paths:
                 processed += 1
@@ -136,22 +170,24 @@ class GalleryIndexBuilder:
 
                 try:
                     image_array = load_image_bgr(image_path)
-                    embedding = self._embed(image_array)
+                    views = [image_array] + (augment_views(image_array, augment) if augmented else [])
+                    embeddings = [self._embed(view) for view in views]
                 except (ValueError, RuntimeError):
                     skipped += 1
                     logger.exception("Failed to process gallery image '%s'; skipping.", image_path)
                     continue
 
-                vectors.append(embedding)
-                metadata.append({"product_id": product_id})
-                vector_counts_by_product[product_id] += 1
+                for embedding in embeddings:
+                    vectors.append(embedding)
+                    metadata.append({"product_id": product_id})
+                    vector_counts_by_product[product_id] += 1
 
         if skipped:
             logger.warning("Skipped %d gallery image(s) due to processing errors.", skipped)
 
         index = self._create_index(vectors)
         self._validate_index_metadata_consistency(index, metadata)
-        self._validate_vector_counts(product_dirs, folder_to_product_id, vector_counts_by_product)
+        self._validate_vector_counts(product_dirs, folder_to_product_id, vector_counts_by_product, augment)
 
         self._save_index(index)
         self._save_metadata(metadata)
@@ -208,12 +244,14 @@ class GalleryIndexBuilder:
         product_dirs: list[Path],
         folder_to_product_id: dict[str, str],
         vector_counts_by_product: Counter[str],
+        augment: GalleryAugmentSection,
     ) -> None:
         """Validates that each product received the expected number of vectors."""
         errors: list[str] = []
         for product_dir in product_dirs:
             product_id = folder_to_product_id[product_dir.name]
-            expected = len(list_image_files(product_dir))
+            image_count = len(list_image_files(product_dir))
+            expected = image_count * views_per_image(augment, image_count)
             actual = vector_counts_by_product.get(product_id, 0)
             if expected != actual:
                 errors.append(f"ID {product_id} ('{product_dir.name}'): expected {expected}, got {actual}")
