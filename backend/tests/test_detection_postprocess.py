@@ -68,23 +68,24 @@ def test_three_copies_of_one_box_leave_one_even_with_the_container_rule() -> Non
 
 
 def _nested(items, ratio):
-    return drop_nested_same_product(items, lambda item: item[0], lambda item: item[1], ratio)
+    return drop_nested_same_product(items, lambda item: item[0], lambda item: item[1], lambda item: item[2], ratio)
 
 
-def test_nested_same_product_drops_the_part_inside_the_whole() -> None:
-    """A tube boxed on its own inside the box of its backing card is the same product."""
-    card = (BoundingBox(0, 0, 200, 400), "33")
-    tube = (BoundingBox(40, 50, 160, 380), "33")
-    other = (BoundingBox(300, 0, 400, 100), "33")
+def test_nested_same_product_keeps_the_more_confident_box() -> None:
+    """A tube boxed alone inside its backing card's box, or a bag box around a product: one object."""
+    card = (BoundingBox(0, 0, 200, 400), "33", 0.9)
+    tube = (BoundingBox(40, 50, 160, 380), "33", 0.8)
+    bag = (BoundingBox(300, 0, 700, 400), "7", 0.45)
+    inside_bag = (BoundingBox(350, 50, 450, 150), "7", 0.95)
 
-    assert _nested([tube, card, other], 0.8) == ([card, other], [tube])
+    assert _nested([tube, card, bag, inside_bag], 0.8) == ([card, inside_bag], [tube, bag])
 
 
 def test_nested_rule_keeps_other_products_and_is_off_at_zero() -> None:
     """A different product lying on top, or the rule switched off, keeps every item."""
-    card = (BoundingBox(0, 0, 200, 400), "33")
-    lipstick = (BoundingBox(40, 50, 160, 380), "7")
-    tube = (BoundingBox(40, 50, 160, 380), "33")
+    card = (BoundingBox(0, 0, 200, 400), "33", 0.9)
+    lipstick = (BoundingBox(40, 50, 160, 380), "7", 0.95)
+    tube = (BoundingBox(40, 50, 160, 380), "33", 0.8)
 
     assert _nested([card, lipstick], 0.8) == ([card, lipstick], [])
     assert _nested([card, tube], 0.0) == ([card, tube], [])

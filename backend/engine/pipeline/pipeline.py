@@ -307,9 +307,11 @@ class InventoryPipeline:
 
         ratio = self._config.detection.suppression.nested_same_product_ratio
         if ratio > 0:
-            items, nested = drop_nested_same_product(items, lambda item: item.bbox, lambda item: item.product_id, ratio)
+            items, nested = drop_nested_same_product(
+                items, lambda item: item.bbox, lambda item: item.product_id, lambda item: item.detection_confidence, ratio
+            )
             if nested:
-                logger.info("Dropped %d item(s) lying inside a larger item of the same product.", len(nested))
+                logger.info("Dropped %d item(s) nested with a more confident item of the same product.", len(nested))
 
         if collect_trace:
             return detection_result, overlap_result, refinement_result, items, rejected, crop_traces
