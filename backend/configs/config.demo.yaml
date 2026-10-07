@@ -114,11 +114,10 @@ retrieval:
     model_name: "google/siglip2-base-patch16-224"
     weights_path: "weights/retriever/siglip2"
     device: "cpu"
-  gallery_crop: "none" # none | detector: cắt sản phẩm khỏi ảnh gallery trước khi nhúng
-  augment: # cân bằng số vector mỗi SKU lúc lập index (tắt = như cũ)
+  augment: # cân bằng index gallery lúc lập index (tắt = như cũ)
     enabled: false
-    rotations: [90, 270, 180] # thứ tự dùng khi chỉ cần một phần số góc
-    target_vectors: "auto" # số vector mong muốn mỗi SKU; "auto" = trung vị số ảnh gốc
+    rotations: [90, 180, 270]
+    max_images: 0 # chỉ xoay SKU có <= N ảnh gốc; 0 = mọi SKU
     max_vectors: 0 # trần số vector mỗi SKU, bỏ vector gần trùng; 0 = không trần
 
 # --- Decision Engine ---

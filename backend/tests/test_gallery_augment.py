@@ -1,4 +1,4 @@
-"""Test cân bằng gallery lúc lập index (``retrieval.augment``) và cắt ảnh gallery (``retrieval.gallery_crop``)."""
+"""Test cân bằng index gallery lúc lập index (``retrieval.augment``)."""
 
 from __future__ import annotations
 
@@ -9,15 +9,8 @@ import pytest
 from engine.catalog.factory import open_catalog_repository
 from engine.core.config import GalleryAugmentSection
 from engine.pipeline.build import BuildPipeline
-from engine.retrieval.backends.mock_visual_embedding import MockVisualEmbeddingBackend
 from engine.retrieval.fingerprint import compute_fingerprint
-from engine.retrieval.gallery_builder import (
-    GalleryIndexBuilder,
-    augment_views,
-    expected_vectors,
-    plan_views,
-    select_diverse,
-)
+from engine.retrieval.gallery_builder import augment_views, expected_vectors, plan_views, select_diverse
 
 
 def test_augment_views_follow_rotation_order():
@@ -30,19 +23,12 @@ def test_augment_views_follow_rotation_order():
     assert views[1][-1, -1].tolist() == [255, 255, 255]
 
 
-def test_plan_views_fills_thin_skus_up_to_target():
-    counts = {"a": 2, "b": 5, "c": 12, "d": 30}
-    augment = GalleryAugmentSection(enabled=True, rotations=[90, 270, 180], target_vectors=12)
+def test_plan_views_rotates_only_thin_skus_with_every_angle():
+    counts = {"a": 2, "b": 9, "c": 10, "d": 30}
 
-    assert plan_views(counts, augment) == {"a": 4, "b": 3, "c": 1, "d": 1}  # a bị kẹp ở 1 + 3 góc
-    assert plan_views(counts, GalleryAugmentSection(target_vectors=12)) == {"a": 1, "b": 1, "c": 1, "d": 1}
-
-
-def test_plan_views_auto_target_is_median_image_count():
-    counts = {"a": 2, "b": 4, "c": 8, "d": 20, "e": 30}
-    augment = GalleryAugmentSection(enabled=True, rotations=[90, 270, 180])  # target "auto" = 8
-
-    assert plan_views(counts, augment) == {"a": 4, "b": 2, "c": 1, "d": 1, "e": 1}
+    assert plan_views(counts, GalleryAugmentSection(enabled=True, max_images=9)) == {"a": 4, "b": 4, "c": 1, "d": 1}
+    assert plan_views(counts, GalleryAugmentSection(enabled=True)) == {"a": 4, "b": 4, "c": 4, "d": 4}
+    assert plan_views(counts, GalleryAugmentSection(max_images=9)) == {"a": 1, "b": 1, "c": 1, "d": 1}
 
 
 def test_select_diverse_drops_near_duplicates():
@@ -57,57 +43,35 @@ def test_select_diverse_drops_near_duplicates():
 def test_expected_vectors_respects_max_vectors():
     capped = GalleryAugmentSection(enabled=True, max_vectors=10)
 
-    assert expected_vectors(4, 3, capped) == 10
-    assert expected_vectors(2, 3, capped) == 6
+    assert expected_vectors(4, 4, capped) == 10
+    assert expected_vectors(2, 4, capped) == 8
     assert expected_vectors(40, 1, GalleryAugmentSection(max_vectors=10)) == 40  # tắt = như cũ
 
 
-def test_invalid_augment_values_are_rejected():
-    with pytest.raises(ValueError):
-        GalleryAugmentSection(target_vectors=0)
+def test_duplicate_rotations_are_rejected():
     with pytest.raises(ValueError):
         GalleryAugmentSection(rotations=[90, 90])
 
 
-def _with_retrieval(cfg, **update):
-    return cfg.model_copy(update={"retrieval": cfg.retrieval.model_copy(update=update)})
+def _with_augment(cfg, **augment):
+    return cfg.model_copy(update={"retrieval": cfg.retrieval.model_copy(update={"augment": GalleryAugmentSection(**augment)})})
 
 
 def _index_size(cfg) -> int:
     return faiss.read_index(str(cfg.resolve_path(cfg.retrieval.gallery_index_path))).ntotal
 
 
-def test_build_balances_vectors_and_changes_fingerprint(gallery_config):
+def test_build_adds_rotations_caps_vectors_and_changes_fingerprint(gallery_config):
     mapping = open_catalog_repository(gallery_config).folder_to_product_id()
     plain = compute_fingerprint(gallery_config, mapping)["digest"]
 
-    cfg = _with_retrieval(gallery_config, augment=GalleryAugmentSection(enabled=True, target_vectors=3))
+    cfg = _with_augment(gallery_config, enabled=True, max_images=9)
     assert compute_fingerprint(cfg, mapping)["digest"] != plain
-    off = _with_retrieval(gallery_config, augment=GalleryAugmentSection(enabled=False, target_vectors=3))
-    assert compute_fingerprint(off, mapping)["digest"] == plain
+    assert compute_fingerprint(_with_augment(gallery_config, max_images=9), mapping)["digest"] == plain
 
     BuildPipeline(cfg).run()
-    assert _index_size(cfg) == 2 * 3  # 2 SKU x 1 ảnh x (gốc + 2 góc xoay)
+    assert _index_size(cfg) == 2 * 4  # 2 SKU x 1 ảnh x (gốc + 3 góc xoay)
 
-    capped = _with_retrieval(gallery_config, augment=GalleryAugmentSection(enabled=True, target_vectors=4, max_vectors=2))
+    capped = _with_augment(gallery_config, enabled=True, max_images=9, max_vectors=2)
     BuildPipeline(capped).run()
     assert _index_size(capped) == 2 * 2
-
-
-def test_gallery_crop_uses_cropper_and_needs_one(gallery_config):
-    cfg = _with_retrieval(gallery_config, gallery_crop="detector")
-    mapping = open_catalog_repository(gallery_config).folder_to_product_id()
-    assert compute_fingerprint(cfg, mapping)["digest"] != compute_fingerprint(gallery_config, mapping)["digest"]
-
-    backend = MockVisualEmbeddingBackend(cfg.retrieval)
-    with pytest.raises(ValueError):
-        GalleryIndexBuilder(cfg, backend)
-
-    seen: list[tuple[int, int]] = []
-
-    def cropper(image: np.ndarray) -> np.ndarray | None:
-        seen.append(image.shape[:2])
-        return image[10:90, 10:90] if len(seen) == 1 else None  # ảnh thứ hai: không thấy sản phẩm
-
-    index, metadata = GalleryIndexBuilder(cfg, backend, cropper=cropper).build()
-    assert len(seen) == 2 and index.ntotal == len(metadata) == 2

@@ -231,25 +231,23 @@ class Siglip2Section(BaseModel):
 
 
 class GalleryAugmentSection(BaseModel):
-    """Cân bằng số vector của từng SKU trong index gallery (chỉ lúc lập index; truy vấn không đổi).
+    """Cân bằng index gallery (chỉ lúc lập index; truy vấn không đổi).
 
-    SKU ít ảnh được thêm bản xoay (hàng trong rổ nằm đủ hướng, ảnh gallery chủ yếu chụp thẳng)
-    cho tới khi đạt ``target_vectors``; SKU quá nhiều vector bị bỏ bớt vector gần trùng nhau.
-    Không lật gương, không đổi màu (làm sai chữ và màu bao bì).
+    SKU ít ảnh (<= ``max_images``) được thêm ĐỦ các bản xoay: hàng trong rổ nằm đủ hướng còn ảnh
+    gallery của SKU mới chủ yếu chụp thẳng. SKU nhiều ảnh giữ nguyên (đo 2026-10-07: xoay SKU nhiều
+    ảnh, hay chỉ xoay một phần cho đủ số lượng, đều kém hơn). SKU vượt ``max_vectors`` bị bỏ bớt
+    vector gần trùng nhau để không lấn át. Không lật gương, không đổi màu (làm sai chữ và màu bao bì).
     """
 
     enabled: bool = False
-    # Thứ tự dùng khi chỉ cần một phần số góc xoay.
-    rotations: list[Literal[90, 180, 270]] = Field(default_factory=lambda: [90, 270, 180])
-    # Số vector mong muốn mỗi SKU; "auto" = trung vị số ảnh gốc của các SKU.
-    target_vectors: int | Literal["auto"] = "auto"
+    rotations: list[Literal[90, 180, 270]] = Field(default_factory=lambda: [90, 180, 270])
+    # Chỉ xoay SKU có <= max_images ảnh gốc (0 = mọi SKU).
+    max_images: int = Field(default=0, ge=0)
     # Trần số vector mỗi SKU (0 = không trần): SKU vượt trần giữ lại các vector khác nhau nhất.
     max_vectors: int = Field(default=0, ge=0)
 
     @model_validator(mode="after")
     def _check_values(self) -> "GalleryAugmentSection":
-        if isinstance(self.target_vectors, int) and self.target_vectors < 1:
-            raise ValueError("retrieval.augment.target_vectors phải >= 1 hoặc 'auto'")
         if len(set(self.rotations)) != len(self.rotations):
             raise ValueError("retrieval.augment.rotations không được trùng góc")
         return self
@@ -267,9 +265,6 @@ class RetrievalSection(BaseModel):
     build_gallery_index: bool = True
     siglip2: Siglip2Section = Field(default_factory=Siglip2Section)
     augment: GalleryAugmentSection = Field(default_factory=GalleryAugmentSection)
-    # Cắt ảnh gallery trước khi nhúng: "none" = cả ảnh (như cũ); "detector" = khung detect tin cậy
-    # nhất + cropping.padding_pixels, giống cách crop lúc nhận diện (ảnh gallery chụp cả nền).
-    gallery_crop: Literal["none", "detector"] = "none"
 
 
 class DecisionSection(BaseModel):
