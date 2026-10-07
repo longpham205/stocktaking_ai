@@ -62,7 +62,7 @@ Chụp → hoá đơn (dòng viền vàng = chưa chắc, chạm để xác nh�
 
 - **Chụp thêm** cộng dồn vào đơn; **Thêm món** tìm theo tên (không cần dấu) hoặc nhập / quét mã vạch. Máy quét USB/Bluetooth dùng được ngay trên màn chụp và hoá đơn.
 - Tải lại trang hoặc đăng nhập lại **không mất đơn**: đơn đang dở được khôi phục; đơn rỗng được dùng lại.
-- Ảnh được thu nhỏ (cạnh dài tối đa 2048 px) và sửa hướng EXIF trước khi tải lên.
+- Ảnh được thu nhỏ (cạnh dài tối đa 4032 px) và sửa hướng EXIF trước khi tải lên.
 - Trên ảnh kết quả: khung xanh = chắc chắn, vàng = cần xác nhận, đỏ = chưa nhận diện (chạm để thêm món thủ công), xám nét đứt = dòng đã xoá.
 
 ## 7. Quản trị
