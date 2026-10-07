@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from engine.detection.postprocess import REASON_CONTAINER, REASON_DUPLICATE, suppress_redundant
+from engine.detection.postprocess import REASON_CONTAINER, REASON_DUPLICATE, drop_nested_same_product, suppress_redundant
 from engine.models.models import BoundingBox, Detection
 
 
@@ -65,3 +65,26 @@ def test_three_copies_of_one_box_leave_one_even_with_the_container_rule() -> Non
 
     assert kept == [copies[0]]
     assert [reason for _, reason in dropped] == [REASON_DUPLICATE, REASON_DUPLICATE]
+
+
+def _nested(items, ratio):
+    return drop_nested_same_product(items, lambda item: item[0], lambda item: item[1], ratio)
+
+
+def test_nested_same_product_drops_the_part_inside_the_whole() -> None:
+    """A tube boxed on its own inside the box of its backing card is the same product."""
+    card = (BoundingBox(0, 0, 200, 400), "33")
+    tube = (BoundingBox(40, 50, 160, 380), "33")
+    other = (BoundingBox(300, 0, 400, 100), "33")
+
+    assert _nested([tube, card, other], 0.8) == ([card, other], [tube])
+
+
+def test_nested_rule_keeps_other_products_and_is_off_at_zero() -> None:
+    """A different product lying on top, or the rule switched off, keeps every item."""
+    card = (BoundingBox(0, 0, 200, 400), "33")
+    lipstick = (BoundingBox(40, 50, 160, 380), "7")
+    tube = (BoundingBox(40, 50, 160, 380), "33")
+
+    assert _nested([card, lipstick], 0.8) == ([card, lipstick], [])
+    assert _nested([card, tube], 0.0) == ([card, tube], [])

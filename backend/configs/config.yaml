@@ -66,6 +66,8 @@ detection:
     # bỏ 2 khung cụm nhưng cũng bỏ khung của một sản phẩm thật bị hai vật khác đè lên.
     container_min_boxes: 0
     containment_ratio: 0.8
+    # Sau nhận diện: bỏ vật nằm >= tỉ lệ này trong một vật lớn hơn CÙNG SKU (tuýp trên vỉ giấy). 0 = tắt.
+    nested_same_product_ratio: 0.0
   rf_detr:
     variant: "base" # nano | small | medium | base | large
     weights_path: "weights/detector/checkpoint_best_ema.pth"

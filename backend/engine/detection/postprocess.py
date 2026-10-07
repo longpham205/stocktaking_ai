@@ -11,13 +11,21 @@ every box becomes a line on the invoice. Two geometric rules:
        (a plastic bag, a pile). OFF by default: on the same set it removed 2 group boxes but also
        the box of a real product that had two other products lying on top of it.
 
-A third rule, "a small box inside a larger box of the same SKU", was tried and rejected: it
-removed real products.
+A third rule runs after recognition, because it needs the SKU: a box lying (almost) entirely
+inside a larger box recognised as the SAME product is a part of that product, e.g. the tube of a
+cream sold on a backing card is boxed on its own as well as together with the card. OFF by default;
+an earlier offline trial (before the container rule) removed two real products that sat inside a
+bag box of the same SKU.
 """
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from typing import TypeVar
+
 from engine.models.models import BoundingBox, Detection
+
+T = TypeVar("T")
 
 REASON_DUPLICATE = "duplicate"
 REASON_CONTAINER = "container"
@@ -77,3 +85,37 @@ def suppress_redundant(
         else:
             kept.append(candidate)
     return kept, dropped
+
+
+def drop_nested_same_product(
+    items: list[T],
+    bbox_of: Callable[[T], BoundingBox],
+    product_of: Callable[[T], str],
+    ratio: float,
+) -> tuple[list[T], list[T]]:
+    """Drop items lying inside a larger item of the same product.
+
+    Args:
+        items: Recognised items of one image.
+        bbox_of: Returns an item's box.
+        product_of: Returns an item's product_id.
+        ratio: Share of an item's area that must lie inside the larger box; 0 turns the rule off.
+
+    Returns:
+        (kept, dropped), both in the input order.
+    """
+    if ratio <= 0:
+        return list(items), []
+    by_area = sorted(range(len(items)), key=lambda i: bbox_of(items[i]).area, reverse=True)
+    kept_idx: list[int] = []
+    dropped_idx: set[int] = set()
+    for i in by_area:
+        box, product = bbox_of(items[i]), product_of(items[i])
+        if any(
+            product_of(items[j]) == product and bbox_of(items[j]).area > box.area and _inside_ratio(box, bbox_of(items[j])) >= ratio
+            for j in kept_idx
+        ):
+            dropped_idx.add(i)
+        else:
+            kept_idx.append(i)
+    return [it for i, it in enumerate(items) if i not in dropped_idx], [it for i, it in enumerate(items) if i in dropped_idx]
