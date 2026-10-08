@@ -598,8 +598,9 @@ class RerankSection(BaseModel):
     ocr: RerankOcrSection = Field(default_factory=RerankOcrSection)
     color: RerankColorSection = Field(default_factory=RerankColorSection)
     confusable_min_agreeing_plugins: int = Field(default=2, ge=1)
-    # Winner in a confusable pair, the other member also among the candidates, and no OCR/colour/
-    # barcode evidence for the winner: mark it uncertain so the cashier confirms it (off = unchanged).
+    # Winner in a confusable pair AND marked `confirm_if_unsure` in the catalog, the other member also
+    # among the candidates, and no OCR/colour/barcode evidence for the winner: mark it uncertain so the
+    # cashier confirms it (off = unchanged).
     confusable_uncertain_without_evidence: bool = False
 
     @model_validator(mode="before")

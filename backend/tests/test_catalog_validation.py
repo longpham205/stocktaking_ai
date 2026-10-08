@@ -93,3 +93,14 @@ def test_keyword_normalized_like_reranker():
 
     assert normalize_ocr_keywords(["be-203", "100 g", "BE203"], 3) == ["BE203", "100G"]
     assert normalize_ocr_token("A/B c-1") == "ABC1"
+
+
+def test_confirm_if_unsure_must_be_bool_and_needs_a_pair():
+    pair = {"7": {"confusable_with": ["8"], "confirm_if_unsure": True}, "8": {"confusable_with": ["7"]}}
+    assert validate_catalog(IDS, pair, set(), ocr_min_length=3).ok
+
+    rep = validate_catalog(IDS, {"9": {"confirm_if_unsure": "yes"}}, set(), ocr_min_length=3)
+    assert not rep.ok
+    lonely = validate_catalog(IDS, {"9": {"confirm_if_unsure": True}}, set(), ocr_min_length=3)
+    assert lonely.ok and any("confirm_if_unsure" in w for w in lonely.warnings)
+

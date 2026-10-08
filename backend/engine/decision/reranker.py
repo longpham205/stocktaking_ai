@@ -337,6 +337,7 @@ class Reranker:
             elif (
                 self._confusable_uncertain_without_evidence
                 and opponent_evidence is not None
+                and self._catalog.evidence(winner.product_id, "confirm_if_unsure") is True
                 and not self._has_identifying_evidence(winner_evidence)
             ):
                 status = STATUS_UNCERTAIN

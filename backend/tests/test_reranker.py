@@ -197,14 +197,17 @@ def test_reranker_keyword_fragment_confidence_lets_clear_keyword_switch(test_con
     assert _keyword_case(test_config, 0.5).product_id == "2"
 
 
-def _confusable_case(test_config, flag: bool, ocr_text: str):
+def _confusable_case(test_config, flag: bool, ocr_text: str, confirm: bool = True):
     """SKU 7 beats its confusable twin 8 on similarity alone; OCR may or may not name one of them."""
     from engine.catalog.repository import CatalogData, InMemoryCatalogRepository, ProductRecord
 
     rerank = test_config.rerank.model_copy(update={"confusable_uncertain_without_evidence": flag})
     config = test_config.model_copy(update={"rerank": rerank})
     products = [ProductRecord(product_id=str(i), product_name=f"P{i}") for i in range(1, 10)]
-    evidence = {"7": {"confusable_with": ["8"], "ocr_keywords": ["ABA"]}, "8": {"confusable_with": ["7"], "ocr_keywords": ["ABC"]}}
+    evidence = {
+        "7": {"confusable_with": ["8"], "ocr_keywords": ["ABA"], "confirm_if_unsure": confirm},
+        "8": {"confusable_with": ["7"], "ocr_keywords": ["ABC"]},
+    }
     catalog = InMemoryCatalogRepository(CatalogData.build(products, evidence, {}))
     reranker = Reranker(config, DecisionEngine(config, catalog), _catalog({}), catalog=catalog)
     retrieval_result = RetrievalResult(
@@ -231,5 +234,11 @@ def test_confusable_pair_without_evidence_needs_confirmation(test_config) -> Non
 def test_confusable_pair_with_evidence_stays_accepted(test_config) -> None:
     """OCR reading the winner's keyword settles it: no confirmation needed."""
     result = _confusable_case(test_config, True, "XX ABA YY")
+    assert (result.product_id, result.status) == ("7", "accepted")
+
+
+def test_confusable_pair_not_marked_confirm_if_unsure_is_not_asked(test_config) -> None:
+    """Only SKUs the catalog marks confirm_if_unsure are asked about: the rule is per product."""
+    result = _confusable_case(test_config, True, "", confirm=False)
     assert (result.product_id, result.status) == ("7", "accepted")
 
