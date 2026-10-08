@@ -47,7 +47,7 @@ Hai biến trong `.env` (hoặc đặt trước lệnh) quyết định API nh�
 
 ## 4. Dùng trên điện thoại
 
-Xem trước camera trong trang và cảm biến nghiêng cần `https://`. Mở bằng `http://<IP LAN>:5173` vẫn dùng được: màn chụp báo không xem trước được, bấm chụp bằng ứng dụng camera của máy hoặc chọn ảnh từ thư viện.
+Xem trước camera trong trang và cảm biến nghiêng cần `https://`. Điện thoại chung Wi-Fi với laptop: nhấp đúp `scripts\run_real_phone.bat` rồi mở địa chỉ **Network** cửa sổ in ra. Mở bằng `http://<IP LAN>:5173` vẫn dùng được: màn chụp báo không xem trước được, bấm chụp bằng ứng dụng camera của máy hoặc chọn ảnh từ thư viện.
 
 **Điện thoại ở mạng khác** (giám khảo dùng 4G của họ): nhấp đúp `scripts\run_real_tunnel.bat`. Cửa sổ in dòng `PHONE (any network): open https://….trycloudflare.com`; mở địa chỉ đó trên bất kỳ điện thoại nào. Script tự tạo mã QR của địa chỉ đó (`backups/tunnel_qr.png`) và mở lên màn hình để điện thoại quét. Đi qua HTTPS nên có khung camera trong trang. Cần `tools\cloudflared.exe` (Cloudflare, miễn phí, không cần tài khoản: tải `cloudflared-windows-amd64.exe` từ github.com/cloudflare/cloudflared/releases, đổi tên). Mỗi lần bật là một địa chỉ mới; đóng cửa sổ là tắt cả tunnel. Đã thử trên điện thoại thật qua 4G (2026-10-08).
 
@@ -61,6 +61,11 @@ Mỗi tài khoản chỉ có **một ca mở**: đăng nhập cùng tài khoản
 
 Chụp → hoá đơn (dòng viền vàng = chưa chắc, chạm để xác nhận hoặc đổi) → nhập giá tay nếu thiếu → thanh toán tiền mặt / QR → hoàn tất.
 
+**Màn quầy trên máy tính** (cửa sổ rộng từ 1024 px; màn hẹp giữ luồng điện thoại ở trên): các trang bán hàng (`/pos`, `/pos/orders/<id>`, `.../capture`) hiện camera trực tiếp bên trái, giỏ hàng luôn ở bên phải; chụp liên tiếp cộng dồn vào đơn mà không rời trang, nhận diện xong thì hiện ảnh kèm khung và thu camera vào một góc. Camera là webcam, hoặc điện thoại nối làm webcam (Phone Link "camera đã kết nối" của Windows, DroidCam, Iriun); có nhiều camera thì chọn, máy nhớ lựa chọn. Kéo-thả ảnh hoặc **Chọn ảnh** cũng được.
+- Phím tắt: **Space** = chụp, **F2** = thanh toán, **F4** = thêm món theo tên. Màn thanh toán: gõ số tiền khách đưa, **Enter** xác nhận, **Esc** quay lại. Màn hoàn tất: **Enter** = đơn mới.
+- Camera trong trang cần ngữ cảnh an toàn: `http://localhost` trên chính máy đó dùng được; `http://<IP LAN>` bị trình duyệt chặn (dùng `scripts\run_real_tunnel.bat` hoặc **Chọn ảnh**).
+- Code: `frontend/src/features/pos/desk-page.tsx`, `desk-camera.tsx`, `use-desk.ts`.
+
 - **Chụp thêm** cộng dồn vào đơn; **Thêm món** tìm theo tên (không cần dấu) hoặc nhập / quét mã vạch. Máy quét USB/Bluetooth dùng được ngay trên màn chụp và hoá đơn.
 - Tải lại trang hoặc đăng nhập lại **không mất đơn**: đơn đang dở được khôi phục; đơn rỗng được dùng lại.
 - Ảnh được thu nhỏ (cạnh dài tối đa 4032 px) và sửa hướng EXIF trước khi tải lên.
@@ -71,7 +76,7 @@ Chụp → hoá đơn (dòng viền vàng = chưa chắc, chạm để xác nh�
 - **Báo cáo:** KPI hôm nay, doanh thu theo ngày (hôm nay / 7 / 30 ngày), top 5 sản phẩm. Đơn đã huỷ không tính. "Hôm nay" theo `TIMEZONE_OFFSET_HOURS`.
 - **Đơn hàng:** danh sách đơn của mọi thu ngân.
 - **Nhân viên:** thêm, khoá, đặt lại mật khẩu.
-- **Sản phẩm:** sửa tên / giá / barcode; xem ảnh gallery; sửa **bằng chứng nhận diện** (từ khoá OCR, mã màu + màu tham chiếu, plugin bắt buộc, SKU dễ nhầm — ghi hai chiều); **lịch sử thay đổi** và **hoàn tác** từng thay đổi (bị từ chối nếu giá trị đã bị đổi sau đó); **thử bằng chứng**: chọn một ảnh, xem OCR đọc gì, màu đo được, mã vạch đọc được (không lưu).
+- **Sản phẩm:** sửa tên / giá / barcode; xem ảnh gallery; sửa **bằng chứng nhận diện** (từ khoá OCR, mã màu + màu tham chiếu, plugin bắt buộc, SKU dễ nhầm — ghi hai chiều); **lịch sử thay đổi** và **hoàn tác** từng thay đổi (bị từ chối nếu giá trị đã bị đổi sau đó); **thử bằng chứng**: chọn một ảnh, xem OCR đọc gì, màu đo được, mã vạch đọc được (trống khi plugin mã vạch đang tắt như cấu hình hiện tại) (không lưu). Sửa tên / barcode / bằng chứng / màu tham chiếu đi qua hàm ghi của engine (`backend/engine/catalog/edits.py`), cùng giao dịch với lịch sử thay đổi; giá là bảng riêng của web.
 - **Cài đặt:** ngưỡng nhận diện theo lượt chụp, cho phép thanh toán khi thiếu giá, chặn chụp khi máy nghiêng, tự in hoá đơn. Hiệu lực ở lượt chụp kế tiếp.
 - **Nâng cao:** thông số của pipeline, hai mức — *chỉ xem* (model, backend, thiết bị: đổi trong file YAML rồi chạy cổng kiểm định) và *cần áp dụng* (ngưỡng detector, trọng số, bật/tắt plugin…). Áp dụng cần **mật khẩu nâng cao**, dựng lại pipeline (ngừng nhận diện trong lúc đó), dựng lỗi thì tự quay về thiết lập cũ. Thiết lập lưu ở bảng `config_overrides` và còn nguyên sau khi khởi động lại.
 - **Kiểm định** (trong tab Nâng cao): chạy benchmark bằng pipeline đang dùng, so với baseline ở `backend/data/baseline/`. Trong lúc chạy thu ngân **không chụp nhận diện được** (vẫn thêm món thủ công được): chỉ chạy ngoài giờ bán. Báo cáo ở `<DATA_DIR>/validation_web/`.

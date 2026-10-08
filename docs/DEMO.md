@@ -16,27 +16,28 @@
 - [ ] Đăng nhập admin → **Sản phẩm** → lọc thiếu giá: nhập giá cho mọi SKU sẽ bán. Nhập **barcode** cho các SKU cần quét.
 - [ ] Thêm SKU mới (dữ liệu thật): quy trình ở [`04_DATA_AND_CATALOG.md`](04_DATA_AND_CATALOG.md) mục 6.2, rồi lập lại index và so cổng kiểm định. Đặt tên và khai báo bằng chứng ở Admin → Sản phẩm.
 - [ ] Dựng database demo sạch: huỷ hoặc thanh toán hết đơn thử, rồi `make db-save NAME=demo_clean`. Kiểm có file `backups/demo_clean.dump`.
-- [ ] Thử `make db-restore NAME=demo_clean` **một lần trước ngày demo**: `docker compose stop api` → `make db-restore NAME=demo_clean` → `docker compose start api` → đăng nhập lại, kiểm dữ liệu.
-- [ ] Tài khoản: thu ngân chỉ đăng nhập trên điện thoại, admin trên laptop (đăng nhập cùng tài khoản ở máy thứ hai sẽ đá máy thứ nhất ra). Mật khẩu không nằm trong repo hay tài liệu; quên thì `make reset-password USER_NAME=<tên>`.
+- [ ] Thử `make db-restore NAME=demo_clean` **một lần trước ngày demo** (lệnh này chưa từng chạy thử): `docker compose stop api` → `make db-restore NAME=demo_clean` → `docker compose start api` → đăng nhập lại, kiểm dữ liệu.
+- [ ] Tài khoản: thu ngân chỉ đăng nhập trên điện thoại (hoặc ở màn quầy trên máy tính), admin trên laptop (đăng nhập cùng tài khoản ở máy thứ hai sẽ đá máy thứ nhất ra). Mật khẩu không nằm trong repo hay tài liệu; quên thì `make reset-password USER_NAME=<tên>`.
 
 **Thiết bị và mạng**
 - [ ] Thử **Android và iOS**: cấp quyền camera; iOS cần chạm nút bật cảm biến nghiêng.
 - [ ] Thử `scripts\run_real_tunnel.bat` trên **4G điện thoại thật** (giám khảo dùng mạng của họ): mở địa chỉ `https://….trycloudflare.com` cửa sổ in ra, đăng nhập, chụp bằng camera trong trang.
 - [ ] Thử thao tác thật trên điện thoại: chụp bằng camera, chọn ảnh lớn từ thư viện, tải lại trang khi đang có giỏ (đơn phải được khôi phục), quét mã vạch, in hoá đơn.
+- [ ] Nếu demo **màn quầy** trên laptop (cửa sổ rộng từ 1024 px, mở `http://localhost:5173`; `WEB.md` mục 6): chọn đúng camera (webcam hoặc điện thoại nối làm webcam), thử chụp liên tiếp và phím tắt Space / F2 / F4, Enter / Esc ở màn thanh toán.
 - [ ] Ảnh trình diễn: `backend/data/demo_sets/` đã chia sẵn bằng `scripts/sort_demo_images.py` — `1_dung_het` (nhận đúng toàn bộ, xếp theo thời gian chạy) cho phần trình diễn chính; `2_nhan_dien_sai` để minh hoạ cơ chế **"cần xác nhận"** (ví dụ ảnh `0001.jpg`: các món Cléo/Simple hiện viền vàng).
 - [ ] Quay **video** chạy trơn tru làm phương án lùi cuối.
 
 ## B. Ngay trước giờ demo (thứ tự cố định)
 
 1. Đăng xuất mọi thiết bị.
-2. `docker compose stop api` → `make db-restore NAME=demo_clean` → `make docker-up` (đúng chế độ nhận diện đã chọn).
+2. Dừng API (nhận diện thật: đóng cửa sổ `run_real*.bat`; bản Docker: `docker compose stop api`) → `make db-restore NAME=demo_clean` → bật lại đúng chế độ đã chọn: nhận diện thật thì nhấp đúp lại `scripts\run_real_tunnel.bat` (hoặc `scripts\run_real_phone.bat` nếu mọi điện thoại bắt chung Wi-Fi/hotspot với laptop; script tự dừng `api` và `web` của Docker); bộ nhận diện giả thì `make docker-up` (lệnh này bật API **giả**, không dùng cho nhận diện thật).
 3. `make check-env`: không có FAIL.
 4. Mở `http://localhost:8000/api/health` trên laptop: phải thấy `"status": "ready"` và đúng tên bộ nhận diện (`fake` hoặc `local`).
-5. Bật `scripts\run_real_tunnel.bat` (hoặc `scripts\run_real_phone.bat` nếu mọi điện thoại bắt chung Wi-Fi/hotspot với laptop), copy địa chỉ cửa sổ in ra.
+5. Copy địa chỉ cửa sổ `run_real_tunnel.bat` (hoặc `run_real_phone.bat`) bật ở bước 2 in ra.
 6. Mở URL đó trên điện thoại **qua đúng mạng 4G dùng lúc demo**, đăng nhập tài khoản thu ngân.
 7. Chạy thử **một giao dịch đầy đủ**: chụp → hoá đơn → (nhập giá tay nếu thiếu) → thanh toán → hoàn tất. Không demo thật nếu bước này chưa trơn.
 8. Xem trạng thái từ laptop bằng tài khoản admin (không dùng tài khoản thu ngân).
-9. Xoá đơn thử: lặp lại bước 1–2. Tunnel còn sống thì giữ nguyên URL.
+9. Xoá đơn thử: lặp lại bước 1–2. Bật lại `run_real_tunnel.bat` là một địa chỉ mới: làm lại bước 5–6.
 
 ## C. Trong lúc demo — nếu có sự cố
 

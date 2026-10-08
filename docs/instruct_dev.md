@@ -138,7 +138,7 @@ Mở `http://localhost:5173`. Dùng **hai cửa sổ khác phiên** (ví dụ m�
 
 **Thu ngân (`staff`)**
 1. Đăng nhập. Lần đầu sẽ thấy màn hướng dẫn, bấm qua.
-2. Màn chụp: trên máy tính không có camera thì chọn ảnh từ máy. Ảnh mẫu: `backend/data_demo/query/query_01.jpg` … `query_06.jpg`.
+2. Màn chụp: trên máy tính (cửa sổ rộng từ 1024 px) là **màn quầy** (camera bên trái, giỏ hàng bên phải, phím tắt Space / F2 / F4; xem `WEB.md` mục 6); không có camera thì kéo-thả ảnh hoặc bấm **Chọn ảnh**. Ảnh mẫu: `backend/data_demo/query/query_01.jpg` … `query_06.jpg`.
 3. Chờ nhận diện xong → màn hoá đơn. Kiểm: có ảnh kèm khung, có dòng hàng; dòng viền vàng là dòng cần xác nhận.
 4. Chạm một dòng viền vàng → xác nhận hoặc đổi sang sản phẩm khác.
 5. Nếu có dòng thiếu giá: nhập giá tay. Thử bấm thanh toán trước khi nhập để thấy bị chặn.
@@ -270,10 +270,11 @@ Chạy API ngay trên máy bằng một môi trường Python có sẵn model, P
 - **Giữ cửa sổ mở** trong lúc dùng. Ctrl+C dừng cả API lẫn giao diện (Postgres vẫn chạy). Quay về bản Docker với bộ nhận diện giả: `docker compose up -d --wait api web`.
 - **Python nào:** biến `ML_PYTHON` trỏ tới `python.exe` của môi trường có model; không đặt thì script tìm `../stocktaking_ai_mini/venv` cạnh repo. Môi trường đó cần torch bản CUDA, cộng thêm `fastapi uvicorn asyncpg "psycopg[binary]" alembic pyjwt`. Thiếu gì script báo đúng tên gói.
 - **Không tạo tài khoản hay dữ liệu:** dùng database đang có. Quên mật khẩu thì xem mục "Quên mật khẩu", nhưng lúc này container `api` đang dừng nên chạy lệnh bằng chính Python đó, từ thư mục `backend`: `python -m entrypoints.reset_password admin`.
-- **Tốc độ đã đo trên RTX 3050 Ti 4 GB:** 12–15 giây mỗi ảnh; VRAM lên tới 3,6 / 4 GB khi đang nhận diện, nên đừng chạy thứ khác dùng GPU cùng lúc.
+- **Tốc độ đã đo trên RTX 3050 Ti 4 GB (laptop):** ~7–9 giây mỗi ảnh khi cắm sạc, chế độ điện Turbo / Performance; chạy pin ở chế độ Silent khoảng 20 giây. Card 4 GB chỉ chứa được một pipeline: đừng chạy thứ khác dùng GPU cùng lúc (validate, `label_benchmark.py propose`…).
 - Log của API: `backups/run_real_api.log`.
 - **Dùng trên điện thoại:** nhấp đúp `scripts\run_real_phone.bat` (= `./scripts/run_real.sh lan`) thay cho `scripts\run_real.bat`. Trên điện thoại mở địa chỉ **Network** mà cửa sổ in ra, dạng `http://172.20.10.7:5173` — KHÔNG phải `localhost` (trên điện thoại, `localhost` là chính cái điện thoại). Điện thoại và laptop phải chung mạng (cùng Wi-Fi, hoặc laptop bắt hotspot của điện thoại). Lần đầu Windows hỏi cho Node.js qua tường lửa: bấm Allow, tích cả mạng Public nếu đang dùng hotspot. Mở bằng `http://` nên không có khung ngắm camera trong trang: bấm chụp bằng camera của máy hoặc chọn ảnh.
-- Đã chạy thử: script bật được, `/api/health` trả `"recognizer":"local"`, dừng thì API tắt theo. Chưa thử nhấp đúp bằng chuột và chưa thử trên Linux/macOS.
+- **Điện thoại ở mạng khác (4G), có camera trong trang:** nhấp đúp `scripts\run_real_tunnel.bat` (= `./scripts/run_real.sh tunnel`): địa chỉ `https://….trycloudflare.com` công khai qua Cloudflare quick tunnel, kèm ảnh mã QR `backups/tunnel_qr.png`. Cần `tools\cloudflared.exe`; chi tiết ở [`WEB.md`](WEB.md) mục 4. Đã thử trên điện thoại thật qua 4G (2026-10-08).
+- Đã chạy thử: script bật được, `/api/health` trả `"recognizer":"local"`, dừng thì API tắt theo; nhấp đúp `run_real.bat` và `run_real_tunnel.bat` trên Windows dùng hằng ngày (2026-10). Chưa thử trên Linux/macOS.
 
 ### Docker GPU: đang hỏng
 

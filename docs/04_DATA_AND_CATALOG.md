@@ -36,7 +36,7 @@
 | `force_evidence` | `["ocr","color","barcode"]` (tập con) | `DecisionEngine` (hợp trên toàn Top-K) |
 | `confusable_with` | `["8"]` — **hai chiều** | `Reranker` (guard cặp dễ nhầm) |
 | `ocr_keywords` | `["BE203","ABA"]` — chữ hoa, bỏ trùng, độ dài ≥ `plugins.ocr.min_text_length` | `Reranker` |
-| `color_code` | `"BE203"` → tra `color_reference` | `Reranker` |
+| `color_code` | `"BE203"` → tra `color_reference` (chế độ `"roi"`) | `Reranker`: chế độ `"signature"` (mặc định, `plugins.color.mode`) chỉ dùng nó như cờ bật bằng chứng màu cho SKU, so với chữ ký màu học từ ảnh gallery (`data/cache/color_signatures.npz`), không tra `color_reference` |
 | `confirm_if_unsure` | `true` — chỉ có tác dụng khi SKU có `confusable_with` | `Reranker` ("cần xác nhận" khi SKU thắng không có bằng chứng phân định và SKU kia cũng là ứng viên; bật bằng `rerank.confusable_uncertain_without_evidence`) |
 | `disabled_plugins` | backlog | — |
 
@@ -47,7 +47,7 @@ Barcode khớp chính xác `product.barcode`.
 - Reranker và plugin **chỉ** dùng dữ liệu khai báo trong catalog; **không suy diễn từ tên** sản phẩm hay tên thư mục.
 - Thiếu khai báo = điểm 0 tường minh cho SKU đó (không fallback).
 - Luật chặn khi lưu (`engine/catalog/validation.py`): `confusable_with` trỏ tới SKU tồn tại, không tự trỏ, phải hai chiều; `force_evidence` ⊆ {ocr, color, barcode}; `ocr_keywords` đã chuẩn hoá; **cặp dễ nhầm có bên bắt buộc OCR thì cả hai phải có từ khoá và không trùng token** (Reranker cho điểm 1.0 khi khớp bất kỳ token nào, token chung làm mất khả năng phân biệt).
-- Cảnh báo (không chặn): `color_code` chưa có `color_reference` (hiện BR641, OR210).
+- Cảnh báo (không chặn): `color_code` chưa có `color_reference` (hiện BR641, OR210) — chỉ ảnh hưởng chế độ màu `"roi"`; chế độ mặc định `"signature"` không dùng `color_reference`.
 
 ## 4. `CatalogRepository` (`engine/catalog/repository.py`)
 
@@ -125,7 +125,7 @@ Bản công khai không chứa dữ liệu cá nhân: catalog SQLite chỉ giữ
 `python scripts/sort_demo_images.py --run <kết quả validate> <thư mục benchmark> [--run ...] --out data/demo_sets`: chia ảnh thành `1_dung_het` (theo thời gian chạy), `2_nhan_dien_sai` (theo số vật sai), `3_crop_sai` (theo tổng lỗi), kèm `danh_sach.csv`.
 
 ## 7. Quy ước đặt tên thư mục gallery
-SKU mới: thư mục = ID đệm 4 chữ số (`0029`) — ASCII, ổn định khi đổi tên hiển thị, khớp `category_id`. 22 thư mục cũ giữ tên hiện tại (đổi tên cần script có log + build lại FAISS; chưa làm).
+SKU mới: thư mục = ID đệm 4 chữ số (`0029`) — ASCII, ổn định khi đổi tên hiển thị, khớp `category_id`. Các thư mục cũ (SKU 1–28) giữ tên hiện tại (đổi tên cần script có log + build lại FAISS; chưa làm): ban đầu 22, nay còn 21 trong `data/gallery/` vì SKU 24 (`KEM_TAY_DA`) đã gộp vào SKU 31 (2026-10-07, `is_active=false`, thư mục chuyển ra khỏi gallery). Gallery hiện có 33 thư mục = 33 SKU đang bán (21 tên cũ + `0029`–`0040`).
 
 ## 8. Web
 - Đọc cho màn hình web: `app/modules/catalog/repository.py` truy vấn các bảng `product`, `product_evidence`, `color_reference` trong Postgres (API không nạp engine để đọc).

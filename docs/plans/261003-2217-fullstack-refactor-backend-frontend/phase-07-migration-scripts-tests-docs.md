@@ -62,9 +62,9 @@ Người dùng chốt: KHÔNG thêm Playwright (bước 3 của kế hoạch g�
 - `POST /api/admin/evidence-test`: lỗi pipeline ngoài timeout trả 500 mặc định, không theo dạng `{"detail", "code"}`.
 - Ảnh đã lưu của một lượt chụp bị từ chối vì hàng đợi vừa đầy không được xoá (chờ `make purge-media`).
 
-## Chưa kiểm (cả Phase 7)
+## Chưa kiểm (cả Phase 7) — vấn đề đã biết
 - Job `migrate` của compose trên volume Postgres mới tinh (`docker compose down -v` rồi `make docker-up`): không làm vì sẽ xoá DB dev.
-- `make db-restore`; `make docker-up-gpu`; `make docker-up-prod` đủ luồng; G thật trên GPU (engine không đổi trong Phase 7); POS trên điện thoại thật qua HTTPS.
+- Vấn đề đã biết: `make db-restore` chưa chạy lần nào; `make docker-up-prod` chưa chạy đủ luồng; `make docker-up-gpu` đang hỏng (không dùng). G thật trên GPU (engine không đổi trong Phase 7). POS trên điện thoại thật qua HTTPS: đã thử 2026-10-08 (tunnel Cloudflare, 4G).
 
 ## Sau 7c: gỡ `src_legacy/` (người dùng quyết 2026-10-04)
 - Xoá cả thư mục (37 file: web v1, launcher, giao diện Tkinter). Bản gốc còn ở commit `f30710d` và ở thư mục làm việc cũ `stocktaking_ai_mini`. Các chỗ dẫn tới `src_legacy/` trong README, docs, comment test và engine đổi sang dẫn commit đó. Các file kế hoạch pha 0–6 giữ nguyên chữ (ghi lại lịch sử).

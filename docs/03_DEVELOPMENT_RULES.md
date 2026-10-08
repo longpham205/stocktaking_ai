@@ -36,9 +36,10 @@ Whenever code and this document disagree, **this document wins**.
 
 # 3. Formatting & Naming
 
-Follow **PEP 8** and **Black** formatting.
+Follow **PEP 8**; formatting and linting use **ruff** (config in `backend/pyproject.toml`).
 
-- Maximum line length: **88 characters**
+- `make format` runs `ruff check --fix` + `ruff format`; `make lint` runs `ruff check` + `ruff format --check` (both on the web code only, see 19.8)
+- Line length: **120 characters** (the formatter's target; rule `E501` is ignored)
 - Python files: `snake_case.py`
 - Functions and variables: `snake_case`
 - Classes: `PascalCase`
@@ -205,66 +206,7 @@ Modules must not exchange raw dictionaries as their primary interface.
 
 # 14. Public API Standard Summary
 
-```text
-Detector.detect(
-    image_data: ImageData
-) -> DetectionResult
-
-OverlapResolver.resolve(
-    detection_result: DetectionResult
-) -> OverlapResult
-
-find_suspicious_pairs(
-    detections,
-    iou_threshold,
-    overlap_ratio_threshold
-) -> list[OverlapPair]
-
-Refiner.refine(
-    image_array,
-    detection_result: DetectionResult,
-    overlap_result: OverlapResult
-) -> RefinementResult
-
-Cropper.crop(
-    image_data: ImageData,
-    detection_result: DetectionResult,
-    refinement_result: RefinementResult
-) -> list[CropImage]
-
-Retriever.retrieve(
-    crop: CropImage
-) -> RetrievalResult
-
-DecisionEngine.decide(
-    retrieval_result: RetrievalResult
-) -> DecisionResult
-
-DecisionEngine.evaluate_thresholds(
-    similarity: float,
-    detection_confidence: float
-) -> tuple[str, float]
-
-PluginManager.run_plugins(
-    crop: CropImage,
-    decision: DecisionResult
-) -> PluginResult
-
-Reranker.rerank(
-    retrieval_result: RetrievalResult,
-    plugin_result: PluginResult
-) -> DecisionResult
-
-InventoryPipeline.run(
-    image_data: ImageData,
-    similarity_threshold: float | None = None,
-    min_confidence_accept: float | None = None,
-) -> InventoryResult
-
-InventoryPipeline.run_with_trace(
-    image_data: ImageData
-) -> tuple[InventoryResult, PipelineTrace]
-```
+The public API of each engine module (`Detector.detect`, `OverlapResolver.resolve`, `find_suspicious_pairs`, `Refiner.refine`, `Cropper.crop`, `Retriever.retrieve`, `DecisionEngine.decide` / `evaluate_thresholds`, `PluginManager.run_plugins`, `Reranker.rerank`, `InventoryPipeline.run` / `run_with_trace`) is specified in `02_MODULE_SPECIFICATION.md`; it is not copied here, for the same reason as section 12.
 
 ---
 
@@ -415,7 +357,7 @@ python -m engine --mode validate
 python scripts/compare_validate.py data/outputs data/baseline/report.json --exact --ignore crop_id
 ```
 
-`make lint` and `mypy` cover the web code only (`app`, `entrypoints`, `migrations`, `tests/api`); the engine predates both gates.
+`make lint` and `make format` cover the web code only (`app`, `entrypoints`, `migrations`, `tests/api`, `tests/test_import_boundary.py`); `mypy` (strict, `make type-check`) covers `app`, `entrypoints`, `migrations`. The engine predates both gates.
 
 ## 19.9 Git
 

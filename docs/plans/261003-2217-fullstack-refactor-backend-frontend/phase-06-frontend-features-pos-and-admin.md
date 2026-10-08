@@ -1,22 +1,22 @@
 # Phase 06 — Frontend features (POS + Admin)
 
-**Priority:** P1 · **Status:** done (2026-10-04: 6a POS, 6b-1, 6b-2); còn thử tay trên điện thoại thật qua HTTPS · Nguồn hành vi: `src_legacy/frontend/app.js`, `docs/WEB.md`
+**Priority:** P1 · **Status:** done (2026-10-04: 6a POS, 6b-1, 6b-2); đã thử trên điện thoại thật qua HTTPS (2026-10-08, tunnel Cloudflare `scripts/run_real_tunnel.bat`, mạng 4G) · Nguồn hành vi: `src_legacy/frontend/app.js`, `docs/WEB.md`
 
 ## POS (staff, mobile-first)
-- [ ] onboarding (một lần, `POST me/onboarding-seen`)
-- [ ] capture: `getUserMedia` khung ngắm, `use-tilt` (deviceorientation, chặn khi > 15° nếu setting bật), fallback chụp bằng camera máy / chọn ảnh, downscale ≤2048px + sửa EXIF, `Idempotency-Key`, máy quét barcode USB (keystroke buffer) trên màn chụp + hoá đơn
-- [ ] loading: poll job (refetchInterval), timeout 120s, hiển thị `position`/`system_reloading`
-- [ ] invoice: dòng viền vàng ⚠ = uncertain (chạm để xác nhận/đổi SKU), giá tay khi thiếu, sửa SL, xoá; ảnh capture + overlay bbox 🟩🟨🟥/xám nét đứt, đánh dấu hai chiều dòng↔khung, zoom 1–4×; Chụp thêm (cộng dồn); Thêm món (tìm không dấu / barcode)
-- [ ] pay: tiền mặt (tiền khách đưa, tiền thừa) / QR; chặn khi thiếu giá trừ khi setting cho phép
-- [ ] done: hoá đơn + in (`#print-area`, auto print theo setting)
-- [ ] history (today/7d/30d/all, chi tiết, void)
-- [ ] khôi phục đơn dở sau reload/đăng nhập lại (`orders/open`)
+- [x] onboarding (một lần, `POST me/onboarding-seen`)
+- [x] capture: `getUserMedia` khung ngắm, `use-tilt` (deviceorientation, chặn khi > 15° nếu setting bật), fallback chụp bằng camera máy / chọn ảnh, downscale ≤2048px + sửa EXIF, `Idempotency-Key`, máy quét barcode USB (keystroke buffer) trên màn chụp + hoá đơn
+- [x] loading: poll job (refetchInterval), timeout 120s, hiển thị `position`/`system_reloading`
+- [x] invoice: dòng viền vàng ⚠ = uncertain (chạm để xác nhận/đổi SKU), giá tay khi thiếu, sửa SL, xoá; ảnh capture + overlay bbox 🟩🟨🟥/xám nét đứt, đánh dấu hai chiều dòng↔khung, zoom 1–4×; Chụp thêm (cộng dồn); Thêm món (tìm không dấu / barcode)
+- [x] pay: tiền mặt (tiền khách đưa, tiền thừa) / QR; chặn khi thiếu giá trừ khi setting cho phép
+- [x] done: hoá đơn + in (`#print-area`, auto print theo setting)
+- [x] history (today/7d/30d/all, chi tiết, void)
+- [x] khôi phục đơn dở sau reload/đăng nhập lại (`orders/open`)
 
 ## Admin (desktop)
-- [ ] reports: KPI + doanh thu theo ngày + top 5 (bảng/biểu đồ nhẹ, CSS bar — tránh thêm lib chart nếu không cần)
-- [ ] products: phân trang, search, filter (chưa đặt tên / thiếu màu), sửa tên/giá/barcode, 🧠 evidence editor (OCR keywords chuẩn hoá, color code + chấm màu 9×9 trên ảnh gallery, force_evidence, confusable_with, ô xác nhận), 🕘 change-log + hoàn tác, 🧪 thử bằng chứng
-- [ ] orders (mọi nhân viên), users (tạo, đặt lại MK, khoá), settings
-- [ ] advanced: registry 🔒/🟡, apply với advanced password + trạng thái reload, validation (chạy, theo dõi, so baseline)
+- [x] reports: KPI + doanh thu theo ngày + top 5 (bảng/biểu đồ nhẹ, CSS bar — tránh thêm lib chart nếu không cần)
+- [x] products: phân trang, search, filter (chưa đặt tên / thiếu màu), sửa tên/giá/barcode, 🧠 evidence editor (OCR keywords chuẩn hoá, color code + chấm màu 9×9 trên ảnh gallery, force_evidence, confusable_with, ô xác nhận), 🕘 change-log + hoàn tác, 🧪 thử bằng chứng
+- [x] orders (mọi nhân viên), users (tạo, đặt lại MK, khoá), settings
+- [x] advanced: registry 🔒/🟡, apply với advanced password + trạng thái reload, validation (chạy, theo dõi, so baseline)
 
 ## Done khi
 Checklist parity đủ; vitest cho mỗi feature (stub API); smoke thủ công trên điện thoại qua HTTPS forward.
@@ -29,7 +29,7 @@ Checklist parity đủ; vitest cho mỗi feature (stub API); smoke thủ công t
 - Chạy thật trên Docker trong trình duyệt nội bộ (bộ nhận diện giả, ảnh tạo bằng canvas qua ô "Chọn ảnh"): hướng dẫn -> chụp -> hoá đơn 7 món, 7 khung, ảnh ký + 6 ảnh thu nhỏ tải được -> xác nhận dòng vàng -> nhập giá tay -> tiền mặt 530.000đ, thối 4.500đ -> lịch sử -> khôi phục đơn dở sau khi tải lại -> huỷ đơn.
 - Docker: `vite.config.ts` bật polling khi có `VITE_USE_POLLING` (compose dev đặt sẵn: Docker Desktop không chuyển sự kiện file qua bind-mount); image `web` dev/prod có tag riêng (`stocktaking-ai-web:dev|prod`) — trước đó build prod đã ghi đè image dev.
 
-## Chưa thử được (cần điện thoại thật qua HTTPS)
+## Chưa thử được (cần điện thoại thật qua HTTPS) — điện thoại qua HTTPS đã thử 2026-10-08 (tunnel, 4G)
 - Khung ngắm camera trực tiếp và cảm biến nghiêng (trình duyệt nội bộ chặn camera; `http://` qua IP LAN cũng bị chặn — app tự chuyển sang "Chụp bằng camera máy"/"Chọn ảnh").
 - Máy quét mã vạch thật (đã test bằng phím giả lập), in hoá đơn ra máy in.
 
@@ -64,4 +64,4 @@ Checklist parity đủ; vitest cho mỗi feature (stub API); smoke thủ công t
 - Lưu ý: ảnh lấy từ `paths.gallery_dir` của `PIPELINE_CONFIG`. DB dev đang chứa catalog demo nên `api` phải chạy với `PIPELINE_CONFIG=configs/config.demo.yaml` mới có ảnh (config mặc định trỏ gallery thật, tên thư mục không khớp catalog demo).
 
 ## Phase 6: hoàn tất về code
-Còn "smoke thủ công trên điện thoại qua HTTPS forward" (camera trực tiếp, cảm biến nghiêng, máy quét, in): việc của người dùng.
+Còn "smoke thủ công trên điện thoại qua HTTPS forward" (camera trực tiếp, cảm biến nghiêng, máy quét, in): việc của người dùng. Điện thoại thật qua HTTPS: đã thử 2026-10-08 (tunnel Cloudflare, 4G).
