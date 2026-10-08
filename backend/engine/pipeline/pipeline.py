@@ -44,6 +44,7 @@ from engine.decision.decision import DecisionEngine
 from engine.decision.reranker import Reranker
 from engine.detection.cropper import Cropper
 from engine.detection.detector import Detector
+from engine.detection.postprocess import drop_nested_same_product
 from engine.models.models import (
     BoundingBox,
     CropTrace,
@@ -303,6 +304,14 @@ class InventoryPipeline:
                     plugin_evidence=plugin_result.evidence if plugin_result else {},
                 )
             )
+
+        ratio = self._config.detection.suppression.nested_same_product_ratio
+        if ratio > 0:
+            items, nested = drop_nested_same_product(
+                items, lambda item: item.bbox, lambda item: item.product_id, lambda item: item.detection_confidence, ratio
+            )
+            if nested:
+                logger.info("Dropped %d item(s) nested with a more confident item of the same product.", len(nested))
 
         if collect_trace:
             return detection_result, overlap_result, refinement_result, items, rejected, crop_traces

@@ -131,6 +131,10 @@ class DetectionSuppressionSection(BaseModel):
     # A box enclosing this many other boxes is dropped as a box around a group; 0 = rule off.
     container_min_boxes: int = Field(default=0, ge=0)
     containment_ratio: float = Field(default=0.8, gt=0.0, le=1.0)
+    # After recognition: of two items of the SAME product where the smaller box has at least this
+    # share inside the larger (tube on its backing card, bag box around a product), the less
+    # confident one is dropped; 0 = rule off.
+    nested_same_product_ratio: float = Field(default=0.0, ge=0.0, le=1.0)
 
 
 class DetectionSection(BaseModel):

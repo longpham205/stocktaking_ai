@@ -11,13 +11,22 @@ every box becomes a line on the invoice. Two geometric rules:
        (a plastic bag, a pile). OFF by default: on the same set it removed 2 group boxes but also
        the box of a real product that had two other products lying on top of it.
 
-A third rule, "a small box inside a larger box of the same SKU", was tried and rejected: it
-removed real products.
+A third rule runs after recognition, because it needs the SKU: two boxes of the SAME product where
+one lies (almost) entirely inside the other are one object counted twice, e.g. the tube of a cream
+sold on a backing card is boxed on its own as well as together with the card, or a plastic bag is
+boxed around a product and recognised as that product. The LESS CONFIDENT box of the pair is
+dropped: always dropping the inner box removed real products sitting inside a low-confidence bag
+box (2026-10-07). OFF by default.
 """
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from typing import TypeVar
+
 from engine.models.models import BoundingBox, Detection
+
+T = TypeVar("T")
 
 REASON_DUPLICATE = "duplicate"
 REASON_CONTAINER = "container"
@@ -77,3 +86,44 @@ def suppress_redundant(
         else:
             kept.append(candidate)
     return kept, dropped
+
+
+def _nested(a: BoundingBox, b: BoundingBox, ratio: float) -> bool:
+    """True when the smaller of the two boxes has at least `ratio` of its area inside the other."""
+    inner, outer = (a, b) if a.area <= b.area else (b, a)
+    return _inside_ratio(inner, outer) >= ratio
+
+
+def drop_nested_same_product(
+    items: list[T],
+    bbox_of: Callable[[T], BoundingBox],
+    product_of: Callable[[T], str],
+    confidence_of: Callable[[T], float],
+    ratio: float,
+) -> tuple[list[T], list[T]]:
+    """Of two nested boxes recognised as the same product, drop the less confident one.
+
+    Args:
+        items: Recognised items of one image.
+        bbox_of: Returns an item's box.
+        product_of: Returns an item's product_id.
+        confidence_of: Returns an item's detection confidence.
+        ratio: Share of the smaller box's area that must lie inside the larger one; 0 turns the
+            rule off.
+
+    Returns:
+        (kept, dropped), both in the input order.
+    """
+    if ratio <= 0:
+        return list(items), []
+    kept_idx: list[int] = []
+    dropped_idx: set[int] = set()
+    for i in sorted(range(len(items)), key=lambda i: confidence_of(items[i]), reverse=True):
+        if any(
+            product_of(items[j]) == product_of(items[i]) and _nested(bbox_of(items[i]), bbox_of(items[j]), ratio)
+            for j in kept_idx
+        ):
+            dropped_idx.add(i)
+        else:
+            kept_idx.append(i)
+    return [it for i, it in enumerate(items) if i not in dropped_idx], [it for i, it in enumerate(items) if i in dropped_idx]
