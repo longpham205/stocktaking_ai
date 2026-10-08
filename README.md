@@ -226,7 +226,7 @@ Web POS dùng catalog trong Postgres: `make db-restore NAME=stocktaking_catalog`
 | `stocktaking_weights_detector_sam2.zip` | RF-DETR fine-tune + RF-DETR base, SAM2.1 hiera-small | 653 MB |
 | `stocktaking_weights_siglip2.zip` | SigLIP2 base patch16-224 | 1,4 GB |
 | `stocktaking_data.zip` | gallery, benchmark (31 + 27 ảnh), catalog SQLite, cache FAISS, baseline, demo_sets | 610 MB |
-| `stocktaking_catalog.dump` | catalog + giá cho Postgres của web | 30 KB |
+| `stocktaking_catalog.zip` | catalog + giá cho Postgres của web (giải nén thành `backups/stocktaking_catalog.dump`) | 8 KB |
 
 | Model | Đường dẫn | Nguồn · giấy phép |
 | --- | --- | --- |

@@ -101,10 +101,11 @@ def main(argv: list[str] | None = None) -> int:
         sums.append(f"{sha256_of(target)}  {zip_name}")
         print(f"{zip_name}: {len(members)} file, {target.stat().st_size / 2**20:.0f} MB")
     if args.catalog_dump is not None:
-        dump = args.out / "stocktaking_catalog.dump"
-        if args.catalog_dump.resolve() != dump.resolve():
-            dump.write_bytes(args.catalog_dump.read_bytes())
-        sums.append(f"{sha256_of(dump)}  {dump.name}")
+        # GitHub Release không nhận đuôi .dump: phát hành trong một file zip
+        packed = args.out / "stocktaking_catalog.zip"
+        with zipfile.ZipFile(packed, "w", zipfile.ZIP_DEFLATED) as archive:
+            archive.write(args.catalog_dump, "stocktaking_catalog.dump")
+        sums.append(f"{sha256_of(packed)}  {packed.name}")
     for group in manifest.values():
         group.sort(key=lambda item: item["path"])
     MANIFEST.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
