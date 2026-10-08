@@ -88,6 +88,9 @@ for key in MEDIA_URL_SECRET JWT_SECRET; do
 done
 
 step "3/8 Python environment (backend/.venv)"
+# torch is a 2.6 GB download that the sam2 build waits for: uv's default 300 s wait is too short
+# on a normal connection, and so is its HTTP timeout on a slow one
+export UV_LOCK_TIMEOUT="${UV_LOCK_TIMEOUT:-7200}" UV_HTTP_TIMEOUT="${UV_HTTP_TIMEOUT:-300}"
 if [ -n "$GPU" ]; then
   echo "NVIDIA GPU: $GPU -> real recognition stack (torch with CUDA, several GB the first time)"
   (cd backend && uv sync --extra ml)
