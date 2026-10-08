@@ -1,6 +1,7 @@
 @echo off
-rem One click on Windows: the whole web POS in Docker with the demo recognizer (scripts/run_docker.sh).
-rem   run_docker.bat        start, open http://localhost:5173
+rem One click on Windows: the whole web POS in Docker (scripts/run_docker.sh).
+rem   run_docker.bat        demo recognizer, open http://localhost:5173
+rem   run_docker.bat gpu    real recognition on the NVIDIA GPU inside Docker (large image)
 rem   run_docker.bat stop   stop the containers (the database is kept)
 setlocal
 rem keep the current directory when bash starts as a login shell
