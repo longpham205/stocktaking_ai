@@ -323,7 +323,9 @@ rerank:
   # Cặp dễ nhầm (catalog: confusable_with) và SKU thắng được đánh dấu confirm_if_unsure trong catalog:
   # SKU thắng không có bằng chứng OCR/màu/mã vạch nào mà SKU kia cũng là ứng viên -> "cần xác nhận"
   # (uncertain) cho thu ngân chọn. false = như cũ.
-  confusable_uncertain_without_evidence: false
+  # Đo 2026-10-08 (catalog đánh dấu 31, 32, 34, 37, 36, 40): 58 ảnh test hỏi 7 lần, 5 lần đúng là
+  # món nhận sai, 1 khung thừa, 1 hỏi thừa; F1 không đổi. Hỏi mọi cặp: 35 lần, 22 lần thừa.
+  confusable_uncertain_without_evidence: true
 
   barcode:
     weight: 1.00
