@@ -61,6 +61,17 @@ dev = [
 [tool.uv]
 package = false
 
+# On Windows, PyPI only has CPU torch wheels: take the CUDA build from the PyTorch index instead
+# (the Linux wheels on PyPI already bundle CUDA). CUDA 12.8 runs on drivers >= 570.
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-cu128", marker = "sys_platform == 'win32'" }]
+torchvision = [{ index = "pytorch-cu128", marker = "sys_platform == 'win32'" }]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
