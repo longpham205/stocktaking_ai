@@ -119,6 +119,12 @@ describe('counter screen (wide window)', () => {
     // the photo with its boxes replaces the camera, which stays in a corner
     expect((await screen.findAllByTestId('capture-box')).map((b) => b.dataset.state)).toEqual(['ok', 'unc']);
     expect(screen.getByRole('button', { name: /Ảnh đã chụp \(1\)/ })).toBeInTheDocument();
+    // the small camera in the corner can be hidden so it does not cover the boxes, and shown again
+    await userEvent.click(screen.getByRole('button', { name: 'Ẩn camera' }));
+    expect(screen.queryByRole('button', { name: 'Ẩn camera' })).toBeNull();
+    expect(screen.getAllByTestId('capture-box')).toHaveLength(2); // still on the photo
+    await userEvent.click(screen.getByRole('button', { name: /Hiện camera/ }));
+    expect(screen.getByRole('button', { name: 'Ẩn camera' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: /^Camera$/ }));
     expect(screen.queryAllByTestId('capture-box')).toEqual([]);
   });
