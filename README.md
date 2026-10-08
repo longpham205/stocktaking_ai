@@ -196,6 +196,8 @@ cd stocktaking_ai
 setup.bat                 # Windows: nhấp đúp. Linux/macOS: ./scripts/setup.sh
 ```
 
+Trên Windows hãy clone vào một đường dẫn ngắn (ví dụ `C:\stocktaking_ai`): `node_modules` lồng sâu, quá giới hạn 260 ký tự của Windows thì cài frontend lỗi (script tự báo khi đường dẫn quá 80 ký tự).
+
 `setup.bat` (= `scripts/setup.sh`) làm một lần, chạy lại an toàn (bước nào đã xong thì bỏ qua, database đã có không bị thay):
 
 1. kiểm Docker (tự mở Docker Desktop nếu đang tắt), cài `uv` và Node.js nếu thiếu;
