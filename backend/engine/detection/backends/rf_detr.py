@@ -85,9 +85,9 @@ class RfDetrBackend(DetectionBackend):
         logger.info("Loading RF-DETR model class='%s' kwargs=%s", model_cls.__name__, model_kwargs)
         model = model_cls(**model_kwargs)
         infer_cfg = self._config.rf_detr.inference
-        
+
         infer_cfg = self._config.rf_detr.inference
-        
+
         dtype = (
             torch.float16
             if infer_cfg.dtype.lower() == "float16"

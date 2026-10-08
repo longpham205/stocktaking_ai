@@ -75,7 +75,7 @@ class DecisionEngine:
             self._config.ambiguous_margin,
             len(force_rules),
         )
-        
+
         logger.info("DecisionEngine force_rules content: %s", force_rules)
 
     def evaluate_thresholds(self, similarity: float, detection_confidence: float) -> tuple[str, float]:

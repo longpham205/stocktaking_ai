@@ -13,7 +13,9 @@ its matching model config (`refinement.sam2.model_type` /
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
+from urllib.request import urlopen
 
 import cv2
 import numpy as np
@@ -21,8 +23,6 @@ import numpy as np
 from engine.core.config import Sam2Section
 from engine.core.logger import get_logger
 from engine.models.models import BoundingBox, RefinedBox
-from pathlib import Path
-from urllib.request import urlopen
 
 logger = get_logger(__name__)
 

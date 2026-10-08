@@ -10,7 +10,6 @@ from __future__ import annotations
 import csv
 import dataclasses
 import json
-from pathlib import Path
 
 import cv2
 import numpy as np
@@ -108,11 +107,11 @@ class StorageManager:
         color = tuple(self._config.box_color)
 
         img_h, img_w = image.shape[:2]
-        diagonal = (img_h ** 2 + img_w ** 2) ** 0.5 
+        diagonal = (img_h ** 2 + img_w ** 2) ** 0.5
 
         for item in result.items:
             x1, y1, x2, y2 = (int(item.bbox.x1), int(item.bbox.y1), int(item.bbox.x2), int(item.bbox.y2))
-            
+
             box_w = abs(x2 - x1)
             box_h = abs(y2 - y1)
             box_size = min(box_w, box_h)
@@ -122,24 +121,24 @@ class StorageManager:
             text_thickness = max(1, int(thickness // 1.5))
 
             cv2.rectangle(annotated, (x1, y1), (x2, y2), color, thickness)
-            
+
             label = f"{item.product_name} {item.final_confidence:.2f}"
             (text_w, text_h), baseline = cv2.getTextSize(
                 label, cv2.FONT_HERSHEY_SIMPLEX, font_scale, text_thickness
             )
-            
+
             text_bg_y1 = max(0, y1 - text_h - baseline - 6)
             text_bg_y2 = y1 if y1 - text_h - baseline - 6 >= 0 else y1 + text_h + baseline + 6
             text_y = max(text_h, y1 - baseline - 2) if y1 - text_h - baseline - 6 >= 0 else y1 + text_h + 2
 
             cv2.rectangle(
-                annotated, 
-                (x1, text_bg_y1), 
-                (min(img_w, x1 + text_w + 6), text_bg_y2), 
-                color, 
+                annotated,
+                (x1, text_bg_y1),
+                (min(img_w, x1 + text_w + 6), text_bg_y2),
+                color,
                 -1
             )
-            
+
             cv2.putText(
                 annotated,
                 label,

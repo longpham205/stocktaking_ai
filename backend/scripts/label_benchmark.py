@@ -222,10 +222,11 @@ def propose(images_dir: Path, out_dir: Path, config_path: Path | None) -> int:
     # nhập muộn: bước duyệt và các test không cần torch. `python scripts/...` chỉ đưa scripts/ vào
     # sys.path, nên thêm backend/ để thấy gói `engine`.
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    from PIL import Image, ImageOps
+
     from engine.catalog.factory import open_catalog_repository
     from engine.core.config import build_config, load_config
     from engine.inference.infer import InferenceRunner
-    from PIL import Image, ImageOps
 
     config = build_config(config_path) if config_path else load_config()
     products = {pid: rec.to_dict().get("product_name") or f"SKU {pid}" for pid, rec in open_catalog_repository(config).products().items()}
