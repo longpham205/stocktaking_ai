@@ -184,7 +184,8 @@ frontend/src/
 ├── components/      app-shell, confirm-dialog, route-states, ui/ (button, input, dialog, switch…)
 ├── features/
 │   ├── auth/        đăng nhập
-│   ├── pos/         chụp, hoá đơn + khung nhận diện, sửa dòng, thanh toán, hoàn tất, lịch sử, hướng dẫn lần đầu
+│   ├── pos/         chụp, hoá đơn + khung nhận diện, sửa dòng, thanh toán, hoàn tất, lịch sử, hướng dẫn lần đầu;
+│   │                màn quầy cho màn hình rộng (desk-page, desk-camera, use-desk)
 │   └── admin-*/     reports, orders, users, settings, products, advanced
 └── test/            setup + test-utils (renderApp, stubFetchRoutes)
 ```
@@ -195,6 +196,8 @@ frontend/src/
 | `/pos`, `/pos/orders/$orderId`, `…/capture`, `…/pay`, `…/done` | chụp, hoá đơn, chụp thêm, thanh toán, hoàn tất | thu ngân |
 | `/history`, `/onboarding` | lịch sử ca, hướng dẫn lần đầu | thu ngân |
 | `/admin/…` | báo cáo, đơn hàng, nhân viên, cài đặt, sản phẩm, nâng cao | quản trị |
+
+Từ bề rộng 1024 px (máy tính, tablet xoay ngang), `/pos`, `/pos/orders/$orderId` và `…/capture` hiện **màn quầy**: camera (webcam, hoặc điện thoại nối làm webcam) bên trái, giỏ hàng luôn hiện bên phải, chụp liên tiếp không rời trang; kéo thả ảnh vào khung camera cũng được nhận diện. Phím tắt: Space chụp, F2 thanh toán, F4 thêm món theo tên; ở màn thanh toán gõ số tiền, Enter xác nhận, Esc quay lại; ở màn hoàn tất Enter mở đơn mới. Màn hẹp giữ luồng điện thoại. Camera đã chọn được nhớ trong `localStorage` của máy đó.
 
 Máy chủ là nguồn sự thật: đơn đang dở lấy từ `GET /api/orders/open`, nên tải lại trang không mất đơn. Dữ liệu máy chủ đi qua TanStack Query; trạng thái job được hỏi lại định kỳ bằng `refetchInterval`.
 
