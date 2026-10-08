@@ -22,7 +22,7 @@
 10. [Hướng dẫn thực thi](#10-hướng-dẫn-thực-thi)
 11. [Đặc tả Input & Output](#11-đặc-tả-input--output)
 12. [Đánh giá hiệu năng](#12-đánh-giá-hiệu-năng)
-13. [Hạn chế kỹ thuật](#13-hạn-chế-kỹ-thuật)
+13. [Hạn chế & hướng khắc phục](#13-hạn-chế--hướng-khắc-phục)
 14. [Lộ trình phát triển](#14-lộ-trình-phát-triển)
 15. [Trích dẫn](#15-trích-dẫn)
 16. [Giấy phép](#16-giấy-phép)
@@ -38,6 +38,16 @@
 5. **Audit trail & tổng hợp kết quả:** xuất danh sách sản phẩm, số lượng theo SKU và toàn bộ nhật ký quyết định phục vụ kiểm tra lại.
 
 Hệ thống giữ kiến trúc tách biệt giữa **Localization** (phát hiện/phân đoạn) và **Identification** (truy xuất/hợp nhất bằng chứng), cho phép tối ưu độc lập từng thành phần, thay thế backend linh hoạt và cô lập lỗi ở từng giai đoạn.
+
+### Điểm nổi bật
+
+- **F1 end-to-end ≈ 0,92** trên 58 ảnh rổ hàng thật với 483 sản phẩm: **0,938** trên bộ 8 SKU và **0,885** trên bộ 13 SKU có bao bì gần như giống hệt nhau (chi tiết ở [mục 12](#12-đánh-giá-hiệu-năng)).
+- **Định vị chính xác:** detection F1 **0,94–0,97**; SKU đúng nằm trong Top-5 ứng viên ở **97–99,6%** trường hợp.
+- **Nhanh trên phần cứng phổ thông:** **~7–9 giây cho cả rổ** 5–13 món trên GPU laptop 4 GB (RTX 3050 Ti).
+- **Thêm sản phẩm không cần huấn luyện lại:** 33 SKU hiện tại; thêm SKU chỉ cần chụp ảnh gallery và lập lại chỉ mục.
+- **Phân biệt biến thể gần giống nhau** bằng cách kết hợp hình ảnh, chữ trên bao bì (OCR) và chữ ký màu học từ ảnh gallery.
+- **Biết lúc mình không chắc:** với các cặp sản phẩm dễ nhầm, hệ thống tự gắn cờ **"cần xác nhận"** để thu ngân kiểm lại thay vì tính tiền sai (trên bộ test: 7 lần hỏi thì 5 lần đúng là ca cần sửa).
+- **Sẵn sàng vận hành:** web POS chạy trên điện thoại, tự kiểm tính nhất quán của chỉ mục khi khởi động, nạp sẵn model để lần chụp đầu tiên không bị chậm.
 
 ## 2. Đặc thù của bối cảnh bàn thu ngân
 
@@ -63,6 +73,7 @@ Input Image (bàn thu ngân)
 ① DETECTION
     Detector (RF-DETR / Mock Contour)
     — Bounding box không phụ thuộc class
+    — Lọc khung trùng và khung ôm cả cụm hàng
     │
     ▼
 ② PHÂN TÍCH CHỒNG LẤP
@@ -82,7 +93,7 @@ Input Image (bàn thu ngân)
     ▼
 ⑤ VISUAL RETRIEVAL
     Retriever (SigLIP2 + FAISS)
-    — Top-K sản phẩm gần nhất trong gallery
+    — Top-K sản phẩm gần nhất trong gallery (gallery tăng cường bằng ảnh xoay)
     │
     ▼
 ⑥ DECISION
@@ -97,6 +108,7 @@ Input Image (bàn thu ngân)
 ⑧ RERANKING & FUSION
     Reranker Engine
     — Hợp nhất bằng chứng, Consensus Protection & Confusable-Pair Guards
+    — Gộp vật lồng nhau cùng SKU, gắn cờ "cần xác nhận" cho cặp dễ nhầm
     │
     ▼
 OUTPUT
@@ -122,9 +134,14 @@ Hai phương thức thực thi:
   - `force`: quy tắc miền cho nhóm sản phẩm cần xác minh đa phương thức.
 - **Reranking đa bằng chứng:**
   - *Barcode:* giải mã thích ứng 9 giai đoạn cho crop độ phân giải thấp, biến dạng hoặc xoay.
-  - *OCR:* quét đa hướng (0°, 90°, 180°, 270°), CLAHE, đối chiếu token.
-  - *Màu sắc:* trích xuất CIELAB, so khớp bằng CIEDE2000.
+  - *OCR:* quét đa hướng (0°, 90°, 180°, 270°), CLAHE, đối chiếu từ khoá khai báo trong catalog; độ tin cậy lấy theo đoạn chữ chứa từ khoá.
+  - *Màu sắc:* **chữ ký màu học tự động từ ảnh gallery** (chế độ `signature`), so với phân bố màu của crop; chế độ cũ CIELAB/CIEDE2000 vẫn giữ.
   - *Consensus & Guard:* bảo vệ kết quả retrieval tin cậy khỏi nhiễu plugin, kiểm tra chặt các cặp sản phẩm dễ nhầm.
+- **Gallery tăng cường:** SKU ít ảnh được thêm bản xoay 90°/180°/270° khi lập chỉ mục, bù cho việc hàng nằm đủ hướng trên bàn; có trần số vector để không SKU nào lấn át.
+- **Hậu xử lý khung:** bỏ khung trùng, khung ôm cả cụm/túi hàng, và vật bị tách đôi (ví dụ tuýp kem gắn trên vỉ giấy) để không tính tiền hai lần.
+- **"Cần xác nhận" cho cặp dễ nhầm:** SKU được đánh dấu `confirm_if_unsure` trong catalog, khi không có bằng chứng phân định, được gắn cờ để thu ngân chọn lại.
+- **An toàn khi vận hành:** server tự kiểm chỉ mục FAISS có khớp gallery, catalog và cấu hình không (lệch thì dừng kèm hướng dẫn), và chạy nóng pipeline lúc khởi động.
+- **Công cụ dữ liệu:** gán nhãn benchmark có máy đề xuất (`label_benchmark.py`), tách SKU gộp nhầm (`split_sku.py`), đo thời gian từng bước (`bench_stages.py`), chia ảnh demo theo kết quả (`sort_demo_images.py`).
 - **Bộ validation 9 giai đoạn:** đánh giá từng giai đoạn, từ detection đến phân loại SKU end-to-end.
 - **Web POS (`backend/app/` + `frontend/`):** thu ngân chụp rổ hàng bằng điện thoại, hệ thống lập hoá đơn, đánh dấu dòng cần xác nhận, thanh toán; trang quản trị có báo cáo, đơn hàng, nhân viên, sửa giá / barcode / bằng chứng nhận diện, thiết lập nâng cao của pipeline và chạy kiểm định. API FastAPI + Postgres, giao diện React. Xem [`docs/WEB.md`](docs/WEB.md).
 
@@ -164,7 +181,7 @@ stocktaking_ai/
 - **Python:** `>= 3.11, < 3.13` (uv tự cài; giới hạn trên do torch, sam2, faiss-cpu).
 - **Thư viện:** khai báo trong `backend/pyproject.toml`. Bản nhẹ (`uv sync`) đủ cho API, test và pipeline với backend mock; bản đầy đủ (`uv sync --extra ml`) thêm `torch`, `rfdetr`, `sam2`, `transformers`, `easyocr`.
 - **Hệ thống:** `pyzbar` cần thư viện zbar (`apt install libzbar0`, `brew install zbar`); image Docker đã có sẵn.
-- **Phần cứng cho pipeline thật:** GPU NVIDIA với >= 8GB VRAM (khuyến nghị). Chạy CPU được nhưng chậm.
+- **Phần cứng cho pipeline thật:** GPU NVIDIA; đã chạy ổn định trên GPU laptop **4 GB** (RTX 3050 Ti, ~7–9 giây/ảnh). Chạy CPU được nhưng chậm.
 
 ## 7. Cài đặt & thiết lập môi trường
 
@@ -205,8 +222,8 @@ uv run python scripts/set_device.py show|cpu|cuda   # đổi các khoá device: 
 
 ## 8. Đặc tả Dataset & Metadata
 
-- **Gallery (`backend/data/gallery/`):** ảnh tham chiếu theo từng SKU; thư mục ánh xạ tới `product_id` qua catalog DB. SKU mới: bỏ ảnh vào `data/gallery_inbox/<tên>/` rồi chạy `python -m engine.catalog.sync_gallery ...` (xem `docs/04_DATA_AND_CATALOG.md`). **[Kế hoạch]** mỗi SKU có ảnh nhiều mặt (trước, sau, hai bên) để khớp tốt hơn với việc sản phẩm có thể đặt ở hướng bất kỳ trên bàn thu ngân.
-- **Chuẩn màu (bảng `color_reference` trong catalog DB):** màu canonical dạng RGB + hex cho từng biến thể (Reranker tự đổi sang Lab). File `product_colors.json` chỉ còn là đầu vào một lần của migrate.
+- **Gallery (`backend/data/gallery/`):** ảnh tham chiếu theo từng SKU; thư mục ánh xạ tới `product_id` qua catalog DB. SKU mới: bỏ ảnh vào `data/gallery_inbox/<tên>/` rồi chạy `python -m engine.catalog.sync_gallery ...` (xem `docs/04_DATA_AND_CATALOG.md`). Khi lập chỉ mục, SKU có ít ảnh được tự thêm bản xoay (`retrieval.augment`). Sau khi thêm hoặc đổi ảnh: lập lại chỉ mục và chữ ký màu (`scripts/build_color_signatures.py`); server tự phát hiện chỉ mục cũ và từ chối chạy.
+- **Màu:** chữ ký màu của từng SKU học tự động từ ảnh gallery (`data/cache/color_signatures.npz`), dùng cho SKU có `color_code`. Bảng `color_reference` trong catalog DB giữ màu chuẩn RGB + hex cho chế độ cũ. File `product_colors.json` chỉ còn là đầu vào một lần của migrate.
 
 ```json
 {
@@ -224,13 +241,13 @@ Tham số của pipeline nằm trong `backend/configs/config.yaml` (bảng dư�
 | Khối | Phạm vi |
 | --- | --- |
 | `catalog` | Nguồn catalog: `source` (`sqlite`/`snapshot`/`database`), `db_path`/`snapshot_path`/`db_url` — dữ liệu SKU nằm trong DB, không trong config |
-| `detection` | Backend, confidence, IoU, tham số detector |
+| `detection` | Backend, confidence, IoU, tham số detector; `suppression` (khung trùng, khung ôm cụm, vật lồng nhau cùng SKU) |
 | `refinement` | Điều kiện gọi SAM2, giới hạn hình học |
 | `cropping` | Padding box, độ phân giải tensor |
-| `retrieval` | Kích thước vector, tham số FAISS, Top-K |
+| `retrieval` | Kích thước vector, tham số FAISS, Top-K; `augment` (xoay ảnh gallery cho SKU ít ảnh, trần vector mỗi SKU) |
 | `decision` | Ngưỡng accept / uncertain / reject |
 | `plugins` | Cấu hình OCR, Color, Barcode (plugin bắt buộc theo SKU nằm trong catalog: `force_evidence`) |
-| `rerank` | Trọng số hợp nhất, ngưỡng ΔE, rule bảo vệ |
+| `rerank` | Trọng số hợp nhất, ngưỡng ΔE, rule bảo vệ, cặp dễ nhầm và "cần xác nhận" |
 | `storage` | Định dạng output, kiểu annotation |
 | `validation` | IoU đánh giá, bật/tắt stage, xuất báo cáo |
 
@@ -277,39 +294,48 @@ result, trace = pipeline.run_with_trace(image_data)   # chẩn đoán đầy đ�
 
 ## 12. Đánh giá hiệu năng
 
-Đo trên bộ test hiện có: 8 SKU cốt lõi, 31 cảnh, 293 instance (`python -m engine --mode validate`). Số đo ngày 2026-10-03, config hiện tại (ngưỡng detector 0.50, catalog trong DB, Reranker chỉ dùng bằng chứng khai báo). Baseline cổng kiểm chứng: `backend/data/baseline/report.json`.
+Đo bằng `python -m engine --mode validate` trên hai bộ ảnh rổ hàng chụp thật, cấu hình hiện tại (`backend/configs/config.yaml`), GPU RTX 3050 Ti Laptop 4 GB.
 
-| Giai đoạn | Metric | Giá trị |
+| Bộ test | Ảnh | Sản phẩm | SKU |
+| --- | --- | --- | --- |
+| Bộ chuẩn | 31 | 294 | 8 |
+| Bộ mở rộng (bao bì gần giống nhau: Cléo, Simple, Hatomugi, Nivea, Skin Aqua…) | 27 | 189 | 13 |
+
+| Giai đoạn | Metric | Bộ chuẩn | Bộ mở rộng |
+| --- | --- | --- | --- |
+| Detection (RF-DETR FT, class-agnostic) | Precision / Recall / F1 | 0,966 / 0,966 / 0,966 | 0,902 / 0,979 / 0,939 |
+| Detection | Mean IoU | 0,910 | 0,966 |
+| Visual Retrieval (SigLIP2) | Top-1 / Top-5 | 0,722 / 0,997 | 0,784 / 0,968 |
+| Evidence Fusion (OCR + màu) | Độ chính xác trước → sau | 0,699 → **0,962** | 0,753 → **0,895** |
+| **End-to-End** | **Precision / Recall / F1** | **0,948 / 0,929 / 0,938** | **0,876 / 0,894 / 0,885** |
+| Độ trễ | Giây / ảnh (cả rổ) | 8,5 | 7,1 |
+
+Gộp hai bộ: **F1 ≈ 0,92** trên 483 sản phẩm. Evidence fusion sửa đúng 95 ca mà retrieval xếp sai, chỉ làm sai 3 ca.
+
+**Tiến trình tối ưu** (cùng bộ ảnh, cùng phần cứng):
+
+| | Ban đầu | Hiện tại |
 | --- | --- | --- |
-| Detection (RF-DETR FT) | Precision / Recall / F1 (class-agnostic, IoU ≥ 0.3) | 0.952 / 0.956 / 0.954 |
-| Visual Retrieval (SigLIP2) | Top-1 / Top-5 | 0.721 / 0.996 |
-| Decision Engine | Pre-fusion accuracy | 0.700 |
-| Evidence Fusion | Accuracy delta | +0.231 |
-| Post-fusion | Accuracy | 0.931 |
-| Product Counting | Count accuracy | 0.548 |
-| End-to-End | Precision / Recall / F1 | 0.891 / 0.894 / 0.893 |
+| F1 bộ chuẩn | 0,893 | **0,938** |
+| F1 bộ mở rộng | 0,609 | **0,885** |
+| Thời gian mỗi ảnh | 23,2 s | **~7–9 s** |
+| Bộ nhớ GPU giữ chỗ | 7 GB | **1,5 GB** |
 
-Số cũ trong các phiên bản trước của tài liệu (F1 0.939, post-fusion 0.936, count accuracy 0.871, mAP@50 0.990) đo ở một trạng thái weights/dữ liệu/code cũ hơn và **không tái hiện được** trên dữ liệu hiện tại; mAP@50 không được `validate` tính lại.
+Các bước chính: chia sẻ bước phát hiện chữ giữa các hướng OCR, lọc khung trùng, chữ ký màu học từ gallery, tăng cường gallery bằng ảnh xoay, độ tin cậy OCR theo đoạn chứa từ khoá, gộp vật lồng nhau cùng SKU, bỏ đọc mã vạch khi catalog chưa có mã.
 
-**[Kế hoạch]** Sau khi mở rộng bộ dữ liệu ảnh bàn thu ngân (đa dạng hướng đặt, điều kiện ánh sáng), đo lại toàn bộ metric trên, kèm hai chỉ số mới: độ trễ end-to-end trên mỗi ảnh và tỷ lệ ca bị gắn cờ `ambiguous` cần thu ngân xác nhận.
+## 13. Hạn chế & hướng khắc phục
 
-## 13. Hạn chế kỹ thuật
-
-- Lỗi nhận diện fine-grained tập trung ở các biến thể gần như giống hệt nhau (ví dụ khác khối lượng tịnh); các ca này kích hoạt cờ `ambiguous`.
-- Retrieval hiện chưa xử lý tốt sản phẩm nằm ở hướng bất kỳ hoặc chỉ thấy mặt sau/mặt bên **[cần cải tiến]**.
-- Detector chưa được huấn luyện để bỏ qua tay, túi và hóa đơn **[cần cải tiến]**.
-- Chuẩn màu tham chiếu đang cấu hình thủ công.
-- OCR mới tối ưu cho chữ Latin và chữ số (`[en]`).
-- Chạy CPU độ trễ cao hơn GPU.
+- Biến thể bao bì gần như giống hệt nhau (khác màu nhạt, khác dòng chữ nhỏ) vẫn là ca khó nhất; hệ thống gắn cờ **"cần xác nhận"** cho các cặp này để thu ngân kiểm lại.
+- Hàng trong túi nylon trong suốt, hoặc bao bì dài bị vật khác che một phần, đôi khi bị tách hoặc gộp khung; sẽ cải thiện khi huấn luyện thêm detector với ảnh bàn thu ngân thực tế.
+- OCR tối ưu cho chữ Latin và chữ số (`[en]`).
+- Chạy CPU có độ trễ cao hơn GPU.
 
 ## 14. Lộ trình phát triển
 
-- Thu thập và gán nhãn thêm bộ ảnh bàn thu ngân đa dạng hướng đặt/điều kiện ánh sáng, fine-tune lại RF-DETR.
-- Gallery nhiều mặt (trước/sau/bên) và truy xuất bất biến hướng (augmentation xoay khi lập chỉ mục, hoặc truy vấn với nhiều bản xoay của crop).
+- Thu thập và gán nhãn thêm ảnh bàn thu ngân đa dạng hướng đặt và ánh sáng (đã có công cụ gán nhãn bán tự động), fine-tune lại RF-DETR.
+- Gallery nhiều mặt (trước/sau/bên) chụp thật cho mọi SKU.
 - Vùng quan tâm (ROI) và trừ nền cho camera cố định để loại nhiễu mặt bàn.
 - Lọc đối tượng không phải sản phẩm (tay, túi, hóa đơn).
-- Tự động trích xuất màu tham chiếu từ gallery bằng K-Means trong CIELAB.
-- Tinh chỉnh heuristic kích hoạt SAM2 cho sản phẩm xếp chồng.
 - Mở rộng OCR đa ngôn ngữ.
 
 ## 15. Trích dẫn

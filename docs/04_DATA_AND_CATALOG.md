@@ -37,6 +37,7 @@
 | `confusable_with` | `["8"]` — **hai chiều** | `Reranker` (guard cặp dễ nhầm) |
 | `ocr_keywords` | `["BE203","ABA"]` — chữ hoa, bỏ trùng, độ dài ≥ `plugins.ocr.min_text_length` | `Reranker` |
 | `color_code` | `"BE203"` → tra `color_reference` | `Reranker` |
+| `confirm_if_unsure` | `true` — chỉ có tác dụng khi SKU có `confusable_with` | `Reranker` ("cần xác nhận" khi SKU thắng không có bằng chứng phân định và SKU kia cũng là ứng viên; bật bằng `rerank.confusable_uncertain_without_evidence`) |
 | `disabled_plugins` | backlog | — |
 
 Barcode khớp chính xác `product.barcode`.
@@ -91,12 +92,16 @@ python -m engine.catalog.migrate --seed-dir data/metadata --legacy-config config
 ### 6.2 Thêm SKU mới
 1. Bỏ ảnh vào `data/gallery_inbox/<tên bất kỳ>/`. Ảnh còn lẫn lộn trong một thư mục thì phân loại bằng tay với `python scripts/sort_gallery_images.py --source <thư mục ảnh>`: cửa sổ hiện từng ảnh, chọn hoặc tạo thư mục, ảnh được sao chép vào `data/gallery_inbox/<thư mục>/0001.jpg, 0002.jpg, ...` (ảnh gốc giữ nguyên; `--dest data/gallery` để thêm ảnh cho SKU đã có; làm dở chạy lại sẽ tiếp tục).
 2. `python -m engine.catalog.sync_gallery --db data/db/app.db --gallery-dir data/gallery --inbox-dir data/gallery_inbox` (Postgres: `--db-url ...` thay cho `--db`) → cấp ID từ `next_product_id`, chuyển thành `data/gallery/<ID 4 chữ số>/`, tạo SKU `needs_naming=true` (DB ghi trước, rồi mới chuyển thư mục).
-3. Chạy build (`python -m engine --mode validate` hoặc `infer`): `BuildPipeline` đồng bộ gallery vào catalog rồi build lại FAISS **chỉ khi fingerprint đổi**.
+3. Chạy build (`python -m engine --mode validate` hoặc `infer`) với `retrieval.build_gallery_index: true`: `BuildPipeline` đồng bộ gallery vào catalog rồi build lại FAISS **chỉ khi fingerprint đổi** (gồm cả cấu hình `retrieval.augment`).
+4. Lập lại chữ ký màu: `python scripts/build_color_signatures.py`.
+5. Validate lại cả hai bộ benchmark: ngưỡng `retrieval.augment.max_images` phụ thuộc số ảnh của từng SKU.
+
+Quên bước 3: server (`Retriever`) so fingerprint đã lưu với gallery, catalog và cấu hình hiện tại, lệch thì **dừng kèm hướng dẫn lập lại**, không chạy âm thầm với chỉ mục cũ.
 
 Thư mục xuất hiện thẳng trong `data/gallery/` mà chưa có SKU cũng được tạo SKU (giữ tên thư mục). Thư mục biến mất → cảnh báo, không xoá SKU. ID đã cấp không bao giờ cấp lại.
 
 ### 6.3 Fingerprint gallery (`engine/retrieval/fingerprint.py`)
-Hash nội dung từng ảnh + ánh xạ thư mục→ID + backend/model/weights + `embedding_dim`. Lưu cạnh index; `retrieval.build_gallery_index: true` chỉ build khi fingerprint khác hoặc thiếu index.
+Hash nội dung từng ảnh + ánh xạ thư mục→ID + backend/model/weights + `embedding_dim` + `retrieval.augment` (khi bật). Lưu cạnh index; `retrieval.build_gallery_index: true` chỉ build khi fingerprint khác hoặc thiếu index. `Retriever` kiểm lại fingerprint mỗi lần khởi tạo.
 
 ### 6.4 Snapshot cho Colab
 `python scripts/export_catalog_snapshot.py --db data/db/app.db --out data/metadata/catalog_snapshot.json` (đọc lại và so `version` trước khi báo thành công; script này đọc file SQLite), rồi đặt `catalog.source: snapshot` + `catalog.snapshot_path`.
@@ -109,6 +114,12 @@ Pipeline đề xuất khung + sản phẩm, người duyệt sửa chỗ sai; k�
 1. `python scripts/label_benchmark.py propose --images data/benchmark_inbox --out data/benchmark_new` — cần GPU; tắt web nhận diện thật trước (4 GB không chứa được hai pipeline). Chạy lại không ghi đè ảnh đã sửa hoặc đã duyệt.
 2. `python scripts/label_benchmark.py review --dir data/benchmark_new` — cửa sổ duyệt: chạm khung để chọn, gõ tìm sản phẩm + Enter để gán, kéo để vẽ khung mới, Delete xoá, `A` duyệt ảnh và sang ảnh sau. Khung đỏ (chưa có sản phẩm) phải gán hoặc xoá mới duyệt được.
 3. `python -m engine --mode validate --benchmark-dir data/benchmark_new` — đo trên bộ mới. `_annotations.coco.json` chỉ chứa ảnh đã duyệt; `category_id` = `product_id`.
+
+### 6.7 Tách một SKU gộp nhầm (`scripts/split_sku.py`)
+`python scripts/split_sku.py --product <id>`: cửa sổ chọn ảnh thuộc sản phẩm cần tách; cấp mã mới ở cả catalog SQLite lẫn Postgres, chuyển ảnh sang thư mục mới. Sau đó lập lại chỉ mục và chữ ký màu như mục 6.2.
+
+### 6.8 Chọn ảnh demo theo kết quả (`scripts/sort_demo_images.py`)
+`python scripts/sort_demo_images.py --run <kết quả validate> <thư mục benchmark> [--run ...] --out data/demo_sets`: chia ảnh thành `1_dung_het` (theo thời gian chạy), `2_nhan_dien_sai` (theo số vật sai), `3_crop_sai` (theo tổng lỗi), kèm `danh_sach.csv`.
 
 ## 7. Quy ước đặt tên thư mục gallery
 SKU mới: thư mục = ID đệm 4 chữ số (`0029`) — ASCII, ổn định khi đổi tên hiển thị, khớp `category_id`. 22 thư mục cũ giữ tên hiện tại (đổi tên cần script có log + build lại FAISS; chưa làm).

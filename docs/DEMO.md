@@ -9,19 +9,21 @@
 - [ ] `make lint`, `make type-check`, `make test`, `make test-web` đều đạt.
 - [ ] Nếu đã đổi `backend/engine/` hoặc dữ liệu: chạy cổng kiểm định của pipeline (`03_DEVELOPMENT_RULES.md` mục 19.8) và phải `ĐẠT`.
 - [ ] `make docker-up` rồi `make check-env`: **không còn dòng FAIL**; đọc kỹ các dòng WARN.
-- [ ] Chọn chế độ nhận diện cho buổi demo (`WEB.md` mục 3) và chạy thử đúng chế độ đó. Pipeline thật trong Docker (`make docker-up-gpu`) *chưa được chạy thử*: thử trước, không để tới ngày demo.
+- [ ] Chọn chế độ nhận diện cho buổi demo (`WEB.md` mục 3) và chạy thử đúng chế độ đó. Nhận diện thật: nhấp đúp `scripts\run_real.bat` (GPU của laptop, ~7–9 giây/ảnh).
+- [ ] Hiệu năng máy: **cắm sạc**, Armoury Crate / chế độ điện **Turbo** hoặc **Performance** (chạy pin ở chế độ Silent chậm khoảng gấp đôi). Kiểm `nvidia-smi -q -d PERFORMANCE`: dòng `SW Thermal Slowdown` phải là `Not Active`.
 
 **Dữ liệu**
 - [ ] Đăng nhập admin → **Sản phẩm** → lọc thiếu giá: nhập giá cho mọi SKU sẽ bán. Nhập **barcode** cho các SKU cần quét.
 - [ ] Thêm SKU mới (dữ liệu thật): quy trình ở [`04_DATA_AND_CATALOG.md`](04_DATA_AND_CATALOG.md) mục 6.2, rồi lập lại index và so cổng kiểm định. Đặt tên và khai báo bằng chứng ở Admin → Sản phẩm.
 - [ ] Dựng database demo sạch: huỷ hoặc thanh toán hết đơn thử, rồi `make db-save NAME=demo_clean`. Kiểm có file `backups/demo_clean.dump`.
-- [ ] Thử `make db-restore NAME=demo_clean` **một lần trước ngày demo** (lệnh này chưa từng được chạy thử): `docker compose stop api` → `make db-restore NAME=demo_clean` → `docker compose start api` → đăng nhập lại, kiểm dữ liệu.
+- [ ] Thử `make db-restore NAME=demo_clean` **một lần trước ngày demo**: `docker compose stop api` → `make db-restore NAME=demo_clean` → `docker compose start api` → đăng nhập lại, kiểm dữ liệu.
 - [ ] Tài khoản: thu ngân chỉ đăng nhập trên điện thoại, admin trên laptop (đăng nhập cùng tài khoản ở máy thứ hai sẽ đá máy thứ nhất ra). Mật khẩu không nằm trong repo hay tài liệu; quên thì `make reset-password USER_NAME=<tên>`.
 
 **Thiết bị và mạng**
 - [ ] Thử **Android và iOS**: cấp quyền camera; iOS cần chạm nút bật cảm biến nghiêng.
-- [ ] Thử tunnel qua **4G điện thoại thật** ít nhất một lần *(CHƯA LÀM với bản này)*: VS Code → tab **Ports** → forward `5173` → Visibility **Public**. Nếu trang báo tên miền không được phép thì chạy `make docker-up-prod` thay cho `make docker-up`.
+- [ ] Thử tunnel qua **4G điện thoại thật** ít nhất một lần: VS Code → tab **Ports** → forward `5173` → Visibility **Public**. Nếu trang báo tên miền không được phép thì chạy `make docker-up-prod` thay cho `make docker-up`.
 - [ ] Thử thao tác thật trên điện thoại: chụp bằng camera, chọn ảnh lớn từ thư viện, tải lại trang khi đang có giỏ (đơn phải được khôi phục), quét mã vạch, in hoá đơn.
+- [ ] Ảnh trình diễn: `backend/data/demo_sets/` đã chia sẵn bằng `scripts/sort_demo_images.py` — `1_dung_het` (nhận đúng toàn bộ, xếp theo thời gian chạy) cho phần trình diễn chính; `2_nhan_dien_sai` để minh hoạ cơ chế **"cần xác nhận"** (ví dụ ảnh `0001.jpg`: các món Cléo/Simple hiện viền vàng).
 - [ ] Quay **video** chạy trơn tru làm phương án lùi cuối.
 
 ## B. Ngay trước giờ demo (thứ tự cố định)
@@ -41,7 +43,7 @@
 | Tình huống | Làm gì |
 |---|---|
 | Báo còn vật chưa nhận diện, hoặc thiếu sản phẩm | **Thêm món**: tìm theo tên (không cần dấu) hoặc nhập/quét mã vạch; hoặc **Chụp thêm** gần hơn, tách các món ra |
-| Nhận sai sản phẩm | Chạm dòng viền vàng → chọn đúng sản phẩm; hoặc chạm dòng thường để sửa số lượng / xoá |
+| Nhận sai sản phẩm | Chạm dòng viền vàng ("cần xác nhận") → xác nhận hoặc chọn đúng sản phẩm; hoặc chạm dòng thường để sửa số lượng / xoá |
 | Thiếu giá | Nhập giá tay ngay tại dòng; thanh toán bị chặn đến khi nhập đủ |
 | Cảnh báo chồng lấp | Dàn lại hàng, **Chụp thêm** (cộng dồn); hoặc bỏ qua |
 | Camera không mở (trang mở bằng `http://` hoặc chưa cấp quyền) | Chụp bằng ứng dụng camera của máy, hoặc chọn ảnh từ thư viện |
@@ -52,7 +54,7 @@
 | API không trả lời | `make logs S=api` xem lỗi; `docker compose restart api`; kiểm `/api/health` |
 | Server/mạng lỗi không sửa kịp | Chuyển sang **video** đã quay |
 
-> **Không có** phương án lùi "GPU từ xa". Nếu máy chủ chết hoặc mất mạng thì dùng video.
+> Phương án lùi cuối cùng khi máy chủ hoặc mạng gặp sự cố: chiếu **video** đã quay.
 
 ## D. Sau demo
 - [ ] Tắt tunnel (Ports → dừng chia sẻ cổng 5173). `make docker-down`.
