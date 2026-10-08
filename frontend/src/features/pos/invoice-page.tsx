@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { Camera, Plus } from 'lucide-react';
@@ -8,69 +8,17 @@ import { RoutePending } from '@/components/route-states';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { meQuery } from '@/features/auth/use-auth';
-import { getJob } from '@/features/pos/api';
 import { RecognitionPending } from '@/features/pos/capture-page';
 import { CaptureOverlay } from '@/features/pos/capture-overlay';
 import { timeOfDay } from '@/features/pos/lib';
 import { LineItem } from '@/features/pos/line-item';
 import { ProductPicker } from '@/features/pos/product-picker';
-import type { Job, OrderItem } from '@/features/pos/types';
+import type { OrderItem } from '@/features/pos/types';
 import { useBarcodeScanner } from '@/features/pos/use-barcode-scanner';
+import { useJob } from '@/features/pos/use-job';
 import { addByBarcode, errorText, orderQuery, useOrderActions } from '@/features/pos/use-order';
-import { errorMessage } from '@/lib/errors';
 import { formatVnd } from '@/lib/format';
 import { qk } from '@/lib/query-keys';
-
-/** A recognition that takes longer than this is given up (a pipeline reload does not count). */
-const JOB_TIMEOUT_MS = 120_000;
-const POLL_MS = 700;
-
-/** Follows a recognition job until it ends; its result is the order to show. */
-function useJob(jobId: number | undefined, orderId: number) {
-  const navigate = useNavigate();
-  const queryClient = useQueryClient();
-  const started = useRef(Date.now());
-  const [slow, setSlow] = useState(false);
-  const job = useQuery({
-    queryKey: qk.job(jobId ?? 0),
-    queryFn: () => getJob(jobId!),
-    enabled: jobId !== undefined,
-    refetchInterval: (query) => (query.state.data && ['done', 'error'].includes(query.state.data.status) ? false : POLL_MS),
-    staleTime: Infinity,
-  });
-  const data: Job | undefined = job.data;
-
-  useEffect(() => {
-    if (!data) return;
-    if (data.status === 'done' && data.order) {
-      queryClient.setQueryData(qk.order(orderId), data.order);
-      void queryClient.invalidateQueries({ queryKey: meQuery.queryKey }); // an admin may have changed the settings
-      if (!data.added) {
-        const unrecognised = data.warnings?.find((w) => w.type === 'unrecognized_objects');
-        toast(
-          unrecognised && unrecognised.type === 'unrecognized_objects'
-            ? `Phát hiện ${unrecognised.count} vật nhưng chưa nhận diện được — hãy chụp gần hơn hoặc thêm thủ công`
-            : 'Không thấy sản phẩm nào — hãy chụp lại hoặc thêm thủ công',
-        );
-      }
-      return;
-    }
-    if (data.status === 'error') {
-      toast.error(errorMessage(data.error?.code ?? 'PIPELINE_ERROR', data.error?.message));
-      void navigate({ to: '/pos/orders/$orderId', params: { orderId: String(orderId) }, search: {}, replace: true });
-      return;
-    }
-    if (data.system_reloading) started.current = Date.now();
-    const waited = Date.now() - started.current;
-    if (waited > 3000) setSlow(true);
-    if (waited > JOB_TIMEOUT_MS) {
-      toast.error('Quá thời gian chờ, hãy chụp lại');
-      void navigate({ to: '/pos/orders/$orderId/capture', params: { orderId: String(orderId) }, replace: true });
-    }
-  }, [data, orderId, navigate, queryClient]);
-
-  return { job: data, waiting: jobId !== undefined && (!data || !['done', 'error'].includes(data.status)), slow };
-}
 
 interface InvoicePageProps {
   orderId: number;

@@ -19,11 +19,13 @@ import { LoginPage } from '@/features/auth/login-page';
 import { meQuery } from '@/features/auth/use-auth';
 import { getOpenOrder } from '@/features/pos/api';
 import { CapturePage } from '@/features/pos/capture-page';
+import { DeskPage } from '@/features/pos/desk-page';
 import { DonePage } from '@/features/pos/done-page';
 import { HistoryPage } from '@/features/pos/history-page';
 import { InvoicePage } from '@/features/pos/invoice-page';
 import { OnboardingPage } from '@/features/pos/onboarding-page';
 import { PayPage } from '@/features/pos/pay-page';
+import { useWideScreen } from '@/features/pos/use-desk';
 import { ApiError } from '@/lib/api-client';
 import { getToken } from '@/lib/auth-token';
 import { qk } from '@/lib/query-keys';
@@ -80,7 +82,10 @@ const indexRoute = createRoute({
   },
 });
 
-/** `/pos`: a new basket. An open order with lines left from before (a reload, a new login) is resumed. */
+/**
+ * `/pos`: a new basket. An open order with lines left from before (a reload, a new login) is resumed.
+ * On a wide screen the POS routes show the counter screen (camera and basket together) instead.
+ */
 const posRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/pos',
@@ -94,7 +99,9 @@ const posRoute = createRoute({
       throw redirect({ to: '/pos/orders/$orderId', params: { orderId: String(open.id) }, search: { resumed: true } });
     }
   },
-  component: () => <CapturePage />,
+  component: function Pos() {
+    return useWideScreen() ? <DeskPage /> : <CapturePage />;
+  },
 });
 
 const onboardingRoute = createRoute({
@@ -114,7 +121,12 @@ const invoiceRoute = createRoute({
   }),
   component: function Invoice() {
     const { job, resumed } = invoiceRoute.useSearch();
-    return <InvoicePage orderId={orderId(invoiceRoute.useParams())} jobId={job} resumed={resumed} />;
+    const id = orderId(invoiceRoute.useParams());
+    return useWideScreen() ? (
+      <DeskPage orderId={id} jobId={job} resumed={resumed} />
+    ) : (
+      <InvoicePage orderId={id} jobId={job} resumed={resumed} />
+    );
   },
 });
 
@@ -122,7 +134,8 @@ const moreCaptureRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/pos/orders/$orderId/capture',
   component: function MoreCapture() {
-    return <CapturePage orderId={orderId(moreCaptureRoute.useParams())} />;
+    const id = orderId(moreCaptureRoute.useParams());
+    return useWideScreen() ? <DeskPage orderId={id} /> : <CapturePage orderId={id} />;
   },
 });
 
