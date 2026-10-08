@@ -227,7 +227,9 @@ plugins:
     kmeans_attempts: 3
 
   barcode:
-    enabled: true
+    # Đo 2026-10-08 (cấu hình 7fd61de): tắt -> F1 không đổi trên cả hai bộ (đọc được 3/77 lần, 28/33
+    # SKU chưa có mã vạch trong catalog), nhanh hơn 1,0–1,5 s/ảnh. Bật lại khi đã nhập mã vạch thật.
+    enabled: false
 
     # --- confidence computation ---
     quality_saturation: 30
