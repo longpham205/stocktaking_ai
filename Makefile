@@ -2,12 +2,12 @@
 # On Windows run it from Git Bash (the recipes are POSIX shell).
 .PHONY: help setup docker-up docker-up-gpu docker-up-prod docker-up-data docker-down logs \
         migrate migration dev-api test lint format type-check check-env clean reset-password \
-        reset-advanced-password smoke test-web seed-demo import-legacy db-save db-restore purge-media
+        reset-advanced-password smoke test-web seed-demo import-legacy db-save db-restore purge-media assets
 
 COMPOSE      := docker compose
 COMPOSE_GPU  := $(COMPOSE) -f docker-compose.yml -f docker-compose.gpu.yml
 COMPOSE_PROD := $(COMPOSE) -f docker-compose.yml -f docker-compose.prod.yml
-# linted and formatted: the web app. The engine predates the lint gate (60 findings on main).
+# linted and formatted: the web app. The engine and backend/scripts pass `ruff check` but are not ruff-formatted.
 LINT_PATHS   := app entrypoints migrations tests/api tests/test_import_boundary.py
 S            ?= api
 
@@ -117,6 +117,9 @@ db-restore: docker-up-data  ## REPLACE the database with backups/NAME.dump (stop
 
 purge-media:     ## delete capture photos older than DAYS (default 30): make purge-media DAYS=30 [DRY_RUN=1]
 	cd backend && uv run python -m entrypoints.purge_media --days $(or $(DAYS),30) $(if $(DRY_RUN),--dry-run,)
+
+assets:          ## download the released weights + data into backend/ and check their SHA-256: make assets [TAG=assets-v1]
+	cd backend && uv run python scripts/fetch_assets.py $(if $(TAG),--tag $(TAG),)
 
 clean:           ## remove caches (not data, not weights, not the database volume)
 	rm -rf backend/.pytest_cache backend/.mypy_cache backend/.ruff_cache frontend/dist
