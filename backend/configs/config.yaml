@@ -62,13 +62,16 @@ detection:
     # Hai khung có IoU >= ngưỡng là cùng một vật: bỏ khung tin cậy thấp hơn. Đo 2026-10-06 trên
     # val: bỏ 4 khung, không vật nào mất khung, precision 0,898 -> 0,910.
     duplicate_iou: 0.6
-    # Bỏ khung chứa >= N khung khác (khung quanh cả túi/cụm hàng). 0 = tắt. ĐANG TẮT: trên val nó
-    # bỏ 2 khung cụm nhưng cũng bỏ khung của một sản phẩm thật bị hai vật khác đè lên.
-    container_min_boxes: 0
+    # Bỏ khung chứa >= N khung khác (khung quanh cả túi/cụm hàng). 0 = tắt. N = 2 (06/10) bỏ cả
+    # khung một sản phẩm thật bị hai vật khác đè lên. Đo 2026-10-07: N = 3 -> val FP 23 -> 21, không
+    # mất vật nào; bộ mới không đổi. N = 4 kém hơn.
+    container_min_boxes: 3
     containment_ratio: 0.8
     # Sau nhận diện: hai vật CÙNG SKU lồng nhau (khung nhỏ nằm >= tỉ lệ này trong khung lớn: tuýp trên
     # vỉ giấy, khung túi quanh sản phẩm) thì bỏ vật có độ tin cậy detect thấp hơn. 0 = tắt.
-    nested_same_product_ratio: 0.0
+    # Đo 2026-10-07: 0,6 -> bộ mới F1 0,8579 -> 0,8848 (Nivea 33 tách hai nửa không còn đếm đôi),
+    # val 0,9320 -> 0,9382 (mất 1 vật thật); 0,8 không bắt được Nivea; 0,5 mất thêm vật thật.
+    nested_same_product_ratio: 0.6
   rf_detr:
     variant: "base" # nano | small | medium | base | large
     weights_path: "weights/detector/checkpoint_best_ema.pth"
@@ -126,10 +129,13 @@ retrieval:
     model_name: "google/siglip2-base-patch16-224"
     weights_path: "weights/retriever/siglip2"
     device: "cuda"
+  # Đo 2026-10-07: xoay đủ góc cho SKU <= 9 ảnh -> bộ mới F1 0,7259 -> 0,8477, val không đổi.
+  # Xoay mọi SKU làm val tụt (0,8795); 7 ảnh: 0,7970, 12 ảnh: 0,8376 -> mốc 9 nhạy: thêm/bớt ảnh
+  # gallery hay thêm SKU thì validate lại. Bật/đổi ở đây phải lập lại index (cờ build_gallery_index).
   augment: # cân bằng index gallery lúc lập index (tắt = như cũ)
-    enabled: false
+    enabled: true
     rotations: [90, 180, 270]
-    max_images: 0 # chỉ xoay SKU có <= N ảnh gốc; 0 = mọi SKU
+    max_images: 9 # chỉ xoay SKU có <= N ảnh gốc; 0 = mọi SKU
     max_vectors: 0 # trần số vector mỗi SKU, bỏ vector gần trùng; 0 = không trần
 
 # --- Decision Engine ---
@@ -321,11 +327,13 @@ rerank:
     min_text_length: 2
     fuzzy_threshold: 0.80
     # Khớp đúng từ khoá: độ tin cậy = đoạn chữ chứa từ khoá, không thấp hơn sàn này (0 = tắt).
-    keyword_confidence_floor: 0.0
+    # Đo 2026-10-07: 0,5 -> val sửa đúng thêm 2 vật (khớp mô phỏng cặp 7/8), không làm sai vật nào.
+    keyword_confidence_floor: 0.5
 
   color:
     enabled: true
-    weight: 0.20
+    # Đo 2026-10-07: 0,35 (từ 0,20) -> bộ mới +2 vật (Cléo 31/32 hồng/tím sát nhau), val không đổi.
+    weight: 0.35
     delta_e_strong: 6.0
     delta_e_weak: 20.0
     min_margin: 1.0
