@@ -2,6 +2,8 @@
 
 Ba dịch vụ chạy bằng Docker: `postgres`, `api` (FastAPI + bộ nhận diện) và `web` (giao diện React). Mọi lệnh là target của `Makefile` ở gốc repo. Kiến trúc: [`system-architecture.md`](system-architecture.md). Ngày demo: [`DEMO.md`](DEMO.md).
 
+> **Máy mới, chỉ muốn chạy:** nhấp đúp `setup.bat` ở gốc repo (= `scripts/setup.sh`): nó làm thay mục 1–2 (kể cả catalog thật và hai tài khoản `admin`, `staff`), rồi chạy `scripts\run_real.bat` (có GPU NVIDIA) hoặc `scripts\run_docker.bat` (không GPU). Xem README mục 7. Các mục dưới đây là cách làm từng bước bằng `make`.
+
 ## 1. Cần có
 
 - Docker Desktop (có `docker compose`), [`uv`](https://docs.astral.sh/uv/), `make`, `openssl`. Trên Windows chạy `make` trong **Git Bash** (công thức là shell POSIX).

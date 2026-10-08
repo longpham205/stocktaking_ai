@@ -178,7 +178,9 @@ stocktaking_ai/
 
 ## 6. Yêu cầu hệ thống
 
-- **Chạy web POS:** Docker Desktop (có `docker compose`), [`uv`](https://docs.astral.sh/uv/), `make`, `openssl`. Windows: chạy `make` trong Git Bash. `pnpm` chỉ cần cho test / kiểm kiểu frontend trên máy.
+- **Cài nhanh (`setup.bat`):** [Git for Windows](https://git-scm.com/download/win) và [Docker Desktop](https://www.docker.com/products/docker-desktop/) (đã mở lên một lần). Script tự cài [`uv`](https://docs.astral.sh/uv/) (Python) và Node.js nếu máy chưa có. Lần đầu tải khoảng 6 GB (torch CUDA ~2,6 GB, weights + dữ liệu ~2,7 GB), cần khoảng 15 GB đĩa trống.
+- **Nhận diện thật:** GPU NVIDIA, driver 570 trở lên (torch CUDA 12.8 trên Windows). Chạy GPU trong Docker (`run_docker.bat gpu`): Docker Desktop dùng WSL2, driver hỗ trợ CUDA 13 (580 trở lên).
+- **Phát triển:** thêm `make` và `pnpm` cho các cổng kiểm (`make lint`, `make test`, `make test-web`); trên Windows chạy `make` trong Git Bash.
 - **Python:** `>= 3.11, < 3.13` (uv tự cài; giới hạn trên do torch, sam2, faiss-cpu).
 - **Thư viện:** khai báo trong `backend/pyproject.toml`. Bản nhẹ (`uv sync`) đủ cho API, test và pipeline với backend mock; bản đầy đủ (`uv sync --extra ml`) thêm `torch`, `rfdetr`, `sam2`, `transformers`, `easyocr`.
 - **Hệ thống:** `pyzbar` cần thư viện zbar (`apt install libzbar0`, `brew install zbar`); image Docker đã có sẵn.
@@ -186,14 +188,40 @@ stocktaking_ai/
 
 ## 7. Cài đặt & thiết lập môi trường
 
-### Web POS (khuyến nghị)
+### Cài nhanh: tải về là chạy (khuyến nghị)
 
 ```bash
 git clone https://github.com/longpham205/stocktaking_ai
 cd stocktaking_ai
+setup.bat                 # Windows: nhấp đúp. Linux/macOS: ./scripts/setup.sh
+```
 
+`setup.bat` (= `scripts/setup.sh`) làm một lần, chạy lại an toàn (bước nào đã xong thì bỏ qua, database đã có không bị thay):
+
+1. kiểm Docker (tự mở Docker Desktop nếu đang tắt), cài `uv` và Node.js nếu thiếu;
+2. tạo `.env` với bí mật ngẫu nhiên;
+3. môi trường Python `backend/.venv`: có GPU NVIDIA thì bản đầy đủ với torch CUDA, không có thì bản nhẹ (`setup.bat --cpu` để ép bản nhẹ);
+4. gói frontend;
+5. weights + dữ liệu từ GitHub Release (không GPU: chỉ dữ liệu);
+6. Postgres trong Docker (cổng 5437), nạp catalog phát hành khi database còn trống, migration;
+7. tạo tài khoản `admin` và `staff` khi chưa có tài khoản nào — **mật khẩu in ra một lần, hãy ghi lại**;
+8. tải `cloudflared` cho chế độ tunnel (Windows).
+
+Sau đó:
+
+| Máy | Chạy | Ghi chú |
+| --- | --- | --- |
+| Có GPU NVIDIA | `scripts\run_real.bat` | nhận diện thật trên GPU; điện thoại chung Wi-Fi: `run_real_phone.bat`; điện thoại mạng bất kỳ: `run_real_tunnel.bat` |
+| Không có GPU | `scripts\run_docker.bat` | toàn bộ trong Docker, bộ nhận diện giả (chọn sản phẩm từ catalog thật) |
+| Có GPU, chỉ muốn Docker | `scripts\run_docker.bat gpu` | image ~10 GB build lần đầu |
+
+Mở `http://localhost:5173`, đăng nhập `admin` hoặc `staff`. Quên mật khẩu: `cd backend && uv run python -m entrypoints.reset_password <tên>`. Chi tiết chế độ chạy, tài khoản, điện thoại: [`docs/WEB.md`](docs/WEB.md).
+
+### Cài thủ công (người phát triển)
+
+```bash
 make setup        # tạo .env, sinh bí mật, kiểm docker + uv
-make docker-up    # postgres, migration, api, web -> http://localhost:5173
+make docker-up    # postgres, migration, api, web -> http://localhost:5173 (bộ nhận diện giả)
 make seed-demo    # catalog demo + giá demo (cần backend/data_demo/, xem docs/WEB.md mục 3)
 make reset-password USER_NAME=admin ROLE=admin   # tạo tài khoản đầu tiên, mật khẩu in ra một lần
 ```

@@ -35,6 +35,10 @@ if [ -z "$CPU_ONLY" ] && command -v nvidia-smi > /dev/null 2>&1 && nvidia-smi -L
 fi
 
 step "1/8 tools"
+if [ -n "$WINDOWS" ] && [ "${#ROOT}" -gt 80 ]; then
+  # node_modules nests deep: past Windows' 260-character path limit the frontend install fails
+  fail "the folder path is too long for Windows ($ROOT): clone the repo to a short path such as C:\\stocktaking_ai and run setup.bat there"
+fi
 command -v docker > /dev/null 2>&1 \
   || fail "Docker is not installed: install Docker Desktop (https://www.docker.com/products/docker-desktop/), start it once, then run this again"
 if ! docker info > /dev/null 2>&1; then
