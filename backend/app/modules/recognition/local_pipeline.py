@@ -36,10 +36,24 @@ class LocalRecognizer:
         self._overrides = dict(overrides or {})
         # the engine loads its weights here, once; a failure stops the process at startup
         self._runner = self._build(self._overrides)
+        self._warm_up()
 
     def _build(self, overrides: dict[str, Any]) -> InferenceRunner:
         # the catalog is the web's database, whatever catalog source the YAML names for the CLI
         return InferenceRunner(build_config(self._config_path, overrides, catalog_db_url=self._catalog_db_url))
+
+    def _warm_up(self) -> None:
+        """Run one gallery photo through the pipeline so the first cashier photo is not the slow one
+        (CUDA kernels, OCR and SAM2 initialise on first use). Its result is discarded."""
+        config = build_config(self._config_path, self._overrides, catalog_db_url=self._catalog_db_url)
+        gallery = config.resolve_path(config.paths.gallery_dir)
+        photo = next((p for p in sorted(gallery.rglob("*")) if p.suffix.lower() in {".jpg", ".jpeg", ".png"}), None)
+        if photo is None:
+            logger.warning("no gallery photo under %s: pipeline not warmed up", gallery)
+            return
+        started = time.perf_counter()
+        self._runner.run_single(str(photo), persist=False)
+        logger.info("pipeline warmed up on %s in %.1f s", photo.name, time.perf_counter() - started)
 
     def recognize(
         self, image_path: str, similarity_threshold: float | None = None, min_confidence_accept: float | None = None
