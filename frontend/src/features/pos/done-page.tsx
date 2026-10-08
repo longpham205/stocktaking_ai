@@ -6,6 +6,7 @@ import { RoutePending } from '@/components/route-states';
 import { Button } from '@/components/ui/button';
 import { useMe } from '@/features/auth/use-auth';
 import type { Order } from '@/features/pos/types';
+import { useShortcuts } from '@/features/pos/use-desk';
 import { orderQuery } from '@/features/pos/use-order';
 import { formatVnd } from '@/lib/format';
 
@@ -47,6 +48,8 @@ export function DonePage({ orderId, fresh }: { orderId: number; fresh?: boolean 
   const order = useQuery(orderQuery(orderId)).data;
   const autoPrint = useMe().data?.settings.auto_print_receipt;
   const printed = useRef(false);
+  const next = () => void navigate({ to: '/pos' });
+  useShortcuts({ Enter: next });
 
   useEffect(() => {
     // printed once, right after the payment, when the shop asked for it (not on a later visit)
@@ -76,7 +79,7 @@ export function DonePage({ orderId, fresh }: { orderId: number; fresh?: boolean 
           <Printer className="h-4 w-4" />
           In hoá đơn
         </Button>
-        <Button className="flex-1" onClick={() => void navigate({ to: '/pos' })}>
+        <Button className="flex-1" onClick={next}>
           Đơn mới
         </Button>
       </div>
