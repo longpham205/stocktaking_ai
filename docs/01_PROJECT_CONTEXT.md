@@ -22,7 +22,7 @@ bottleneck.
 
 The complete inventory process consists of:
 
-- Product Detection (class-agnostic)
+- Product Detection (class-agnostic, followed by redundant-box suppression)
 - Overlap Analysis
 - Segmentation Refinement (optional, geometry-triggered)
 - Product Cropping (dual-resolution)
@@ -46,8 +46,9 @@ The complete inventory process consists of:
   production pipeline* — never a simplified parallel evaluation path —
   at the granularity of each individual stage, so regressions can be
   attributed to a specific stage rather than only observed end-to-end.
-- Provide a web POS (cashier and admin screens) for demonstration and interactive validation; the original Tkinter desktop UI was removed (last present in git commit `f30710d`)
-  review.
+- Provide a web POS (cashier and admin screens) for demonstration and
+  interactive review; the original Tkinter desktop UI was removed (last
+  present in git commit `f30710d`).
 
 ---
 
@@ -65,7 +66,10 @@ the pipeline orchestrator.
 ## 3.2 Single Responsibility, Strictly Enforced Across Stages
 
 - **Detector**: locates products. Never classifies, never touches pixels
-  beyond its own bounding-box output.
+  beyond its own bounding-box output. Its only filtering is geometric
+  removal of redundant boxes (duplicates, boxes around a whole group —
+  `engine/detection/postprocess.py`), since RF-DETR has no suppression
+  step of its own.
 - **OverlapResolver**: flags geometrically suspicious detection groups.
   Never removes or mutates a detection (this is explicitly *not* NMS).
 - **Refiner**: tightens a bounding box via segmentation, only for
@@ -168,7 +172,7 @@ stocktaking_ai/
 │   │   ├── outputs/             # Exported results (JSON, CSV, annotated visuals)
 │   │   └── cache/               # Serialized FAISS vector index & metadata cache
 │   ├── debug/                   # Standalone diagnostic and verification scripts
-│   ├── notebooks/               # Analytical and pipeline evaluation Jupyter notebooks
+│   ├── notebooks/               # 02_detection_analysis, 03_overlap_segmentation, 04_retrieval_analysis, pipeline_visual
 │   ├── scripts/                 # Manifest, gates (compare_validate, compare_golden), set_device
 │   ├── weights/                 # Model checkpoints (RF-DETR, SAM2, SigLIP2)
 │   └── tests/                   # Engine tests + tests/api/ (web API)
@@ -215,26 +219,30 @@ Detection      OverlapResolver ──► Refiner (optional)  Retrieval
 
 ## **Implemented**
 
-* Full 8-stage runtime pipeline (Detection through Reranker/Fusion), with run\_with\_trace() for full-fidelity validation.  
+* Full 8-stage runtime pipeline (Detection through Reranker/Fusion), with `run_with_trace()` for full-fidelity validation.  
 * Pluggable backends for Detection, Retrieval, and Refinement.  
-* Fully functional 9-stage adaptive Barcode plugin integrated with catalog GTIN/Barcode metadata for multi-evidence fusion.  
+* Detection post-processing (`detection.suppression`, `engine/detection/postprocess.py`): duplicate boxes (IoU ≥ `duplicate_iou` 0.6) and container boxes (enclosing ≥ `container_min_boxes` 3 others at `containment_ratio` 0.8) are dropped after detection; after recognition, two nested boxes of the same SKU (`nested_same_product_ratio` 0.6) keep only the more confident one. Detection `confidence_threshold` is 0.40.  
+* Balanced gallery index (`retrieval.augment`): SKUs with ≤ 9 gallery photos also get rotated copies (90/180/270°) in the FAISS index.  
+* OCR: text detection on a canvas capped at 1600 px (`detect_canvas_size`) and shared between orientations (`shared_detection`); an exact keyword match gets at least `rerank.ocr.keyword_confidence_floor` 0.5 confidence.  
+* Colour evidence by gallery colour signatures (`plugins.color.mode: "signature"`, default): (a\*, b\*) histograms learned from the gallery photos by `scripts/build_color_signatures.py` → `data/cache/color_signatures.npz`, no hand-typed reference colours (val F1 0.9066 → 0.9202, measured 2026-10-06). The older ROI + CIEDE2000 mode (`"roi"`) is kept. `rerank.color.weight` is 0.35.  
+* 9-stage adaptive Barcode plugin matched against catalog `product.barcode` (implemented, disabled by default — see below).  
 * Dual-resolution cropping.  
 * Three-reason plugin trigger policy (uncertain / ambiguous / force).  
-* Evidence-driven Reranker with retrieval-consensus protection and a confusable-pair guard.
+* Evidence-driven Reranker with retrieval-consensus protection and a confusable-pair guard; SKUs flagged `confirm_if_unsure` in the catalog are marked "cần xác nhận" (uncertain, cashier picks) when the winner has no OCR/colour/barcode evidence and its confusable partner is also a candidate (`rerank.confusable_uncertain_without_evidence: true`).  
+* Current results (`configs/config.yaml`): end-to-end F1 0.938 on the benchmark set (31 images, 8 SKUs) and 0.885 on the new set (27 images, 13 SKUs), ≈ 0.92 over 483 products combined; ~7–9 s/image on an RTX 3050 Ti 4 GB laptop GPU.
 
 ## **Known-incomplete / actively being tuned**
 
-* Barcode plugin: currently disabled in config (`plugins.barcode.enabled: false`) pending comprehensive re-validation and catalog metadata integration.  
-* Only 5 of 22 real SKUs have a barcode in the catalog (`product.barcode`).  
-* Colour references (`color_reference` table) are seeded by hand; BR641 and OR210 still have none.  
+* Barcode plugin: disabled in config (`plugins.barcode.enabled: false`) since 2026-10-08 — turning it off left F1 unchanged on both test sets (a barcode was read 3 times out of 77) and saves 1.0–1.5 s/image. Re-enable once real barcodes are entered in the catalog.  
+* Only 5 of the 33 active SKUs have a barcode in the catalog (`product.barcode`).  
+* Colour references (`color_reference` table) used by the `"roi"` colour mode are seeded by hand; BR641 and OR210 still have none (the default `"signature"` mode does not use them).  
 * SAM2 segmentation refinement provides only marginal net benefit and degrades roughly as many boxes as it improves.  
-* Fine-grained identification errors (\~6%) remain concentrated among near-identical packaging variants differing solely by minor text descriptors (e.g., net weight).
+* Remaining identification errors are concentrated among near-identical packaging variants differing solely by minor text descriptors (e.g., net weight); the 27-image new set was used for tuning, so its 0.885 is somewhat optimistic.
 
 ## **Explicitly excluded (deferred)**
 
 * Detector/Retriever/Plugin dependency-injection frameworks or registries beyond the existing lightweight dispatcher pattern.  
 * Distributed / real-time camera inference.  
-* Automatic color-reference generation from gallery photos (proposed, not implemented).  
 * Hungarian (optimal) matching in VAL — greedy IoU matching is used throughout by deliberate choice for v0.1.0 simplicity.
 
 # **7\. Project Vision**

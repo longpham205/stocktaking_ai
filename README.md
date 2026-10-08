@@ -1,6 +1,6 @@
 # Stocktaking AI — Nhận diện & đếm sản phẩm tại quầy thanh toán
 
-> Hệ thống AI nhận diện và đếm từng sản phẩm đặt trên **bàn thu ngân** từ một ảnh chụp duy nhất — kết hợp truy xuất hình ảnh với bằng chứng từ OCR, màu sắc và mã vạch để phân biệt các biến thể sản phẩm có bao bì gần như giống hệt nhau.
+> Hệ thống AI nhận diện và đếm từng sản phẩm đặt trên **bàn thu ngân** từ một ảnh chụp duy nhất — kết hợp truy xuất hình ảnh với bằng chứng từ OCR và màu sắc (mã vạch có sẵn, đang tắt) để phân biệt các biến thể sản phẩm có bao bì gần như giống hệt nhau.
 
 > **Kiến trúc:** `backend/` (FastAPI + Postgres + engine nhận diện ở `backend/engine/`) và `frontend/` (Vite + React), chạy bằng `make` và Docker Compose. Web POS thế hệ đầu (stdlib `http.server` + SQLite) không còn trong cây thư mục; xem lại ở commit `f30710d` (`git worktree add ../stocktaking-legacy f30710d`).
 
@@ -34,7 +34,7 @@
 1. **Định vị không phụ thuộc lớp (Object Detection):** xác định bounding box của mọi vật thể trên bàn, không phụ thuộc class.
 2. **Tinh chỉnh biên & phân tích chồng lấp:** phát hiện các vật bị che khuất hoặc xếp chồng và tinh chỉnh ranh giới từng instance bằng SAM2.
 3. **Biểu diễn hình ảnh & truy xuất:** ánh xạ crop vào không gian vector bằng SigLIP2 và truy xuất Top-K ứng viên bằng chỉ mục FAISS.
-4. **Hợp nhất bằng chứng đa phương thức & reranking:** kết hợp token OCR, màu trong không gian Lab (CIEDE2000) và mã vạch để phân biệt các biến thể có hình thức gần giống nhau (khác màu, khối lượng tịnh, hoặc một phần nội dung chữ).
+4. **Hợp nhất bằng chứng đa phương thức & reranking:** kết hợp token OCR và chữ ký màu học từ ảnh gallery (chế độ cũ Lab/CIEDE2000 vẫn giữ; plugin mã vạch có sẵn nhưng đang tắt) để phân biệt các biến thể có hình thức gần giống nhau (khác màu, khối lượng tịnh, hoặc một phần nội dung chữ).
 5. **Audit trail & tổng hợp kết quả:** xuất danh sách sản phẩm, số lượng theo SKU và toàn bộ nhật ký quyết định phục vụ kiểm tra lại.
 
 Hệ thống giữ kiến trúc tách biệt giữa **Localization** (phát hiện/phân đoạn) và **Identification** (truy xuất/hợp nhất bằng chứng), cho phép tối ưu độc lập từng thành phần, thay thế backend linh hoạt và cô lập lỗi ở từng giai đoạn.
@@ -47,7 +47,7 @@ Hệ thống giữ kiến trúc tách biệt giữa **Localization** (phát hi�
 - **Thêm sản phẩm không cần huấn luyện lại:** 33 SKU hiện tại; thêm SKU chỉ cần chụp ảnh gallery và lập lại chỉ mục.
 - **Phân biệt biến thể gần giống nhau** bằng cách kết hợp hình ảnh, chữ trên bao bì (OCR) và chữ ký màu học từ ảnh gallery.
 - **Biết lúc mình không chắc:** với các cặp sản phẩm dễ nhầm, hệ thống tự gắn cờ **"cần xác nhận"** để thu ngân kiểm lại thay vì tính tiền sai (trên bộ test: 7 lần hỏi thì 5 lần đúng là ca cần sửa).
-- **Sẵn sàng vận hành:** web POS chạy trên điện thoại, tự kiểm tính nhất quán của chỉ mục khi khởi động, nạp sẵn model để lần chụp đầu tiên không bị chậm.
+- **Sẵn sàng vận hành:** web POS chạy trên điện thoại, và có màn quầy trên máy tính (camera trực tiếp, phím tắt); tự kiểm tính nhất quán của chỉ mục khi khởi động, nạp sẵn model để lần chụp đầu tiên không bị chậm.
 
 ## 2. Đặc thù của bối cảnh bàn thu ngân
 
@@ -102,7 +102,7 @@ Input Image (bàn thu ngân)
     │
     ▼
 ⑦ SECONDARY EVIDENCE
-    Plugin Manager (OCR / Color / Barcode)
+    Plugin Manager (OCR / Color / Barcode — Barcode đang tắt)
     │
     ▼
 ⑧ RERANKING & FUSION
@@ -133,7 +133,7 @@ Hai phương thức thực thi:
   - `ambiguous`: chênh lệch cosine giữa các ứng viên Top-N rất nhỏ.
   - `force`: quy tắc miền cho nhóm sản phẩm cần xác minh đa phương thức.
 - **Reranking đa bằng chứng:**
-  - *Barcode:* giải mã thích ứng 9 giai đoạn cho crop độ phân giải thấp, biến dạng hoặc xoay.
+  - *Barcode:* giải mã thích ứng 9 giai đoạn cho crop độ phân giải thấp, biến dạng hoặc xoay. Có sẵn nhưng **đang tắt** (`plugins.barcode.enabled: false`): 28/33 SKU chưa có mã vạch trong catalog, tắt đi F1 không đổi và nhanh hơn 1–1,5 giây/ảnh; bật lại khi đã nhập mã vạch thật.
   - *OCR:* quét đa hướng (0°, 90°, 180°, 270°), CLAHE, đối chiếu từ khoá khai báo trong catalog; độ tin cậy lấy theo đoạn chữ chứa từ khoá.
   - *Màu sắc:* **chữ ký màu học tự động từ ảnh gallery** (chế độ `signature`), so với phân bố màu của crop; chế độ cũ CIELAB/CIEDE2000 vẫn giữ.
   - *Consensus & Guard:* bảo vệ kết quả retrieval tin cậy khỏi nhiễu plugin, kiểm tra chặt các cặp sản phẩm dễ nhầm.
@@ -143,7 +143,7 @@ Hai phương thức thực thi:
 - **An toàn khi vận hành:** server tự kiểm chỉ mục FAISS có khớp gallery, catalog và cấu hình không (lệch thì dừng kèm hướng dẫn), và chạy nóng pipeline lúc khởi động.
 - **Công cụ dữ liệu:** gán nhãn benchmark có máy đề xuất (`label_benchmark.py`), tách SKU gộp nhầm (`split_sku.py`), đo thời gian từng bước (`bench_stages.py`), chia ảnh demo theo kết quả (`sort_demo_images.py`).
 - **Bộ validation 9 giai đoạn:** đánh giá từng giai đoạn, từ detection đến phân loại SKU end-to-end.
-- **Web POS (`backend/app/` + `frontend/`):** thu ngân chụp rổ hàng bằng điện thoại, hệ thống lập hoá đơn, đánh dấu dòng cần xác nhận, thanh toán; trang quản trị có báo cáo, đơn hàng, nhân viên, sửa giá / barcode / bằng chứng nhận diện, thiết lập nâng cao của pipeline và chạy kiểm định. API FastAPI + Postgres, giao diện React. Xem [`docs/WEB.md`](docs/WEB.md).
+- **Web POS (`backend/app/` + `frontend/`):** thu ngân chụp rổ hàng bằng điện thoại, hoặc ở màn quầy trên máy tính (cửa sổ rộng từ 1024 px: camera trực tiếp bên trái, giỏ hàng bên phải, chụp liên tiếp, phím tắt Space / F2 / F4), hệ thống lập hoá đơn, đánh dấu dòng cần xác nhận, thanh toán; trang quản trị có báo cáo, đơn hàng, nhân viên, sửa giá / barcode / bằng chứng nhận diện, thiết lập nâng cao của pipeline và chạy kiểm định. API FastAPI + Postgres, giao diện React. Xem [`docs/WEB.md`](docs/WEB.md).
 
 ## 5. Cấu trúc dự án
 
@@ -217,10 +217,10 @@ Weights đã fine-tune và toàn bộ dữ liệu được phát hành trên **G
 
 ```bash
 make assets                                   # hoặc: cd backend && python scripts/fetch_assets.py
-python scripts/fetch_assets.py --from-dir D:/tai_ve   # đã tải tay các file zip
+cd backend && python scripts/fetch_assets.py --from-dir D:/tai_ve   # đã tải tay các file zip
 ```
 
-Web POS dùng catalog trong Postgres: `make db-restore NAME=stocktaking_catalog` (catalog + giá, không chứa tài khoản hay đơn hàng), rồi `make migrate` và `make reset-password USER_NAME=admin ROLE=admin`.
+Web POS dùng catalog trong Postgres: `make db-restore NAME=stocktaking_catalog` (catalog + giá, không chứa tài khoản hay đơn hàng; **thay toàn bộ** database; *lệnh này chưa chạy thử*), rồi `make migrate` và `make reset-password USER_NAME=admin ROLE=admin`.
 
 | File phát hành | Nội dung | Dung lượng |
 | --- | --- | --- |
@@ -271,7 +271,7 @@ Tham số của pipeline nằm trong `backend/configs/config.yaml` (bảng dư�
 
 ## 10. Hướng dẫn thực thi
 
-Web POS: `make docker-up` rồi mở `http://localhost:5173` — chi tiết ở [`docs/WEB.md`](docs/WEB.md), các bước cho buổi demo ở [`docs/DEMO.md`](docs/DEMO.md).
+Web POS: `make docker-up` rồi mở `http://localhost:5173` (bộ nhận diện giả; nhận diện thật trên GPU của máy: `scripts\run_real.bat`) — chi tiết ở [`docs/WEB.md`](docs/WEB.md), các bước cho buổi demo ở [`docs/DEMO.md`](docs/DEMO.md).
 
 Pipeline chạy độc lập, từ thư mục `backend/`:
 
@@ -308,7 +308,7 @@ result, trace = pipeline.run_with_trace(image_data)   # chẩn đoán đầy đ�
 | --- | --- | --- |
 | Inference | Ảnh / thư mục ảnh | `result.json` (audit log), `result.csv` (số lượng theo SKU), `result.jpg` (ảnh annotation) |
 | Validation | Thư mục benchmark COCO | `report.json/csv`, `records.csv`, ảnh & biểu đồ chẩn đoán |
-| Web POS | Ảnh chụp từ điện thoại / tải lên | Hoá đơn (dòng sản phẩm, số lượng, giá), ảnh kèm khung nhận diện; đơn lưu trong Postgres, ảnh trong `MEDIA_DIR` |
+| Web POS | Ảnh chụp từ điện thoại / camera màn quầy / tải lên | Hoá đơn (dòng sản phẩm, số lượng, giá), ảnh kèm khung nhận diện; đơn lưu trong Postgres, ảnh trong `MEDIA_DIR` |
 
 ## 12. Đánh giá hiệu năng
 
@@ -339,7 +339,7 @@ Gộp hai bộ: **F1 ≈ 0,92** trên 483 sản phẩm. Evidence fusion sửa đ
 | Thời gian mỗi ảnh | 23,2 s | **~7–9 s** |
 | Bộ nhớ GPU giữ chỗ | 7 GB | **1,5 GB** |
 
-Các bước chính: chia sẻ bước phát hiện chữ giữa các hướng OCR, lọc khung trùng, chữ ký màu học từ gallery, tăng cường gallery bằng ảnh xoay, độ tin cậy OCR theo đoạn chứa từ khoá, gộp vật lồng nhau cùng SKU, bỏ đọc mã vạch khi catalog chưa có mã.
+Các bước chính: chia sẻ bước phát hiện chữ giữa các hướng OCR, lọc khung trùng, chữ ký màu học từ gallery, tăng cường gallery bằng ảnh xoay, độ tin cậy OCR theo đoạn chứa từ khoá, gộp vật lồng nhau cùng SKU, tắt đọc mã vạch khi catalog chưa có mã.
 
 ## 13. Hạn chế & hướng khắc phục
 

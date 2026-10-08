@@ -1,7 +1,7 @@
 # debug/ — Công cụ debug theo từng giai đoạn pipeline
 
 Mỗi file ứng với đúng 1 giai đoạn trong 8 giai đoạn của `InventoryPipeline`
-(xem `docs/02_MODULE_SPECIFICATION.md`), đánh số theo thứ tự chạy thật của
+(xem [`docs/02_MODULE_SPECIFICATION.md`](../../docs/02_MODULE_SPECIFICATION.md) ở gốc repo), đánh số theo thứ tự chạy thật của
 pipeline để dễ tra — không phải thứ tự quan trọng.
 
 Toàn bộ file tương tác (mở cửa sổ matplotlib) dùng chung 1 bộ phím tắt từ
@@ -23,7 +23,7 @@ Toàn bộ file tương tác (mở cửa sổ matplotlib) dùng chung 1 bộ ph�
 | 01 | `01_detection_viewer.py` | ① Detection | Chỉ cần ảnh (benchmark hoặc query) |
 | 02 | `02_overlap_segmentation_viewer.py` | ② Overlap + ③ Segmentation (SAM2) | Chỉ cần ảnh |
 | 03 | `03_cropping_compare.py` | ④ Cropping | **Cần chạy `python -m engine --mode validate` trước** (đọc `records.csv`) |
-| 04 | `04_retrieval_selfcheck.py` | ⑤ Retrieval | Cần gallery đã build FAISS index (`python -m engine` sẽ tự build) |
+| 04 | `04_retrieval_selfcheck.py` | ⑤ Retrieval | Cần gallery đã build FAISS index (`data/cache/`); `python -m engine --mode ...` chỉ tự build khi bật `retrieval.build_gallery_index: true` (đang `false` trong `config.yaml`) |
 | 05 | `05_retrieval_embedding_pairs.py` | ⑤ Retrieval (backend thô, không qua FAISS) | Cần gallery; sửa cặp test ở `_config/embedding_pairs.json` |
 | 06 | `06_decision_trigger_report.py` | ⑥ Decision | Chỉ cần ảnh benchmark |
 | 07 | `07_plugin_ocr_viewer.py` | ⑦ Plugin: OCR | Chỉ cần ảnh; chạy pipeline thật |
@@ -33,6 +33,14 @@ Toàn bộ file tương tác (mở cửa sổ matplotlib) dùng chung 1 bộ ph�
 | 11 | `11_reranker_delta_e_calibration.py` | ⑧ Reranker (hiệu chuẩn ΔE màu) | Cần benchmark COCO đầy đủ |
 | 12 | `12_benchmark_gt_viewer.py` | Ground truth (chưa chạy pipeline) | Chỉ cần benchmark COCO |
 | 13 | `13_validation_dashboard.py` | End-to-end / Validation | **Cần chạy `python -m engine --mode validate` trước** (đọc `records.csv`) |
+
+Lưu ý với cấu hình hiện tại (`configs/config.yaml`):
+
+- `08` (các panel ROI/K-Means) và `11` (hiệu chuẩn ΔE với bảng màu tham chiếu)
+  viết cho chế độ màu ROI cũ; `config.yaml` nay dùng `plugins.color.mode: "signature"`.
+- `09` debug plugin barcode, nay tắt mặc định (`plugins.barcode.enabled: false`).
+- `08` và `10` mặc định đọc `data/query`, thư mục có thể không tồn tại: truyền
+  `--source data/benchmark/images` (hoặc 1 ảnh).
 
 `_shared/` (bootstrap, io_utils, formatting, paged_viewer) và `_config/`
 (dữ liệu cấu hình tách khỏi code, ví dụ cặp ảnh test embedding) không phải
@@ -66,7 +74,9 @@ tool debug — là hạ tầng dùng chung, không chạy trực tiếp.
 - **`pipeline.plugin_manager` không tồn tại**: `debug_color.py` bản gốc
   dò sai tên thuộc tính (`_plugin_manager`, và là list chứ không phải
   dict) nên không bao giờ gọi được hàm resize thật của `ColorPlugin`. Đã
-  sửa ở `08`.
+  sửa ở `08`, nhưng `08` dò hàm `_resize_for_detection` mà `ColorPlugin` nay
+  không còn (hàm hiện tại là `_resize_image`), nên thực tế `08` luôn dùng
+  bản resize tự viết của nó.
 - **Path Unicode**: nhiều file bản gốc dùng `cv2.imread`/`load_image_bgr`
   thường, lỗi âm thầm với tên thư mục gallery tiếng Nhật. Toàn bộ debug/
   nay dùng `_shared/io_utils.load_bgr` (an toàn Unicode) thống nhất.

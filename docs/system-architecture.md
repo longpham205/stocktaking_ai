@@ -1,6 +1,6 @@
 # Kiến trúc hệ thống — Stocktaking AI (full-stack)
 
-> Mô tả đúng code hiện có trên nhánh refactor (FastAPI + Postgres + React). Thuật toán của pipeline nhận diện: [`01_PROJECT_CONTEXT.md`](01_PROJECT_CONTEXT.md), [`02_MODULE_SPECIFICATION.md`](02_MODULE_SPECIFICATION.md). Dữ liệu và catalog: [`04_DATA_AND_CATALOG.md`](04_DATA_AND_CATALOG.md). Cách chạy: [`WEB.md`](WEB.md).
+> Mô tả đúng code hiện có trên `main` (FastAPI + Postgres + React; bản refactor đã merge). Thuật toán của pipeline nhận diện: [`01_PROJECT_CONTEXT.md`](01_PROJECT_CONTEXT.md), [`02_MODULE_SPECIFICATION.md`](02_MODULE_SPECIFICATION.md). Dữ liệu và catalog: [`04_DATA_AND_CATALOG.md`](04_DATA_AND_CATALOG.md). Cách chạy: [`WEB.md`](WEB.md).
 
 ## 1. Sơ đồ tổng thể (HLD)
 
@@ -8,6 +8,7 @@
 flowchart LR
     subgraph client["Thiết bị"]
         phone[Điện thoại thu ngân<br/>POS: chụp, hoá đơn, thanh toán]
+        desk[Máy tính quầy, trình duyệt<br/>màn quầy: webcam hoặc<br/>điện thoại nối làm webcam]
         laptop[Laptop quản trị<br/>báo cáo, sản phẩm, nâng cao]
     end
 
@@ -29,6 +30,7 @@ flowchart LR
     files[(Tệp trên đĩa<br/>gallery, FAISS, weights,<br/>ảnh chụp MEDIA_DIR)]
 
     phone --> spa
+    desk --> spa
     laptop --> spa
     spa -- "/api (proxy cùng origin)" --> routers
     routers --> services
@@ -56,7 +58,7 @@ Trình duyệt chỉ nói chuyện với `web`; API không có CORS vì mọi re
 
 ## 2. Vì sao chỉ một tiến trình API
 
-Model (RF-DETR, SAM2, SigLIP2), hàng đợi nhận diện, bộ đếm đăng nhập sai và khoá idempotency đều nằm trong bộ nhớ của tiến trình `api`. Chạy hai worker sẽ nạp model hai lần và làm các bộ đếm lệch nhau, nên `--workers 1` là bắt buộc (đã đặt trong compose, Dockerfile và `make dev-api`). Không dùng Redis hay hàng đợi ngoài.
+Model (RF-DETR, SAM2, SigLIP2), hàng đợi nhận diện, bộ đếm đăng nhập sai và khoá idempotency đều nằm trong bộ nhớ của tiến trình `api`. Chạy hai worker sẽ nạp model hai lần và làm các bộ đếm lệch nhau, nên chỉ được chạy một worker: compose và Dockerfile đặt `--workers 1`; `make dev-api` không truyền cờ này và dùng mặc định của uvicorn (cũng là một worker). Không dùng Redis hay hàng đợi ngoài.
 
 Trạng thái lượt chụp thì **không** nằm trong bộ nhớ: nó ở bảng `captures` (`queued` → `processing` → `done` | `error`). Lượt chụp còn dở khi máy chủ khởi động lại được trả về lỗi `SERVER_RESTARTED` để thu ngân chụp lại.
 

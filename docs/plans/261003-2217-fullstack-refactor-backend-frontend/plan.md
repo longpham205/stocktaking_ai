@@ -1,6 +1,6 @@
 # Plan: Refactor Stocktaking AI → `backend/` (FastAPI, pattern `demo/app`) + `frontend/` (Vite React, pattern `demo/web`)
 
-Status: **APPROVED design, chưa implement** · Quyết định: [design.md §5](design.md#5-quyết-định-đã-chốt-2026-10-03) · Branch đề xuất: `refactor/fullstack-layout`
+Status: **DONE** — hoàn thành 2026-10-04 (phase 7c rồi gỡ `src_legacy/`), đã merge vào `main` · Quyết định: [design.md §5](design.md#5-quyết-định-đã-chốt-2026-10-03) · Branch đề xuất: `refactor/fullstack-layout`
 Tham chiếu: `blog-code.henryonai.com/packages/system_design_how_to_design_chatgpt/demo/{app,web}`
 Thiết kế chi tiết: [design.md](design.md)
 
@@ -16,7 +16,8 @@ stocktaking_ai/
 ├── Makefile · docker-compose.yml · docker-compose.gpu.yml · .env.example · README.md
 ├── backend/      FastAPI app + engine ML + configs/ data/ weights/ + scripts/ debug/ notebooks/ tests/ (uv, py3.12)
 ├── frontend/     Vite + React 19 + TS + TanStack Router/Query + shadcn + zustand + i18n
-├── src_legacy/   code web cũ đóng băng (backend/, frontend/, bin/, launch.bat, tkinter ui, …)
+│                 (thực tế: không zustand, không i18n — docs/03 §19.6.4; `src/components/ui/` là thành phần kiểu shadcn viết thẳng trong repo: Tailwind + class-variance-authority, không Radix)
+├── src_legacy/   code web cũ đóng băng (backend/, frontend/, bin/, launch.bat, tkinter ui, …) — đã xoá sau 7c (2026-10-04); bản gốc ở commit `f30710d`
 └── docs/ · plans/
 ```
 
@@ -29,10 +30,12 @@ stocktaking_ai/
 | 3 | Backend modules (auth, catalog, orders, captures, recognition, admin…) | [phase-03](phase-03-backend-modules-port-legacy-api.md) | done (2026-10-04) |
 | 4 | Recognition worker in-process + job state trong DB | [phase-04](phase-04-inference-worker-and-job-queue.md) | done (2026-10-04, mostly within phase 3) |
 | 5 | Frontend scaffold + shared (api, auth, i18n, ui) | [phase-05](phase-05-frontend-scaffold-and-shared-layer.md) | done (2026-10-04) |
-| 6 | Frontend features: POS flow + Admin | [phase-06](phase-06-frontend-features-pos-and-admin.md) | done (2026-10-04); phone smoke over HTTPS left to do by hand |
-| 7 | Data migration, scripts, tests, docs, cleanup | [phase-07](phase-07-migration-scripts-tests-docs.md) | in progress (7a data and ops commands done 2026-10-04) |
+| 6 | Frontend features: POS flow + Admin | [phase-06](phase-06-frontend-features-pos-and-admin.md) | done (2026-10-04); thử trên điện thoại thật qua HTTPS: done (2026-10-08, tunnel) |
+| 7 | Data migration, scripts, tests, docs, cleanup | [phase-07](phase-07-migration-scripts-tests-docs.md) | done (2026-10-04: 7a, 7b, 7c, gỡ `src_legacy/`); mục chưa kiểm: cuối phase-07 |
 
 Thứ tự: 0 → 1 → 2 → 3 ∥ 5 → 4 → 6 → 7 (frontend scaffold làm song song với backend modules vì hợp đồng API giữ nguyên path).
+
+Sau kế hoạch này (ngoài phạm vi): màn quầy cho máy tính (PR #55, 2026-10-08); chế độ tunnel + mã QR để mở trên điện thoại; ghi catalog qua hàm của engine ("hướng C", mentor duyệt 2026-10-08).
 
 ## Nguyên tắc xuyên suốt
 - **Giữ nguyên hợp đồng nghiệp vụ** (path `/api/...`, ý nghĩa field, error code như `PRICE_MISSING_BLOCKED`, `QUEUE_FULL`, `SYSTEM_BUSY`) → frontend mới và legacy so sánh được 1-1.
@@ -46,6 +49,6 @@ Thứ tự: 0 → 1 → 2 → 3 ∥ 5 → 4 → 6 → 7 (frontend scaffold làm 
 - Camera trên điện thoại cần HTTPS → giữ cách port-forward cũ, hoặc thêm Caddy (tuỳ chọn).
 - Rewrite UI 1k dòng có nhiều chi tiết vi mô (tilt, scanner USB, EXIF, bbox overlay, in hoá đơn) → checklist parity ở phase 6.
 
-## Câu hỏi còn mở
-- HTTPS cho camera điện thoại: giữ port-forward hay thêm Caddy?
-- E2E thay `frontend_smoke.js`: Playwright hay chỉ vitest + test API?
+## Câu hỏi còn mở (đã trả lời)
+- HTTPS cho camera điện thoại: giữ port-forward hay thêm Caddy? → Không Caddy: tunnel Cloudflare `scripts/run_real_tunnel.bat`; đã thử trên điện thoại thật qua 4G (2026-10-08).
+- E2E thay `frontend_smoke.js`: Playwright hay chỉ vitest + test API? → Không Playwright: `make smoke` + vitest (phase-07).
