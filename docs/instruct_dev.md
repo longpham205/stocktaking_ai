@@ -261,14 +261,14 @@ make type-check
 |---|---|
 | Thử giao diện, không cần model (mặc định) | `RECOGNIZER=fake` (bản Docker: `make docker-up`) |
 | **Nhận diện thật trên GPU của máy** | nhấp đúp `scripts\run_real.bat` (hoặc `./scripts/run_real.sh`) |
-| Pipeline thật trong Docker | `make docker-up-gpu` — **đang hỏng, đừng chạy** (xem dưới) |
+| Pipeline thật trong Docker | `scripts\run_docker.bat gpu` (= `make docker-up-gpu`; xem dưới) |
 
 ### Nhận diện thật: `scripts\run_real.bat`
 
 Chạy API ngay trên máy bằng một môi trường Python có sẵn model, Postgres vẫn trong Docker, giao diện là Vite trên máy. Script làm lần lượt: kiểm Python (torch thấy GPU + đủ thư viện web) → bật Postgres, dừng `api` và `web` của Docker (trùng cổng) → chạy migration → bật API với `RECOGNIZER=local`, `PIPELINE_CONFIG=configs/config.yaml` và chờ nạp model (1–2 phút) → bật giao diện, mở `http://localhost:5173`.
 
 - **Giữ cửa sổ mở** trong lúc dùng. Ctrl+C dừng cả API lẫn giao diện (Postgres vẫn chạy). Quay về bản Docker với bộ nhận diện giả: `docker compose up -d --wait api web`.
-- **Python nào:** biến `ML_PYTHON` trỏ tới `python.exe` của môi trường có model; không đặt thì script tìm `../stocktaking_ai_mini/venv` cạnh repo. Môi trường đó cần torch bản CUDA, cộng thêm `fastapi uvicorn asyncpg "psycopg[binary]" alembic pyjwt`. Thiếu gì script báo đúng tên gói.
+- **Python nào:** môi trường đầu tiên có torch bản CUDA thấy GPU và đủ `fastapi uvicorn asyncpg "psycopg[binary]" alembic pyjwt`, theo thứ tự: biến `ML_PYTHON`, `backend/.venv` (do `setup.bat` tạo bằng `uv sync --extra ml`; trên Windows `uv` lấy torch CUDA 12.8 từ kho của PyTorch), `../stocktaking_ai_mini/venv` cạnh repo. Môi trường nào thiếu thì script ghi lý do rồi thử cái tiếp theo.
 - **Không tạo tài khoản hay dữ liệu:** dùng database đang có. Quên mật khẩu thì xem mục "Quên mật khẩu", nhưng lúc này container `api` đang dừng nên chạy lệnh bằng chính Python đó, từ thư mục `backend`: `python -m entrypoints.reset_password admin`.
 - **Tốc độ đã đo trên RTX 3050 Ti 4 GB (laptop):** ~7–9 giây mỗi ảnh khi cắm sạc, chế độ điện Turbo / Performance; chạy pin ở chế độ Silent khoảng 20 giây. Card 4 GB chỉ chứa được một pipeline: đừng chạy thứ khác dùng GPU cùng lúc (validate, `label_benchmark.py propose`…).
 - Log của API: `backups/run_real_api.log`.
@@ -276,9 +276,13 @@ Chạy API ngay trên máy bằng một môi trường Python có sẵn model, P
 - **Điện thoại ở mạng khác (4G), có camera trong trang:** nhấp đúp `scripts\run_real_tunnel.bat` (= `./scripts/run_real.sh tunnel`): địa chỉ `https://….trycloudflare.com` công khai qua Cloudflare quick tunnel, kèm ảnh mã QR `backups/tunnel_qr.png`. Cần `tools\cloudflared.exe`; chi tiết ở [`WEB.md`](WEB.md) mục 4. Đã thử trên điện thoại thật qua 4G (2026-10-08).
 - Đã chạy thử: script bật được, `/api/health` trả `"recognizer":"local"`, dừng thì API tắt theo; nhấp đúp `run_real.bat` và `run_real_tunnel.bat` trên Windows dùng hằng ngày (2026-10). Chưa thử trên Linux/macOS.
 
-### Docker GPU: đang hỏng
+### Docker GPU: `scripts\run_docker.bat gpu`
 
-`make docker-up-gpu` đã chạy thử một lần (2026-10-05): bước cài thư viện trong image tải bộ gói CUDA nhiều lần, chết với `Bus error` sau khoảng 27 phút, làm Docker Desktop ngừng hẳn và ngốn 15 GB đĩa. Nguyên nhân chưa xác định. Đừng chạy lại cho tới khi `backend/Dockerfile` được sửa. Nếu lỡ chạy và ổ C đầy: `docker builder prune -af`, rồi nén file `docker_data.vhdx` (chạy `fstrim` trong máy ảo Docker trước, nếu không file không co).
+Cả API lẫn model chạy trong Docker (`docker-compose.gpu.yml`, `TORCH_VARIANT=cuda`): image cài đúng bộ thư viện trong lock, torch Linux trên PyPI đã kèm CUDA (2.14.1+cu130) nên chỉ tải một lần. Cần Docker Desktop dùng WSL2, driver NVIDIA hỗ trợ CUDA 13 (580 trở lên), và weights + dữ liệu trên máy (`setup.bat`; gắn vào container từ `backend/weights`, `backend/data`).
+
+- Đã kiểm 2026-10-08 trên một bản clone mới (RTX 3050 Ti 4 GB): build lần đầu ~35 phút, image ~11 GB, API nạp model trong ~3 phút (healthcheck chờ tới 300 giây); smoke test đạt, ~5,5 giây/ảnh; validate bộ chuẩn trong container: F1 0,9382, fusion 0,9618 — giống hệt chạy trên máy.
+- Lần chạy 2026-10-05 chết với `Bus error`: image khi đó cài torch hai lần (bản trong lock rồi bản CUDA 12.8), tải bộ gói CUDA nhiều lần và làm cạn đĩa ảo của WSL. Nếu ổ C đầy: `docker builder prune -af`, rồi nén file `docker_data.vhdx` (chạy `fstrim` trong máy ảo Docker trước, nếu không file không co).
+- Card 4 GB chỉ chứa một pipeline: đừng bật `run_real` cùng lúc.
 
 Kiểm đang chạy chế độ nào:
 

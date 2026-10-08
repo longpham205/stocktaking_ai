@@ -2,8 +2,10 @@
 # job (`alembic upgrade head`). Dependencies come from the lock only.
 #
 #   TORCH_VARIANT=none   (default) light install: mock/fake recognizer, no torch. Small image.
-#   TORCH_VARIANT=cpu    + the ML stack with CPU torch wheels
-#   TORCH_VARIANT=cu128  + the ML stack with CUDA 12.8 torch wheels (docker-compose.gpu.yml)
+#   TORCH_VARIANT=cuda   + the ML stack as locked: the Linux torch wheels on PyPI bundle CUDA, so
+#                        torch is downloaded once (docker-compose.gpu.yml; the host's NVIDIA
+#                        driver must support that CUDA version)
+#   TORCH_VARIANT=cpu    + the ML stack with CPU torch wheels instead
 FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
 
 ARG TORCH_VARIANT=none
@@ -25,6 +27,8 @@ COPY pyproject.toml uv.lock ./
 RUN --mount=type=cache,target=/root/.cache/uv \
     if [ "$TORCH_VARIANT" = "none" ]; then \
         uv sync --frozen --no-dev; \
+    elif [ "$TORCH_VARIANT" = "cuda" ]; then \
+        uv sync --frozen --no-dev --extra ml; \
     else \
         uv sync --frozen --no-dev --extra ml \
         && uv pip install --python /opt/venv/bin/python --reinstall torch torchvision \

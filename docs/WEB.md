@@ -2,6 +2,8 @@
 
 Ba dịch vụ chạy bằng Docker: `postgres`, `api` (FastAPI + bộ nhận diện) và `web` (giao diện React). Mọi lệnh là target của `Makefile` ở gốc repo. Kiến trúc: [`system-architecture.md`](system-architecture.md). Ngày demo: [`DEMO.md`](DEMO.md).
 
+> **Máy mới, chỉ muốn chạy:** nhấp đúp `setup.bat` ở gốc repo (= `scripts/setup.sh`): nó làm thay mục 1–2 (kể cả catalog thật và hai tài khoản `admin`, `staff`), rồi chạy `scripts\run_real.bat` (có GPU NVIDIA) hoặc `scripts\run_docker.bat` (không GPU). Xem README mục 7. Các mục dưới đây là cách làm từng bước bằng `make`.
+
 ## 1. Cần có
 
 - Docker Desktop (có `docker compose`), [`uv`](https://docs.astral.sh/uv/), `make`, `openssl`. Trên Windows chạy `make` trong **Git Bash** (công thức là shell POSIX).
@@ -39,7 +41,7 @@ Hai biến trong `.env` (hoặc đặt trước lệnh) quyết định API nh�
 - Catalog demo đi với `PIPELINE_CONFIG=configs/config.demo.yaml`: nếu để config mặc định thì ảnh gallery ở màn Sản phẩm không khớp. Ví dụ: `PIPELINE_CONFIG=configs/config.demo.yaml docker compose up -d --wait api`.
 - **Nhận diện thật trên GPU của máy:** nhấp đúp `scripts\run_real.bat` (hoặc `./scripts/run_real.sh`): API chạy trên máy bằng môi trường Python có model, Postgres vẫn trong Docker. Chi tiết và số đo: [`instruct_dev.md`](instruct_dev.md) mục 6.
   Lúc khởi động, API kiểm chỉ mục gallery có khớp gallery, catalog và cấu hình không (lệch thì dừng và in cách lập lại), rồi chạy nóng pipeline trên một ảnh gallery để lần chụp đầu tiên không bị chậm.
-- Pipeline thật trong Docker: `make docker-up-gpu`. **Đang hỏng** (lần chạy thử làm Docker Desktop ngừng hẳn, xem `instruct_dev.md` mục 6): đừng chạy cho tới khi `backend/Dockerfile` được sửa.
+- Pipeline thật trong Docker: `scripts\run_docker.bat gpu` (= `make docker-up-gpu`). Image ~11 GB, lần đầu build ~35 phút; cần weights + dữ liệu trên máy (`setup.bat`). Đã kiểm 2026-10-08: F1 bộ chuẩn 0,9382, giống hệt chạy trên máy. Chi tiết: `instruct_dev.md` mục 6.
 - Bản không có hot reload, log JSON, không có `/docs`, giao diện đã build do nginx phục vụ: `make docker-up-prod`. **Mới kiểm tới bước build image web; chưa chạy đủ luồng.**
 - Chạy API ngay trên máy với bộ nhận diện giả (để sửa code backend): `make docker-up-data` (chỉ Postgres, cổng 5437) rồi `make dev-api`.
 
@@ -88,7 +90,7 @@ Chụp → hoá đơn (dòng viền vàng = chưa chắc, chạm để xác nh�
 | `make reset-password USER_NAME=<tên> [ROLE=admin\|staff]` | mật khẩu ngẫu nhiên mới; có `ROLE` thì tạo tài khoản nếu chưa có |
 | `make reset-advanced-password` | mật khẩu nâng cao mới |
 | `make db-save NAME=<tên>` | sao lưu database vào `backups/<tên>.dump` |
-| `make db-restore NAME=<tên>` | **thay toàn bộ** database bằng bản sao lưu (dừng `api` trước). *Chưa chạy thử.* |
+| `make db-restore NAME=<tên>` | **thay toàn bộ** database bằng bản sao lưu (dừng `api` trước). Đã thử 2026-10-08 với catalog phát hành, lên database trống lẫn database đã có. |
 | `make purge-media DAYS=30 [DRY_RUN=1]` | xoá ảnh chụp cũ hơn số ngày; đơn vẫn còn, chỉ mất ảnh |
 | `make import-legacy DATA_DIR=<thư mục> [REPLACE=1]` | chép `app.db` của web v1 (`<thư mục>/db/app.db`) vào Postgres; file SQLite chỉ được đọc. Ảnh đơn hàng không được chép: chép thư mục `transactions/` cũ vào `MEDIA_DIR`. |
 | `make check-env` | công cụ, bí mật (không in giá trị), database + migration, số SKU / giá / tài khoản, pipeline, thư mục ảnh, GPU |

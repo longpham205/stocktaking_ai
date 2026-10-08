@@ -16,7 +16,7 @@
 - [ ] Đăng nhập admin → **Sản phẩm** → lọc thiếu giá: nhập giá cho mọi SKU sẽ bán. Nhập **barcode** cho các SKU cần quét.
 - [ ] Thêm SKU mới (dữ liệu thật): quy trình ở [`04_DATA_AND_CATALOG.md`](04_DATA_AND_CATALOG.md) mục 6.2, rồi lập lại index và so cổng kiểm định. Đặt tên và khai báo bằng chứng ở Admin → Sản phẩm.
 - [ ] Dựng database demo sạch: huỷ hoặc thanh toán hết đơn thử, rồi `make db-save NAME=demo_clean`. Kiểm có file `backups/demo_clean.dump`.
-- [ ] Thử `make db-restore NAME=demo_clean` **một lần trước ngày demo** (lệnh này chưa từng chạy thử): `docker compose stop api` → `make db-restore NAME=demo_clean` → `docker compose start api` → đăng nhập lại, kiểm dữ liệu.
+- [ ] Thử `make db-restore NAME=demo_clean` **một lần trước ngày demo** (đã thử 2026-10-08 với catalog phát hành trong container tạm, chưa thử với `demo_clean`): `docker compose stop api` → `make db-restore NAME=demo_clean` → `docker compose start api` → đăng nhập lại, kiểm dữ liệu.
 - [ ] Tài khoản: thu ngân chỉ đăng nhập trên điện thoại (hoặc ở màn quầy trên máy tính), admin trên laptop (đăng nhập cùng tài khoản ở máy thứ hai sẽ đá máy thứ nhất ra). Mật khẩu không nằm trong repo hay tài liệu; quên thì `make reset-password USER_NAME=<tên>`.
 
 **Thiết bị và mạng**

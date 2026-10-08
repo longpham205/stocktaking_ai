@@ -3,20 +3,24 @@
 #
 #   make docker-up-gpu     = docker compose -f docker-compose.yml -f docker-compose.gpu.yml up
 #
-# Builds the image with the ML stack and CUDA 12.8 torch wheels (several GB), loads the engine
-# in the API process (RECOGNIZER=local) and hands it every GPU.
+# Builds the image with the ML stack as locked (the Linux torch wheels bundle CUDA: several GB,
+# downloaded once), loads the engine in the API process (RECOGNIZER=local) and hands it every GPU.
+# Weights and data come from the host (backend/weights, backend/data): run scripts/setup.sh first.
 services:
   migrate:
     build:
       args:
-        TORCH_VARIANT: cu128
+        TORCH_VARIANT: cuda
 
   api:
     build:
       args:
-        TORCH_VARIANT: cu128
+        TORCH_VARIANT: cuda
     environment:
       RECOGNIZER: local
+    # loading RF-DETR, SAM2, SigLIP2 and the warm-up photo takes a minute or two
+    healthcheck:
+      start_period: 300s
     deploy:
       resources:
         reservations:
