@@ -21,7 +21,7 @@
 
 **Thiết bị và mạng**
 - [ ] Thử **Android và iOS**: cấp quyền camera; iOS cần chạm nút bật cảm biến nghiêng.
-- [ ] Thử tunnel qua **4G điện thoại thật** ít nhất một lần: VS Code → tab **Ports** → forward `5173` → Visibility **Public**. Nếu trang báo tên miền không được phép thì chạy `make docker-up-prod` thay cho `make docker-up`.
+- [ ] Thử `scripts\run_real_tunnel.bat` trên **4G điện thoại thật** (giám khảo dùng mạng của họ): mở địa chỉ `https://….trycloudflare.com` cửa sổ in ra, đăng nhập, chụp bằng camera trong trang.
 - [ ] Thử thao tác thật trên điện thoại: chụp bằng camera, chọn ảnh lớn từ thư viện, tải lại trang khi đang có giỏ (đơn phải được khôi phục), quét mã vạch, in hoá đơn.
 - [ ] Ảnh trình diễn: `backend/data/demo_sets/` đã chia sẵn bằng `scripts/sort_demo_images.py` — `1_dung_het` (nhận đúng toàn bộ, xếp theo thời gian chạy) cho phần trình diễn chính; `2_nhan_dien_sai` để minh hoạ cơ chế **"cần xác nhận"** (ví dụ ảnh `0001.jpg`: các món Cléo/Simple hiện viền vàng).
 - [ ] Quay **video** chạy trơn tru làm phương án lùi cuối.
@@ -32,7 +32,7 @@
 2. `docker compose stop api` → `make db-restore NAME=demo_clean` → `make docker-up` (đúng chế độ nhận diện đã chọn).
 3. `make check-env`: không có FAIL.
 4. Mở `http://localhost:8000/api/health` trên laptop: phải thấy `"status": "ready"` và đúng tên bộ nhận diện (`fake` hoặc `local`).
-5. Mở tunnel (Ports → forward 5173 → Public), copy URL `https://…`.
+5. Bật `scripts\run_real_tunnel.bat` (hoặc `scripts\run_real_phone.bat` nếu mọi điện thoại bắt chung Wi-Fi/hotspot với laptop), copy địa chỉ cửa sổ in ra.
 6. Mở URL đó trên điện thoại **qua đúng mạng 4G dùng lúc demo**, đăng nhập tài khoản thu ngân.
 7. Chạy thử **một giao dịch đầy đủ**: chụp → hoá đơn → (nhập giá tay nếu thiếu) → thanh toán → hoàn tất. Không demo thật nếu bước này chưa trơn.
 8. Xem trạng thái từ laptop bằng tài khoản admin (không dùng tài khoản thu ngân).
@@ -57,6 +57,6 @@
 > Phương án lùi cuối cùng khi máy chủ hoặc mạng gặp sự cố: chiếu **video** đã quay.
 
 ## D. Sau demo
-- [ ] Tắt tunnel (Ports → dừng chia sẻ cổng 5173). `make docker-down`.
+- [ ] Đóng cửa sổ `run_real_tunnel.bat` (tắt cả tunnel). Đặt lại mật khẩu các tài khoản đã dùng qua địa chỉ công khai.
 - [ ] Nếu mật khẩu có thể đã lộ: Admin → Nhân viên → đặt lại mật khẩu; với admin: `make reset-password USER_NAME=admin`.
 - [ ] Ảnh chụp tích lại trong `MEDIA_DIR`: `make purge-media DAYS=30 DRY_RUN=1` để xem, bỏ `DRY_RUN` để xoá.

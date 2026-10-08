@@ -5,6 +5,9 @@
 #
 #   ./scripts/run_real.sh       this machine only (http://localhost:5173)
 #   ./scripts/run_real.sh lan   also reachable from a phone on the same network (run_real_phone.bat)
+#   ./scripts/run_real.sh tunnel  a public https:// address through a Cloudflare quick tunnel: phones on
+#                               any network (their own 4G), and the in-page camera works (run_real_tunnel.bat).
+#                               Needs cloudflared: on PATH, CLOUDFLARED=<path>, or tools/cloudflared.exe.
 #
 # The window stays open while it runs. Ctrl+C stops the API and the frontend (Postgres keeps running).
 #
@@ -59,6 +62,15 @@ for port in 8000 5173; do
   fi
 done
 
+CF=""
+if [ "$MODE" = "tunnel" ]; then
+  CF="${CLOUDFLARED:-}"
+  [ -n "$CF" ] || CF="$(command -v cloudflared || true)"
+  [ -n "$CF" ] || { [ -x "$ROOT/tools/cloudflared.exe" ] && CF="$ROOT/tools/cloudflared.exe"; }
+  [ -n "$CF" ] || fail "tunnel mode needs cloudflared: put it on PATH, in tools/cloudflared.exe, or set CLOUDFLARED"
+  echo "ok: $("$CF" --version 2>&1 | head -n 1)"
+fi
+
 step "3/5 migrations"
 (cd backend && "$PY" -m alembic upgrade head)
 
@@ -66,8 +78,10 @@ step "4/5 API with the real pipeline (loading the models takes a minute or two)"
 mkdir -p backups
 (cd backend && exec "$PY" -m uvicorn entrypoints.api:app --host 127.0.0.1 --port 8000 --workers 1 --no-access-log) > "$API_LOG" 2>&1 &
 API_PID=$!
+TUNNEL_PID=""
 stop_api() {
   kill "$API_PID" > /dev/null 2>&1 || true
+  [ -z "$TUNNEL_PID" ] || kill "$TUNNEL_PID" > /dev/null 2>&1 || true
   printf '\nStopped. Back to the Docker version (fake recognizer): docker compose up -d --wait api web\n'
 }
 trap stop_api EXIT
@@ -99,6 +113,24 @@ if [ "$MODE" = "lan" ]; then
   # The API itself stays on 127.0.0.1; the phone reaches it through this server's /api proxy.
   echo "PHONE: open the http://<Network address>:5173 printed below (not localhost). Windows may ask to allow Node.js through the firewall: allow it."
   ./node_modules/.bin/vite --port 5173 --strictPort --host 0.0.0.0
+elif [ "$MODE" = "tunnel" ]; then
+  # Cloudflare quick tunnel (no account): a random https://<words>.trycloudflare.com address that
+  # forwards to this Vite server; Vite must accept that host name. Anyone with the address reaches the
+  # login page: reset the passwords used during the session afterwards.
+  TUNNEL_LOG="$ROOT/backups/run_real_tunnel.log"
+  "$CF" tunnel --no-autoupdate --url http://127.0.0.1:5173 > "$TUNNEL_LOG" 2>&1 &
+  TUNNEL_PID=$!
+  (
+    for _ in $(seq 1 60); do
+      # `|| true`: no address yet makes grep fail, and set -e would end this loop at once
+      url="$(grep -o 'https://[a-z0-9-]*\.trycloudflare\.com' "$TUNNEL_LOG" 2> /dev/null | head -n 1 || true)"
+      if [ -n "$url" ]; then printf '\n==== PHONE (any network): open %s ====\n\n' "$url"; exit 0; fi
+      sleep 1
+    done
+    echo "the tunnel address did not appear: see $TUNNEL_LOG" >&2
+  ) &
+  # IPv4 loopback: cloudflared dials 127.0.0.1, and Vite alone would listen on ::1 only
+  VITE_ALLOWED_HOSTS=".trycloudflare.com" ./node_modules/.bin/vite --port 5173 --strictPort --host 127.0.0.1
 else
   ./node_modules/.bin/vite --port 5173 --strictPort
 fi

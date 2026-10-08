@@ -147,3 +147,5 @@ docs/dev/
 
 # database dumps of `make db-save`
 /backups/
+# cloudflared.exe for scripts/run_real_tunnel.bat (downloaded, not committed)
+/tools/
