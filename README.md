@@ -152,7 +152,8 @@ stocktaking_ai/
 ├── README.md
 ├── Makefile                     # Mọi lệnh hằng ngày (make help)
 ├── scripts/                     # Chạy bằng một lệnh: run_real.bat · run_real_phone.bat (nhận diện thật
-│                                #   trên GPU), run_e2e.bat (dịch vụ + dữ liệu demo + smoke), kèm bản .sh
+│                                #   trên GPU), run_real_tunnel.bat (địa chỉ https công khai cho điện thoại
+│                                #   ở mạng khác), run_e2e.bat (dịch vụ + dữ liệu demo + smoke), kèm bản .sh
 ├── docker-compose.yml           # postgres + migrate + api + web; .gpu.yml / .prod.yml là lớp phủ
 ├── .env.example                 # Mẫu cấu hình; `make setup` tạo .env và sinh bí mật
 ├── backend/

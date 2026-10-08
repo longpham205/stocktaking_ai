@@ -21,6 +21,8 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: { '/api': apiProxy },
+    // a tunnel's public host name (scripts/run_real.sh tunnel); unset = Vite's default host check
+    allowedHosts: process.env.VITE_ALLOWED_HOSTS?.split(','),
     // in docker compose on Windows/macOS, file events do not cross the bind mount: poll instead
     watch: process.env.VITE_USE_POLLING ? { usePolling: true, interval: 300 } : undefined,
   },
