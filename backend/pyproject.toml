@@ -72,6 +72,11 @@ explicit = true
 torch = [{ index = "pytorch-cu128", marker = "sys_platform == 'win32'" }]
 torchvision = [{ index = "pytorch-cu128", marker = "sys_platform == 'win32'" }]
 
+# sam2 is built from source and needs torch to build: the same torch as the environment, not
+# whatever PyPI has (on Windows that would be another version, outside the lock).
+[tool.uv.extra-build-dependencies]
+sam2 = [{ requirement = "torch", match-runtime = true }]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
