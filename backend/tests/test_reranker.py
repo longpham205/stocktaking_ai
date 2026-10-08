@@ -195,3 +195,41 @@ def test_reranker_keyword_fragment_confidence_off_keeps_old_behaviour(test_confi
 def test_reranker_keyword_fragment_confidence_lets_clear_keyword_switch(test_config) -> None:
     """With the floor on, the confidence of the fragment holding the keyword decides the evidence."""
     assert _keyword_case(test_config, 0.5).product_id == "2"
+
+
+def _confusable_case(test_config, flag: bool, ocr_text: str):
+    """SKU 7 beats its confusable twin 8 on similarity alone; OCR may or may not name one of them."""
+    from engine.catalog.repository import CatalogData, InMemoryCatalogRepository, ProductRecord
+
+    rerank = test_config.rerank.model_copy(update={"confusable_uncertain_without_evidence": flag})
+    config = test_config.model_copy(update={"rerank": rerank})
+    products = [ProductRecord(product_id=str(i), product_name=f"P{i}") for i in range(1, 10)]
+    evidence = {"7": {"confusable_with": ["8"], "ocr_keywords": ["ABA"]}, "8": {"confusable_with": ["7"], "ocr_keywords": ["ABC"]}}
+    catalog = InMemoryCatalogRepository(CatalogData.build(products, evidence, {}))
+    reranker = Reranker(config, DecisionEngine(config, catalog), _catalog({}), catalog=catalog)
+    retrieval_result = RetrievalResult(
+        crop_id="c1",
+        candidates=[
+            RetrievalCandidate(product_id="7", product_name="P7", similarity_score=0.90, rank=1),
+            RetrievalCandidate(product_id="8", product_name="P8", similarity_score=0.89, rank=2),
+        ],
+        detection_confidence=0.95,
+    )
+    plugin_result = PluginResult(
+        crop_id="c1", executed_plugins=["ocr"], evidence={"ocr": {"text": ocr_text, "confidence": 0.9}}
+    )
+    return reranker.rerank(retrieval_result, plugin_result)
+
+
+def test_confusable_pair_without_evidence_needs_confirmation(test_config) -> None:
+    """Nothing tells the twins apart: the cashier is asked instead of trusting similarity alone."""
+    assert _confusable_case(test_config, False, "").status == "accepted"
+    result = _confusable_case(test_config, True, "")
+    assert (result.product_id, result.status) == ("7", "uncertain")
+
+
+def test_confusable_pair_with_evidence_stays_accepted(test_config) -> None:
+    """OCR reading the winner's keyword settles it: no confirmation needed."""
+    result = _confusable_case(test_config, True, "XX ABA YY")
+    assert (result.product_id, result.status) == ("7", "accepted")
+

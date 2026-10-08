@@ -113,6 +113,7 @@ class Reranker:
         )
         # Confusable Pairs
         self._confusable_min_agree = config.rerank.confusable_min_agreeing_plugins
+        self._confusable_uncertain_without_evidence = config.rerank.confusable_uncertain_without_evidence
 
     # ----------------------------------------------------------------------
     # PUBLIC API
@@ -332,6 +333,17 @@ class Reranker:
                     f"pair {sorted(confusable_pair)} has stronger plugin evidence "
                     f"(winner_ocr={winner_evidence['ocr_match_strength']:.2f}, "
                     f"opponent_ocr={(opponent_evidence or {}).get('ocr_match_strength', 0.0):.2f})."
+                )
+            elif (
+                self._confusable_uncertain_without_evidence
+                and opponent_evidence is not None
+                and not self._has_identifying_evidence(winner_evidence)
+            ):
+                status = STATUS_UNCERTAIN
+                other_id = next(iter(confusable_pair - {str(winner.product_id)}), None)
+                reason += (
+                    f" Downgraded to uncertain: confusable-pair member {other_id} is also a candidate "
+                    "and no OCR, colour or barcode evidence tells them apart."
                 )
 
         # Final Result & Debug Construction
@@ -853,6 +865,14 @@ class Reranker:
                 return True, opponent_entry
 
         return False, opponent_entry
+
+    @staticmethod
+    def _has_identifying_evidence(evidence: dict[str, Any]) -> bool:
+        """True when OCR, colour or barcode matched this candidate at all."""
+        return any(
+            float(evidence.get(key, 0.0)) > 0.0
+            for key in ("ocr_match_strength", "color_match_strength", "barcode_match_strength")
+        )
 
     def _eligible_plugin_count(self, product_id: str, barcode_matches: set[str]) -> int:
         """Count plugins structurally capable of producing evidence for this crop.
