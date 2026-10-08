@@ -6,8 +6,8 @@
 
 Mỗi file zip được so với SHA256SUMS.txt của bản phát hành trước khi giải nén; sau khi giải nén, từng
 file được so với ``configs/assets_manifest.json``. File đã có trên máy không bị ghi đè (thêm ``--force``
-để ghi đè). Catalog cho web (Postgres): file ``stocktaking_catalog.dump`` được chép vào ``backups/``
-ở gốc repo, nạp bằng ``make db-restore NAME=stocktaking_catalog`` rồi tạo tài khoản bằng
+để ghi đè). Catalog cho web (Postgres): ``stocktaking_catalog.zip`` (GitHub Release không nhận đuôi .dump)
+được giải nén thành ``backups/stocktaking_catalog.dump`` ở gốc repo, nạp bằng ``make db-restore NAME=stocktaking_catalog`` rồi tạo tài khoản bằng
 ``make reset-password USER_NAME=admin ROLE=admin``.
 """
 
@@ -31,6 +31,7 @@ ZIPS = {
     "weights": ["stocktaking_weights_detector_sam2.zip", "stocktaking_weights_siglip2.zip"],
     "data": ["stocktaking_data.zip"],
 }
+CATALOG_ZIP = "stocktaking_catalog.zip"
 CATALOG_DUMP = "stocktaking_catalog.dump"
 
 
@@ -122,11 +123,12 @@ def main(argv: list[str] | None = None) -> int:
             written, skipped = extract(path, args.force)
             print(f"{name}: giải nén {written} file, bỏ qua {skipped} file đã có")
     if "data" in groups:
-        dump = obtain(CATALOG_DUMP, args.tag, args.from_dir, cache)
-        if sha256_of(dump) != sums.get(CATALOG_DUMP):
-            print(f"Dừng: {CATALOG_DUMP} sai mã SHA-256.", file=sys.stderr)
+        packed = obtain(CATALOG_ZIP, args.tag, args.from_dir, cache)
+        if sha256_of(packed) != sums.get(CATALOG_ZIP):
+            print(f"Dừng: {CATALOG_ZIP} sai mã SHA-256.", file=sys.stderr)
             return 1
-        shutil.copy2(dump, REPO / "backups" / CATALOG_DUMP)
+        with zipfile.ZipFile(packed) as archive, archive.open(CATALOG_DUMP) as source:
+            (REPO / "backups" / CATALOG_DUMP).write_bytes(source.read())
         print(f"Catalog web: backups/{CATALOG_DUMP} -> make db-restore NAME=stocktaking_catalog")
     return 1 if verify(groups) else 0
 
