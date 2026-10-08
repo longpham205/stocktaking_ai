@@ -43,6 +43,7 @@ from engine.core.logger import get_logger
 from engine.core.utils import timer
 from engine.models.models import CropImage, RetrievalCandidate, RetrievalResult
 from engine.retrieval.backends.base import EmbeddingBackend
+from engine.retrieval.fingerprint import compute_fingerprint, fingerprint_path, index_is_current
 
 logger = get_logger(__name__)
 
@@ -77,6 +78,7 @@ class Retriever:
         self._metadata = self._load_gallery_metadata()
         self._catalog = catalog if catalog is not None else open_catalog_repository(config)
         logger.info("Loaded %d product(s) from catalog (source=%s).", len(self._catalog.products()), config.catalog.source)
+        self._check_index_current(config)
 
         logger.info(
             "Retriever initialized with backend='%s' gallery_size=%d embedding_dim=%d",
@@ -195,6 +197,23 @@ class Retriever:
                 f"metadata={len(metadata)}, index={self._index.ntotal}."
             )
         return metadata
+
+    def _check_index_current(self, config: AppConfig) -> None:
+        """Refuses a FAISS index built from another gallery, catalog mapping or config.
+
+        The index is only rebuilt offline (BuildPipeline), so after gallery photos, SKUs or
+        ``retrieval.augment`` change, a stale index would otherwise be served silently.
+
+        Raises:
+            RuntimeError: If the saved fingerprint is missing or differs from the current inputs.
+        """
+        if not index_is_current(config, compute_fingerprint(config, self._catalog.folder_to_product_id())):
+            raise RuntimeError(
+                f"Gallery index '{self._index_path}' does not match the current gallery photos, catalog "
+                f"or retrieval settings (fingerprint '{fingerprint_path(config)}' missing or different). "
+                "Rebuild it: run the build pipeline with retrieval.build_gallery_index: true "
+                "(e.g. data/experiments/move_31_32_1007/rebuild_index.py), then restart."
+            )
 
     def _get_product_name(self, product_id: str) -> str:
         """Resolves the display name for a product_id.

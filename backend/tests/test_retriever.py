@@ -124,3 +124,13 @@ def test_retriever_crop_keeps_separate_raw_and_resized_images() -> None:
     assert crop.raw_image_array.shape == (480, 320, 3)
     assert crop.image_array.shape == (224, 224, 3)
     assert crop.source_bbox == BoundingBox(0, 0, 320, 480)
+
+
+def test_retriever_refuses_an_index_older_than_the_gallery(gallery_config) -> None:
+    """A gallery photo added after the build must stop the Retriever instead of serving the old index."""
+    photo = gallery_config.resolve_path(gallery_config.paths.gallery_dir) / "prod_red_square" / "02.png"
+    cv2.imwrite(str(photo), np.full((100, 100, 3), 90, dtype=np.uint8))
+
+    with pytest.raises(RuntimeError, match="does not match"):
+        Retriever(gallery_config)
+
