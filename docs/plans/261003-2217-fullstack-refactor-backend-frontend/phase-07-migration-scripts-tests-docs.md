@@ -64,7 +64,7 @@ Người dùng chốt: KHÔNG thêm Playwright (bước 3 của kế hoạch g�
 
 ## Chưa kiểm (cả Phase 7) — vấn đề đã biết
 - Job `migrate` của compose trên volume Postgres mới tinh (`docker compose down -v` rồi `make docker-up`): không làm vì sẽ xoá DB dev.
-- Vấn đề đã biết: `make db-restore` chưa chạy lần nào; `make docker-up-prod` chưa chạy đủ luồng; `make docker-up-gpu` đang hỏng (không dùng). G thật trên GPU (engine không đổi trong Phase 7). POS trên điện thoại thật qua HTTPS: đã thử 2026-10-08 (tunnel Cloudflare, 4G).
+- Vấn đề đã biết: `make docker-up-prod` chưa chạy đủ luồng. Đã giải quyết 2026-10-08: `make db-restore` (thử với catalog phát hành trong một container Postgres dùng tạm: chạy được, cả lên database trống lẫn database đã có); `make docker-up-gpu` (sửa Dockerfile; build, smoke và validate trong container đạt, F1 0,9382). G thật trên GPU (engine không đổi trong Phase 7). POS trên điện thoại thật qua HTTPS: đã thử 2026-10-08 (tunnel Cloudflare, 4G).
 
 ## Sau 7c: gỡ `src_legacy/` (người dùng quyết 2026-10-04)
 - Xoá cả thư mục (37 file: web v1, launcher, giao diện Tkinter). Bản gốc còn ở commit `f30710d` và ở thư mục làm việc cũ `stocktaking_ai_mini`. Các chỗ dẫn tới `src_legacy/` trong README, docs, comment test và engine đổi sang dẫn commit đó. Các file kế hoạch pha 0–6 giữ nguyên chữ (ghi lại lịch sử).

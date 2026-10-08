@@ -215,7 +215,7 @@ Sau đó:
 | --- | --- | --- |
 | Có GPU NVIDIA | `scripts\run_real.bat` | nhận diện thật trên GPU; điện thoại chung Wi-Fi: `run_real_phone.bat`; điện thoại mạng bất kỳ: `run_real_tunnel.bat` |
 | Không có GPU | `scripts\run_docker.bat` | toàn bộ trong Docker, bộ nhận diện giả (chọn sản phẩm từ catalog thật) |
-| Có GPU, chỉ muốn Docker | `scripts\run_docker.bat gpu` | image ~10 GB build lần đầu |
+| Có GPU, chỉ muốn Docker | `scripts\run_docker.bat gpu` | image ~11 GB, build lần đầu ~35 phút; kết quả giống chạy trên máy |
 
 Mở `http://localhost:5173`, đăng nhập `admin` hoặc `staff`. Quên mật khẩu: `cd backend && uv run python -m entrypoints.reset_password <tên>`. Chi tiết chế độ chạy, tài khoản, điện thoại: [`docs/WEB.md`](docs/WEB.md).
 
@@ -250,7 +250,7 @@ make assets                                   # hoặc: cd backend && python scr
 cd backend && python scripts/fetch_assets.py --from-dir D:/tai_ve   # đã tải tay các file zip
 ```
 
-Web POS dùng catalog trong Postgres: `make db-restore NAME=stocktaking_catalog` (catalog + giá, không chứa tài khoản hay đơn hàng; **thay toàn bộ** database; *lệnh này chưa chạy thử*), rồi `make migrate` và `make reset-password USER_NAME=admin ROLE=admin`.
+Web POS dùng catalog trong Postgres: `make db-restore NAME=stocktaking_catalog` (catalog + giá, không chứa tài khoản hay đơn hàng; **thay toàn bộ** database; `setup.bat` tự làm bước này khi database còn trống), rồi `make migrate` và `make reset-password USER_NAME=admin ROLE=admin`.
 
 | File phát hành | Nội dung | Dung lượng |
 | --- | --- | --- |
