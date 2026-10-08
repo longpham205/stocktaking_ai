@@ -210,15 +210,32 @@ uv sync --extra ml      # pipeline thật
 uv run python scripts/set_device.py show|cpu|cuda   # đổi các khoá device: trong configs/config.yaml
 ```
 
-### Model checkpoint
+### Weights và dữ liệu
 
-| Model | Đường dẫn |
-| --- | --- |
-| RF-DETR Detector | `weights/detector/checkpoint_best_ema.pth` |
-| SAM2 Refinement | `weights/refinement/sam2/sam2.1_hiera_small.pt` |
-| SigLIP2 Encoder | Tự tải từ Hugging Face (`google/siglip2-base-patch16-224`) |
+Weights đã fine-tune và toàn bộ dữ liệu được phát hành trên **GitHub Releases** (tag `assets-v1`): gallery 33 SKU, hai bộ benchmark đã gán nhãn, catalog, chỉ mục FAISS + chữ ký màu dựng sẵn, mốc kiểm định và bộ ảnh demo. Một lệnh tải, kiểm SHA-256 từng file và giải nén vào `backend/`:
 
-> **[Kế hoạch]** Tiếp tục fine-tune RF-DETR khi có thêm dữ liệu ảnh bàn thu ngân thực tế để cải thiện độ chính xác trên các hướng đặt sản phẩm đa dạng.
+```bash
+make assets                                   # hoặc: cd backend && python scripts/fetch_assets.py
+python scripts/fetch_assets.py --from-dir D:/tai_ve   # đã tải tay các file zip
+```
+
+Web POS dùng catalog trong Postgres: `make db-restore NAME=stocktaking_catalog` (catalog + giá, không chứa tài khoản hay đơn hàng), rồi `make migrate` và `make reset-password USER_NAME=admin ROLE=admin`.
+
+| File phát hành | Nội dung | Dung lượng |
+| --- | --- | --- |
+| `stocktaking_weights_detector_sam2.zip` | RF-DETR fine-tune + RF-DETR base, SAM2.1 hiera-small | 653 MB |
+| `stocktaking_weights_siglip2.zip` | SigLIP2 base patch16-224 | 1,4 GB |
+| `stocktaking_data.zip` | gallery, benchmark (31 + 27 ảnh), catalog SQLite, cache FAISS, baseline, demo_sets | 610 MB |
+| `stocktaking_catalog.dump` | catalog + giá cho Postgres của web | 30 KB |
+
+| Model | Đường dẫn | Nguồn · giấy phép |
+| --- | --- | --- |
+| RF-DETR Detector (fine-tune cho bàn thu ngân) | `weights/detector/checkpoint_best_ema.pth` | Dự án này (khởi tạo từ RF-DETR base của Roboflow, Apache-2.0) |
+| SAM2 Refinement | `weights/refinement/sam2/sam2.1_hiera_small.pt` | Meta AI · Apache-2.0 |
+| SigLIP2 Encoder | `weights/retriever/siglip2/` | Google (`google/siglip2-base-patch16-224`) · Apache-2.0 |
+
+Phát hành bản mới (người bảo trì): làm sạch catalog SQLite (bỏ tài khoản, đơn hàng), rồi `python scripts/pack_assets.py --db <app.db sạch> --out <thư mục ngoài repo> --catalog-dump <dump catalog>`; script ghi các file zip, `SHA256SUMS.txt` và `configs/assets_manifest.json` (commit file này).
+
 
 ## 8. Đặc tả Dataset & Metadata
 

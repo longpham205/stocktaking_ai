@@ -118,7 +118,10 @@ Pipeline đề xuất khung + sản phẩm, người duyệt sửa chỗ sai; k�
 ### 6.7 Tách một SKU gộp nhầm (`scripts/split_sku.py`)
 `python scripts/split_sku.py --product <id>`: cửa sổ chọn ảnh thuộc sản phẩm cần tách; cấp mã mới ở cả catalog SQLite lẫn Postgres, chuyển ảnh sang thư mục mới. Sau đó lập lại chỉ mục và chữ ký màu như mục 6.2.
 
-### 6.8 Chọn ảnh demo theo kết quả (`scripts/sort_demo_images.py`)
+### 6.8 Phát hành dữ liệu (`scripts/pack_assets.py`, `scripts/fetch_assets.py`)
+Bản công khai không chứa dữ liệu cá nhân: catalog SQLite chỉ giữ `product`, `product_evidence`, `color_reference`, `catalog_meta`; bản dump Postgres chỉ gồm catalog + `product_prices` + `alembic_version` (dựng trong một database tạm từ dump schema + dump dữ liệu của đúng các bảng đó). `pack_assets.py` đóng zip + ghi `configs/assets_manifest.json`; `fetch_assets.py` (hoặc `make assets`) tải từ GitHub Releases, kiểm `SHA256SUMS.txt` rồi kiểm từng file theo manifest. Đổi gallery, nhãn hay catalog thì phát hành tag mới.
+
+### 6.9 Chọn ảnh demo theo kết quả (`scripts/sort_demo_images.py`)
 `python scripts/sort_demo_images.py --run <kết quả validate> <thư mục benchmark> [--run ...] --out data/demo_sets`: chia ảnh thành `1_dung_het` (theo thời gian chạy), `2_nhan_dien_sai` (theo số vật sai), `3_crop_sai` (theo tổng lỗi), kèm `danh_sach.csv`.
 
 ## 7. Quy ước đặt tên thư mục gallery
