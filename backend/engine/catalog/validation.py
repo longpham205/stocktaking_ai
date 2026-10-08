@@ -13,7 +13,7 @@ from typing import Any, Iterable, Mapping
 
 FORCE_EVIDENCE_PLUGINS = frozenset({"ocr", "color", "barcode"})
 KNOWN_EVIDENCE_TYPES = frozenset(
-    {"force_evidence", "confusable_with", "ocr_keywords", "color_code", "disabled_plugins"}
+    {"force_evidence", "confusable_with", "ocr_keywords", "color_code", "disabled_plugins", "confirm_if_unsure"}
 )
 _HEX_RE = re.compile(r"^#?([0-9A-Fa-f]{6})$")
 
@@ -130,6 +130,11 @@ def validate_catalog(
             elif etype == "disabled_plugins":
                 if not _is_str_list(value):
                     report.errors.append(f"SKU {pid}: disabled_plugins phải là danh sách chuỗi")
+            elif etype == "confirm_if_unsure":
+                if not isinstance(value, bool):
+                    report.errors.append(f"SKU {pid}: confirm_if_unsure phải là true/false")
+                elif value and not evidence.get(pid, {}).get("confusable_with"):
+                    report.warnings.append(f"SKU {pid}: confirm_if_unsure chỉ có tác dụng khi SKU có cặp dễ nhầm (confusable_with)")
 
     # Cặp dễ nhầm mà một bên bắt buộc OCR: cả hai phải có từ khoá và không trùng token.
     seen: set[frozenset[str]] = set()

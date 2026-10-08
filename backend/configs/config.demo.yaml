@@ -284,8 +284,9 @@ rerank:
     min_switch_margin: 0.05
 
   confusable_min_agreeing_plugins: 1
-  # Cặp dễ nhầm (catalog: confusable_with): SKU thắng không có bằng chứng OCR/màu/mã vạch nào mà SKU
-  # kia cũng là ứng viên -> "cần xác nhận" (uncertain) cho thu ngân chọn. false = như cũ.
+  # Cặp dễ nhầm (catalog: confusable_with) và SKU thắng được đánh dấu confirm_if_unsure trong catalog:
+  # SKU thắng không có bằng chứng OCR/màu/mã vạch nào mà SKU kia cũng là ứng viên -> "cần xác nhận"
+  # (uncertain) cho thu ngân chọn. false = như cũ.
   confusable_uncertain_without_evidence: false
 
   barcode:
