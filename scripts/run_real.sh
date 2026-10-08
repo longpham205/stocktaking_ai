@@ -11,8 +11,9 @@
 #
 # The window stays open while it runs. Ctrl+C stops the API and the frontend (Postgres keeps running).
 #
-# Which Python: ML_PYTHON, or ../stocktaking_ai_mini/venv next to this repo. It needs torch with
-# CUDA plus: fastapi uvicorn asyncpg "psycopg[binary]" alembic pyjwt.
+# Which Python: the first of ML_PYTHON, backend/.venv (made by scripts/setup.sh) and
+# ../stocktaking_ai_mini/venv next to this repo that has torch with CUDA plus the web libraries
+# (fastapi uvicorn asyncpg "psycopg[binary]" alembic pyjwt).
 # Other settings: PIPELINE_CONFIG (default configs/config.yaml), NO_OPEN=1 keeps the browser closed.
 # It does not create accounts or data: the database is used as it is.
 set -euo pipefail
@@ -29,14 +30,9 @@ step() { printf '\n==== %s ====\n' "$1"; }
 fail() { printf '\nFAILED: %s\n' "$1" >&2; exit 1; }
 
 step "1/5 tools"
-PY="${ML_PYTHON:-}"
-if [ -z "$PY" ]; then
-  for candidate in "$ROOT/../stocktaking_ai_mini/venv/Scripts/python.exe" "$ROOT/../stocktaking_ai_mini/venv/bin/python"; do
-    [ -x "$candidate" ] && PY="$candidate" && break
-  done
-fi
-[ -n "$PY" ] && [ -x "$PY" ] || fail "no Python with the ML stack: set ML_PYTHON to its python executable"
-"$PY" - <<'EOF' || fail "this Python cannot run the real pipeline (see the line above)"
+# prints why a Python cannot run the real pipeline, or what it runs on
+ml_check() {
+  "$1" - <<'EOF'
 import importlib.util, sys
 missing = [m for m in ("torch", "faiss", "fastapi", "uvicorn", "asyncpg", "psycopg", "alembic", "jwt") if importlib.util.find_spec(m) is None]
 if missing:
@@ -46,10 +42,23 @@ if not torch.cuda.is_available():
     sys.exit("torch does not see a CUDA GPU")
 print("ok: python", sys.version.split()[0], "torch", torch.__version__, "on", torch.cuda.get_device_name(0))
 EOF
+}
+PY=""
+if [ -n "${ML_PYTHON:-}" ]; then
+  ml_check "$ML_PYTHON" || fail "ML_PYTHON cannot run the real pipeline (see the line above)"
+  PY="$ML_PYTHON"
+else
+  for candidate in "$ROOT/backend/.venv/Scripts/python.exe" "$ROOT/backend/.venv/bin/python"     "$ROOT/../stocktaking_ai_mini/venv/Scripts/python.exe" "$ROOT/../stocktaking_ai_mini/venv/bin/python"; do
+    [ -x "$candidate" ] || continue
+    if ml_check "$candidate"; then PY="$candidate"; break; fi
+    echo "  (skipped $candidate)"
+  done
+fi
+[ -n "$PY" ] || fail "no Python with torch on a CUDA GPU: run scripts/setup.sh (setup.bat) on a machine with an NVIDIA GPU, or set ML_PYTHON"
 command -v docker > /dev/null 2>&1 || fail "'docker' not found on PATH"
 docker info > /dev/null 2>&1 || fail "Docker is not running: start Docker Desktop, then run this again"
-[ -f .env ] || fail ".env is missing: run 'make setup' once (docs/instruct_dev.md, section 2)"
-[ -x frontend/node_modules/.bin/vite ] || fail "frontend/node_modules is missing: run 'cd frontend && pnpm install --frozen-lockfile'"
+[ -f .env ] || fail ".env is missing: run scripts/setup.sh (setup.bat) once"
+[ -x frontend/node_modules/.bin/vite ] || fail "frontend/node_modules is missing: run scripts/setup.sh (setup.bat) once"
 
 step "2/5 postgres up; the Docker api and web are stopped (same ports)"
 docker compose up -d --wait postgres
