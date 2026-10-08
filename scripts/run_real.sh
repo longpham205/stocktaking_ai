@@ -124,7 +124,19 @@ elif [ "$MODE" = "tunnel" ]; then
     for _ in $(seq 1 60); do
       # `|| true`: no address yet makes grep fail, and set -e would end this loop at once
       url="$(grep -o 'https://[a-z0-9-]*\.trycloudflare\.com' "$TUNNEL_LOG" 2> /dev/null | head -n 1 || true)"
-      if [ -n "$url" ]; then printf '\n==== PHONE (any network): open %s ====\n\n' "$url"; exit 0; fi
+      if [ -n "$url" ]; then
+        printf '\n==== PHONE (any network): open %s ====\n\n' "$url"
+        # a QR code of the address for the phones to scan; the address changes at every start
+        QR="$ROOT/backups/tunnel_qr.png"
+        if (cd "$ROOT/backend" && "$PY" scripts/make_qr.py "$url" --out "$QR") && [ -z "${NO_OPEN:-}" ]; then
+          case "$(uname -s)" in
+            MINGW* | MSYS* | CYGWIN*) cmd.exe //c start "" "$(cygpath -w "$QR")" > /dev/null 2>&1 || true ;;
+            Darwin) open "$QR" > /dev/null 2>&1 || true ;;
+            *) xdg-open "$QR" > /dev/null 2>&1 || true ;;
+          esac
+        fi
+        exit 0
+      fi
       sleep 1
     done
     echo "the tunnel address did not appear: see $TUNNEL_LOG" >&2

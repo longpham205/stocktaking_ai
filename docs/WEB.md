@@ -49,7 +49,7 @@ Hai biến trong `.env` (hoặc đặt trước lệnh) quyết định API nh�
 
 Xem trước camera trong trang và cảm biến nghiêng cần `https://`. Mở bằng `http://<IP LAN>:5173` vẫn dùng được: màn chụp báo không xem trước được, bấm chụp bằng ứng dụng camera của máy hoặc chọn ảnh từ thư viện.
 
-**Điện thoại ở mạng khác** (giám khảo dùng 4G của họ): nhấp đúp `scripts\run_real_tunnel.bat`. Cửa sổ in dòng `PHONE (any network): open https://….trycloudflare.com`; mở địa chỉ đó trên bất kỳ điện thoại nào. Đi qua HTTPS nên có khung camera trong trang. Cần `tools\cloudflared.exe` (Cloudflare, miễn phí, không cần tài khoản: tải `cloudflared-windows-amd64.exe` từ github.com/cloudflare/cloudflared/releases, đổi tên). Mỗi lần bật là một địa chỉ mới; đóng cửa sổ là tắt cả tunnel. Đã thử trên điện thoại thật qua 4G (2026-10-08).
+**Điện thoại ở mạng khác** (giám khảo dùng 4G của họ): nhấp đúp `scripts\run_real_tunnel.bat`. Cửa sổ in dòng `PHONE (any network): open https://….trycloudflare.com`; mở địa chỉ đó trên bất kỳ điện thoại nào. Script tự tạo mã QR của địa chỉ đó (`backups/tunnel_qr.png`) và mở lên màn hình để điện thoại quét. Đi qua HTTPS nên có khung camera trong trang. Cần `tools\cloudflared.exe` (Cloudflare, miễn phí, không cần tài khoản: tải `cloudflared-windows-amd64.exe` từ github.com/cloudflare/cloudflared/releases, đổi tên). Mỗi lần bật là một địa chỉ mới; đóng cửa sổ là tắt cả tunnel. Đã thử trên điện thoại thật qua 4G (2026-10-08).
 
 Mỗi tài khoản chỉ có **một ca mở**: đăng nhập cùng tài khoản ở máy thứ hai sẽ đá máy thứ nhất ra. Khi demo: tài khoản thu ngân chỉ trên điện thoại, admin trên laptop.
 
