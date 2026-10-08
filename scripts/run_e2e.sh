@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # One command for the whole end-to-end check (Windows: double-click run_e2e.bat):
 #
-#   ./run_e2e.sh          start everything, seed the demo catalog, run the smoke test, open the browser
-#   ./run_e2e.sh full     the same, after lint, type-check and both test suites
+#   ./scripts/run_e2e.sh       start everything, seed the demo catalog, run the smoke test, open the browser
+#   ./scripts/run_e2e.sh full  the same, after lint, type-check and both test suites
 #
 # What it does, in order: make setup -> make docker-up -> make seed-demo -> two test accounts
 # (e2e_admin, e2e_staff) -> make check-env -> make smoke. It stops at the first step that fails.
@@ -14,7 +14,7 @@
 # never printed. Your own accounts are not touched. The smoke test pays one real order: it stays
 # in the database and in the day's report.
 set -euo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."
 
 MODE="${1:-}"
 export RECOGNIZER="${RECOGNIZER:-fake}"

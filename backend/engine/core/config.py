@@ -565,7 +565,7 @@ class RerankRetrievalProtectionSection(BaseModel):
     barcode_strong_ratio: float = Field(default=1.00, ge=0.0, le=1.0)
 
     min_switch_margin: float = Field(default=0.05, ge=0.0)
-    
+
     @model_validator(mode="after")
     def validate_thresholds(self) -> "RerankRetrievalProtectionSection":
         if self.consensus_strong <= self.consensus_start:

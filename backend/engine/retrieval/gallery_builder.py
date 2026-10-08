@@ -55,10 +55,10 @@ import numpy as np
 from engine.catalog.factory import open_catalog_repository
 from engine.catalog.repository import BaseCatalogRepository
 from engine.core.config import AppConfig, GalleryAugmentSection
-from engine.retrieval.fingerprint import compute_fingerprint, write_fingerprint
 from engine.core.logger import get_logger
 from engine.core.utils import ensure_dir, list_image_files, load_image_bgr
 from engine.retrieval.backends.base import EmbeddingBackend
+from engine.retrieval.fingerprint import compute_fingerprint, write_fingerprint
 
 logger = get_logger(__name__)
 

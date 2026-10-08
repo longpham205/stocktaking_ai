@@ -3,8 +3,8 @@
 # run_real.bat). The API runs on the host, in a Python environment that has both the ML stack and
 # the web libraries; Postgres stays in Docker; the frontend is Vite on the host.
 #
-#   ./run_real.sh          this machine only (http://localhost:5173)
-#   ./run_real.sh lan      also reachable from a phone on the same network (run_real_phone.bat)
+#   ./scripts/run_real.sh       this machine only (http://localhost:5173)
+#   ./scripts/run_real.sh lan   also reachable from a phone on the same network (run_real_phone.bat)
 #
 # The window stays open while it runs. Ctrl+C stops the API and the frontend (Postgres keeps running).
 #
@@ -13,7 +13,7 @@
 # Other settings: PIPELINE_CONFIG (default configs/config.yaml), NO_OPEN=1 keeps the browser closed.
 # It does not create accounts or data: the database is used as it is.
 set -euo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."
 ROOT="$(pwd)"
 MODE="${1:-}"
 

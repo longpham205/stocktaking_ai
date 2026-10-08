@@ -27,7 +27,6 @@ import argparse
 import glob
 import os
 import sys
-import traceback
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -38,7 +37,6 @@ for _stream in (sys.stdout, sys.stderr):  # Windows cp1252 khi pipe không in đ
         _stream.reconfigure(encoding="utf-8", errors="replace")
 
 from engine.models.models import ImageData  # noqa: E402
-
 
 # ============================================================
 # CẤU HÌNH
@@ -757,10 +755,10 @@ def main():
 
         print_header("CẤU HÌNH STRESS TEST")
 
-        print(f"Thư mục ảnh:")
+        print("Thư mục ảnh:")
         print(f"  {image_dir}")
 
-        print(f"Số lần lặp / ảnh:")
+        print("Số lần lặp / ảnh:")
         print(f"  {args.repeats}")
 
         print(
@@ -801,8 +799,8 @@ def main():
     if not image_paths:
 
         print(
-            f"\nKhông tìm thấy ảnh "
-            f"(.jpg/.jpeg/.png) trong:"
+            "\nKhông tìm thấy ảnh "
+            "(.jpg/.jpeg/.png) trong:"
         )
 
         print(f"  {image_dir}")

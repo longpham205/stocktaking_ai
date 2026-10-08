@@ -37,7 +37,8 @@ Hai biến trong `.env` (hoặc đặt trước lệnh) quyết định API nh�
 | `local` | `configs/config.yaml` | Pipeline thật (RF-DETR, SAM2, SigLIP2), dữ liệu `data/`, cần `weights/` và GPU. |
 
 - Catalog demo đi với `PIPELINE_CONFIG=configs/config.demo.yaml`: nếu để config mặc định thì ảnh gallery ở màn Sản phẩm không khớp. Ví dụ: `PIPELINE_CONFIG=configs/config.demo.yaml docker compose up -d --wait api`.
-- **Nhận diện thật trên GPU của máy:** nhấp đúp `run_real.bat` (hoặc `./run_real.sh`): API chạy trên máy bằng môi trường Python có model, Postgres vẫn trong Docker. Chi tiết và số đo: [`instruct_dev.md`](instruct_dev.md) mục 6.
+- **Nhận diện thật trên GPU của máy:** nhấp đúp `scripts\run_real.bat` (hoặc `./scripts/run_real.sh`): API chạy trên máy bằng môi trường Python có model, Postgres vẫn trong Docker. Chi tiết và số đo: [`instruct_dev.md`](instruct_dev.md) mục 6.
+  Lúc khởi động, API kiểm chỉ mục gallery có khớp gallery, catalog và cấu hình không (lệch thì dừng và in cách lập lại), rồi chạy nóng pipeline trên một ảnh gallery để lần chụp đầu tiên không bị chậm.
 - Pipeline thật trong Docker: `make docker-up-gpu`. **Đang hỏng** (lần chạy thử làm Docker Desktop ngừng hẳn, xem `instruct_dev.md` mục 6): đừng chạy cho tới khi `backend/Dockerfile` được sửa.
 - Bản không có hot reload, log JSON, không có `/docs`, giao diện đã build do nginx phục vụ: `make docker-up-prod`. **Mới kiểm tới bước build image web; chưa chạy đủ luồng.**
 - Chạy API ngay trên máy với bộ nhận diện giả (để sửa code backend): `make docker-up-data` (chỉ Postgres, cổng 5437) rồi `make dev-api`.

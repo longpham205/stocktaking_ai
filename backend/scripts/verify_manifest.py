@@ -47,9 +47,11 @@ def main() -> int:
     for entry in entries:
         path = PROJECT_ROOT / entry["path"]
         if not path.exists():
-            missing.append(entry["path"]); continue
+            missing.append(entry["path"])
+            continue
         if path.stat().st_size != entry["size"]:
-            size_mismatch.append(entry["path"]); continue
+            size_mismatch.append(entry["path"])
+            continue
         if args.hash and sha256_of(path) != entry["sha256"]:
             hash_mismatch.append(entry["path"])
 
