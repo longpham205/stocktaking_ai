@@ -114,11 +114,11 @@ retrieval:
     model_name: "google/siglip2-base-patch16-224"
     weights_path: "weights/retriever/siglip2"
     device: "cpu"
-  augment: # thêm vector cho bản biến đổi của ảnh gallery lúc lập index (tắt = như cũ)
+  augment: # cân bằng index gallery lúc lập index (tắt = như cũ)
     enabled: false
     rotations: [90, 180, 270]
-    center_crops: [] # tỉ lệ cạnh giữ lại khi cắt giữa ảnh, vd [0.8]
-    max_images: 0 # chỉ augment SKU có <= N ảnh gốc; 0 = mọi SKU
+    max_images: 0 # chỉ xoay SKU có <= N ảnh gốc; 0 = mọi SKU
+    max_vectors: 0 # trần số vector mỗi SKU, bỏ vector gần trùng; 0 = không trần
 
 # --- Decision Engine ---
 decision:

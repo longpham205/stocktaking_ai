@@ -231,28 +231,26 @@ class Siglip2Section(BaseModel):
 
 
 class GalleryAugmentSection(BaseModel):
-    """Thêm vector cho bản biến đổi của ảnh gallery (chỉ lúc lập index; truy vấn không đổi).
+    """Cân bằng index gallery (chỉ lúc lập index; truy vấn không đổi).
 
-    Hàng trong rổ nằm đủ hướng còn ảnh gallery chủ yếu chụp thẳng: bản xoay giúp khớp hướng.
-    Cắt giữa ảnh (tỉ lệ cạnh giữ lại) bớt nền quanh sản phẩm. Không lật gương, không đổi màu
-    (làm sai chữ và màu bao bì).
+    SKU ít ảnh (<= ``max_images``) được thêm ĐỦ các bản xoay: hàng trong rổ nằm đủ hướng còn ảnh
+    gallery của SKU mới chủ yếu chụp thẳng. SKU nhiều ảnh giữ nguyên (đo 2026-10-07: xoay SKU nhiều
+    ảnh, hay chỉ xoay một phần cho đủ số lượng, đều kém hơn). SKU vượt ``max_vectors`` bị bỏ bớt
+    vector gần trùng nhau để không lấn át. Không lật gương, không đổi màu (làm sai chữ và màu bao bì).
     """
 
     enabled: bool = False
     rotations: list[Literal[90, 180, 270]] = Field(default_factory=lambda: [90, 180, 270])
-    center_crops: list[float] = Field(default_factory=list)
-    # Chỉ augment SKU có <= max_images ảnh gốc (0 = mọi SKU): tăng ảnh cho nhóm ít ảnh.
+    # Chỉ xoay SKU có <= max_images ảnh gốc (0 = mọi SKU).
     max_images: int = Field(default=0, ge=0)
+    # Trần số vector mỗi SKU (0 = không trần): SKU vượt trần giữ lại các vector khác nhau nhất.
+    max_vectors: int = Field(default=0, ge=0)
 
     @model_validator(mode="after")
-    def _check_crops(self) -> "GalleryAugmentSection":
-        if any(not 0.0 < c < 1.0 for c in self.center_crops):
-            raise ValueError("retrieval.augment.center_crops: mỗi tỉ lệ phải nằm trong (0, 1)")
+    def _check_values(self) -> "GalleryAugmentSection":
+        if len(set(self.rotations)) != len(self.rotations):
+            raise ValueError("retrieval.augment.rotations không được trùng góc")
         return self
-
-    def applies_to(self, image_count: int) -> bool:
-        """SKU có ``image_count`` ảnh gốc có được augment không."""
-        return self.enabled and (self.max_images == 0 or image_count <= self.max_images)
 
 
 class RetrievalSection(BaseModel):
