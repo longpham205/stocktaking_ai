@@ -508,6 +508,10 @@ def write_demo_config(out_rel: str, skus: list[dict], path: Path | None = None) 
     Catalog demo nằm ở <out_rel>/db/app.db, nạp bằng:
         python -m engine.catalog.migrate --seed-dir <out_rel>/seed --legacy-config configs/config.demo.yaml --db <out_rel>/db/app.db
     (force_evidence/confusable_with lấy từ seed/expected_evidence.json.)
+
+    Lưu ý: configs/config.demo.yaml đang commit được sinh ngày 2026-10-03 và là mốc của cổng G-demo
+    (compare_validate --exact). Chạy lại sẽ kéo theo mọi thay đổi của config.yaml từ đó (ngưỡng detect,
+    lọc khung, xoay gallery, ...) nên phải đo lại mốc data/baseline/demo.
     """
     base = ROOT / "configs" / "config.yaml"
     t = base.read_text(encoding="utf-8").replace("\r\n", "\n")
@@ -524,10 +528,12 @@ def write_demo_config(out_rel: str, skus: list[dict], path: Path | None = None) 
     sub(r'(retrieval:\n  backend: )"siglip2"', r'\1"mock_visual_embedding"', 1)
     sub(r'"data/(gallery|benchmark|benchmark/images|benchmark/_annotations\.coco\.json|query|outputs|cache|metadata)"',
         rf'"{out_rel}/\1"', 8)
-    sub(r'"data/cache/(gallery_index\.faiss|gallery_metadata\.json)"', rf'"{out_rel}/cache/\1"')
+    sub(r'"data/cache/(gallery_index\.faiss|gallery_metadata\.json|color_signatures\.npz)"', rf'"{out_rel}/cache/\1"')
     sub(r'"data/cache/logs"', f'"{out_rel}/cache/logs"', 1)
     sub(r'(  db_path: )"data/db/app\.db"', rf'\1"{out_rel}/db/app.db"', 1)
     sub(r'(  ocr:\n    enabled: )true', r'\1false  # demo: bật lại (true) để thử EasyOCR', 1)
+    # Bộ demo có bảng màu tham chiếu (seed/product_colors.json) nhưng chưa có chữ ký màu từ gallery.
+    sub(r'(    mode: )"signature"', r'\1"roi"  # demo: chưa build chữ ký màu cho gallery demo', 1)
     # Config thật có index FAISS build sẵn (cờ = false); bộ demo chưa có index nên phải bật để `python -m engine` tự build.
     sub(r'(  build_gallery_index: )false', r'\1true  # demo: build index từ data_demo/gallery ở lần chạy đầu', 1)
     header = ("# CONFIG DEMO - sinh bởi scripts/make_demo_dataset.py (đừng sửa tay, chạy lại script).\n"
