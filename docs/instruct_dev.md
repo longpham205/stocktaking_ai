@@ -48,8 +48,8 @@ Nhớ: đặt lại mật khẩu sẽ đăng xuất tài khoản đó ở mọi 
 
 ## 0. Cách nhanh nhất: một cú nhấp
 
-- **Windows:** nhấp đúp `run_e2e.bat` ở gốc repo (cần Git for Windows; file `.bat` tự tìm Git Bash).
-- **Linux / macOS / Git Bash:** `./run_e2e.sh`
+- **Windows:** nhấp đúp `scripts\run_e2e.bat` (cần Git for Windows; file `.bat` tự tìm Git Bash).
+- **Linux / macOS / Git Bash:** `./scripts/run_e2e.sh`
 
 Script làm lần lượt mục 2 và mục 5 của tài liệu này, dừng ở bước đầu tiên bị lỗi:
 
@@ -66,8 +66,8 @@ Script làm lần lượt mục 2 và mục 5 của tài liệu này, dừng ở
 - Lần đầu mất vài phút (build image); các lần sau khoảng một phút.
 - Mật khẩu của `e2e_admin` / `e2e_staff` sinh ngẫu nhiên mỗi lần chạy, chỉ dùng cho smoke và **không in ra**. Tài khoản của bạn không bị đụng. Để tự đăng nhập xem giao diện, tạo tài khoản riêng một lần: `make reset-password USER_NAME=admin ROLE=admin` (mục 4).
 - Mỗi lần chạy, smoke **thanh toán một đơn thật**: đơn đó ở lại trong database và báo cáo ngày.
-- `run_e2e.bat full` (hoặc `./run_e2e.sh full`): chạy thêm `make lint`, `make type-check`, `make test`, `make test-web` trước khi bật dịch vụ.
-- Đổi chế độ: đặt biến trước khi gọi, ví dụ `RECOGNIZER=local ./run_e2e.sh`. `NO_OPEN=1` để không mở trình duyệt.
+- `scripts\run_e2e.bat full` (hoặc `./scripts/run_e2e.sh full`): chạy thêm `make lint`, `make type-check`, `make test`, `make test-web` trước khi bật dịch vụ.
+- Đổi chế độ: đặt biến trước khi gọi, ví dụ `RECOGNIZER=local ./scripts/run_e2e.sh`. `NO_OPEN=1` để không mở trình duyệt.
 - Script chỉ gọi các target `make` có sẵn; khi một bước lỗi, chạy tay đúng lệnh đó theo các mục dưới để xem kỹ.
 
 ## 1. Chuẩn bị máy (một lần)
@@ -260,10 +260,10 @@ make type-check
 | Muốn | Làm |
 |---|---|
 | Thử giao diện, không cần model (mặc định) | `RECOGNIZER=fake` (bản Docker: `make docker-up`) |
-| **Nhận diện thật trên GPU của máy** | nhấp đúp `run_real.bat` (hoặc `./run_real.sh`) |
+| **Nhận diện thật trên GPU của máy** | nhấp đúp `scripts\run_real.bat` (hoặc `./scripts/run_real.sh`) |
 | Pipeline thật trong Docker | `make docker-up-gpu` — **đang hỏng, đừng chạy** (xem dưới) |
 
-### Nhận diện thật: `run_real.bat`
+### Nhận diện thật: `scripts\run_real.bat`
 
 Chạy API ngay trên máy bằng một môi trường Python có sẵn model, Postgres vẫn trong Docker, giao diện là Vite trên máy. Script làm lần lượt: kiểm Python (torch thấy GPU + đủ thư viện web) → bật Postgres, dừng `api` và `web` của Docker (trùng cổng) → chạy migration → bật API với `RECOGNIZER=local`, `PIPELINE_CONFIG=configs/config.yaml` và chờ nạp model (1–2 phút) → bật giao diện, mở `http://localhost:5173`.
 
@@ -272,7 +272,7 @@ Chạy API ngay trên máy bằng một môi trường Python có sẵn model, P
 - **Không tạo tài khoản hay dữ liệu:** dùng database đang có. Quên mật khẩu thì xem mục "Quên mật khẩu", nhưng lúc này container `api` đang dừng nên chạy lệnh bằng chính Python đó, từ thư mục `backend`: `python -m entrypoints.reset_password admin`.
 - **Tốc độ đã đo trên RTX 3050 Ti 4 GB:** 12–15 giây mỗi ảnh; VRAM lên tới 3,6 / 4 GB khi đang nhận diện, nên đừng chạy thứ khác dùng GPU cùng lúc.
 - Log của API: `backups/run_real_api.log`.
-- **Dùng trên điện thoại:** nhấp đúp `run_real_phone.bat` (= `./run_real.sh lan`) thay cho `run_real.bat`. Trên điện thoại mở địa chỉ **Network** mà cửa sổ in ra, dạng `http://172.20.10.7:5173` — KHÔNG phải `localhost` (trên điện thoại, `localhost` là chính cái điện thoại). Điện thoại và laptop phải chung mạng (cùng Wi-Fi, hoặc laptop bắt hotspot của điện thoại). Lần đầu Windows hỏi cho Node.js qua tường lửa: bấm Allow, tích cả mạng Public nếu đang dùng hotspot. Mở bằng `http://` nên không có khung ngắm camera trong trang: bấm chụp bằng camera của máy hoặc chọn ảnh.
+- **Dùng trên điện thoại:** nhấp đúp `scripts\run_real_phone.bat` (= `./scripts/run_real.sh lan`) thay cho `scripts\run_real.bat`. Trên điện thoại mở địa chỉ **Network** mà cửa sổ in ra, dạng `http://172.20.10.7:5173` — KHÔNG phải `localhost` (trên điện thoại, `localhost` là chính cái điện thoại). Điện thoại và laptop phải chung mạng (cùng Wi-Fi, hoặc laptop bắt hotspot của điện thoại). Lần đầu Windows hỏi cho Node.js qua tường lửa: bấm Allow, tích cả mạng Public nếu đang dùng hotspot. Mở bằng `http://` nên không có khung ngắm camera trong trang: bấm chụp bằng camera của máy hoặc chọn ảnh.
 - Đã chạy thử: script bật được, `/api/health` trả `"recognizer":"local"`, dừng thì API tắt theo. Chưa thử nhấp đúp bằng chuột và chưa thử trên Linux/macOS.
 
 ### Docker GPU: đang hỏng

@@ -1,11 +1,10 @@
 @echo off
-rem One click on Windows: runs run_e2e.sh in Git Bash (the Makefile needs a POSIX shell).
-rem   run_e2e.bat          start, seed, smoke test, open the browser
-rem   run_e2e.bat full     the same, after lint, type-check and the test suites
+rem One click on Windows: the web POS with the REAL recognition pipeline on the GPU.
+rem Runs run_real.sh in Git Bash. Keep this window open; Ctrl+C (or closing it) stops the API and the web.
 setlocal
 rem keep the current directory when bash starts as a login shell
 set "CHERE_INVOKING=1"
-cd /d "%~dp0"
+cd /d "%~dp0.."
 
 set "BASH="
 if exist "%ProgramFiles%\Git\bin\bash.exe" set "BASH=%ProgramFiles%\Git\bin\bash.exe"
@@ -17,9 +16,9 @@ if not defined BASH (
   exit /b 1
 )
 
-"%BASH%" --login "./run_e2e.sh" %*
+"%BASH%" --login "./scripts/run_real.sh" %*
 set "CODE=%ERRORLEVEL%"
 echo.
-if "%CODE%"=="0" (echo Done.) else (echo Stopped with an error ^(code %CODE%^). Read the lines above.)
+if "%CODE%"=="0" (echo Stopped.) else (echo Stopped with code %CODE%. Read the lines above.)
 pause
 exit /b %CODE%

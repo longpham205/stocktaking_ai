@@ -134,8 +134,8 @@ Hai phương thức thực thi:
 stocktaking_ai/
 ├── README.md
 ├── Makefile                     # Mọi lệnh hằng ngày (make help)
-├── run_e2e.sh · run_e2e.bat     # Một lệnh: bật dịch vụ, nạp demo, chạy smoke
-├── run_real.sh · run_real.bat   # Một lệnh: web với nhận diện thật trên GPU của máy
+├── scripts/                     # Chạy bằng một lệnh: run_real.bat · run_real_phone.bat (nhận diện thật
+│                                #   trên GPU), run_e2e.bat (dịch vụ + dữ liệu demo + smoke), kèm bản .sh
 ├── docker-compose.yml           # postgres + migrate + api + web; .gpu.yml / .prod.yml là lớp phủ
 ├── .env.example                 # Mẫu cấu hình; `make setup` tạo .env và sinh bí mật
 ├── backend/
@@ -155,8 +155,7 @@ stocktaking_ai/
 │   ├── data_demo/               # Dữ liệu tổng hợp cho demo CPU (không commit)
 │   └── weights/                 # detector / refinement / retriever (không commit)
 ├── frontend/                    # Vite + React + TypeScript (pnpm)
-├── docs/                        # Đặc tả 01–04, system-architecture, WEB, DEMO
-└── plans/                       # Kế hoạch refactor theo pha
+└── docs/                        # Đặc tả 01–04, system-architecture, WEB, DEMO; plans/ = kế hoạch refactor
 ```
 
 ## 6. Yêu cầu hệ thống
@@ -181,7 +180,7 @@ make seed-demo    # catalog demo + giá demo (cần backend/data_demo/, xem docs
 make reset-password USER_NAME=admin ROLE=admin   # tạo tài khoản đầu tiên, mật khẩu in ra một lần
 ```
 
-Làm tất cả các bước trên và chạy kiểm đầu-cuối bằng một lệnh: `./run_e2e.sh` (Windows: nhấp đúp `run_e2e.bat`).
+Làm tất cả các bước trên và chạy kiểm đầu-cuối bằng một lệnh: `./scripts/run_e2e.sh` (Windows: nhấp đúp `scripts\run_e2e.bat`).
 
 Mặc định API chạy với bộ nhận diện giả (`RECOGNIZER=fake`, không cần model). Các chế độ khác, tài khoản, điện thoại và lệnh vận hành: [`docs/WEB.md`](docs/WEB.md).
 
