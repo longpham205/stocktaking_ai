@@ -11,6 +11,8 @@ class Product:
     barcode: str
     # None: nobody has priced it yet
     price: int | None
+    # on hand; None: the product is not tracked. Below 0: more was sold than counted
+    stock: int | None
     # created from a new gallery folder, still waiting for an admin to name it
     needs_naming: bool
     # its colour-code evidence names a colour that has no reference value

@@ -3,7 +3,7 @@ import { apiFetch } from '@/lib/api-client';
 
 /** Mirrors backend catalog/schemas.py and audit/schemas.py, validation/schemas.py. */
 
-export type ProductFilter = '' | 'missing_price' | 'missing_barcode' | 'needs_naming';
+export type ProductFilter = '' | 'missing_price' | 'missing_barcode' | 'needs_naming' | 'out_of_stock';
 
 export interface AdminProducts {
   total: number;
@@ -14,6 +14,7 @@ export interface AdminProducts {
   missing_price: number;
   missing_barcode: number;
   needs_naming: number;
+  out_of_stock: number;
 }
 
 export interface ColorRef {
@@ -81,6 +82,8 @@ export function getAdminProducts(search: string, filter: ProductFilter, page: nu
 
 export interface ProductChange {
   price?: number | null;
+  /** null: stop tracking the product's stock */
+  stock?: number | null;
   barcode?: string;
   name?: string;
 }

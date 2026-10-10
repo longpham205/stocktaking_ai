@@ -40,7 +40,10 @@ from app.modules.recognition.ports import RecognizerPort  # noqa: E402
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 # every web table, for TRUNCATE between tests (the engine's catalog tables: `catalog_url`)
 CATALOG_TABLES = "product_evidence, product, color_reference, catalog_meta"
-WEB_TABLES = "change_log, captures, order_items, orders, shifts, users, product_prices, settings, config_overrides"
+WEB_TABLES = (
+    "change_log, captures, order_items, orders, shifts, users, product_prices, product_stock, settings, "
+    "config_overrides"
+)
 STAFF_PASSWORD, ADMIN_PASSWORD = "staff-pass-123", "admin-pass-456"
 # capture photos of a test run, never backend/data (a test that looks at them passes its own)
 TEST_MEDIA_DIR = Path(tempfile.mkdtemp(prefix="stocktaking-test-media-"))

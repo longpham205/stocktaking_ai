@@ -25,8 +25,11 @@ from app.modules.audit.ports import Change
 from app.modules.audit.repository import record_changes_sync
 from app.modules.catalog.models import ProductPriceRow
 from app.modules.catalog.ports import ColorRef, Product
+from app.modules.inventory.models import ProductStockRow
+from app.modules.inventory.repository import set_stock_sync
 
 _PRICE = ProductPriceRow
+_STOCK = ProductStockRow
 _P = table(
     "product",
     column("product_id", String),
@@ -99,10 +102,12 @@ class CatalogRepository:
                 _P.c.barcode,
                 _P.c.needs_naming,
                 _PRICE.price,
+                _STOCK.quantity,
                 _E.c.value_json,
             )
             .select_from(_P)
             .outerjoin(_PRICE, _PRICE.product_id == _P.c.product_id)
+            .outerjoin(_STOCK, _STOCK.product_id == _P.c.product_id)
             .outerjoin(_E, and_(_E.c.product_id == _P.c.product_id, _E.c.evidence_type == "color_code"))
             .where(condition)
         )
@@ -118,6 +123,7 @@ class CatalogRepository:
                     name=row["product_name"],
                     barcode=row["barcode"] or "",
                     price=row["price"],
+                    stock=row["quantity"],
                     needs_naming=row["needs_naming"],
                     missing_color_reference=code is not None and code not in colors,
                 )
@@ -168,8 +174,8 @@ class CatalogEdits:
             self._engine.dispose()
 
     def update_product(self, product_id: str, fields: dict[str, Any], changed_by: int) -> bool:
-        """Apply `price`, `barcode` (None = remove), `name` with their log entries, in one transaction.
-        Returns whether the engine's catalog changed (the price is the web's)."""
+        """Apply `price`, `stock`, `barcode` (None = remove), `name` with their log entries, in one
+        transaction. Returns whether the engine's catalog changed (price and stock are the web's)."""
         from engine.catalog.edits import BarcodeTaken, ProductNotFound, set_barcode, set_name
 
         changes: list[Change] = []
@@ -193,6 +199,12 @@ class CatalogEdits:
                                 index_elements=[_PRICE.product_id], set_={"price": price, "updated_at": func.now()}
                             )
                         )
+            if "stock" in fields:
+                stock = fields["stock"]
+                old_stock = set_stock_sync(conn, product_id, stock)
+                if old_stock != stock:
+                    before = None if old_stock is None else str(old_stock)
+                    changes.append(Change("stock", before, None if stock is None else str(stock)))
             try:
                 if "barcode" in fields:
                     old_barcode, new_barcode = set_barcode(session, product_id, fields["barcode"])

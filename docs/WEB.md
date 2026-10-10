@@ -15,7 +15,8 @@ Ba dịch vụ chạy bằng Docker: `postgres`, `api` (FastAPI + bộ nhận di
 ```bash
 make setup          # tạo .env từ .env.example, sinh JWT_SECRET và MEDIA_URL_SECRET, kiểm docker + uv
 make docker-up      # build, bật postgres, chạy migration, bật api và web
-make seed-demo      # catalog demo 50 SKU + giá demo vào database
+make seed-demo      # catalog demo 50 SKU + giá demo + tồn kho ngẫu nhiên vào database
+make seed-stock     # chỉ tồn kho ngẫu nhiên (20..100) cho sản phẩm chưa có số tồn
 make reset-password USER_NAME=admin ROLE=admin    # tạo tài khoản admin, mật khẩu in ra MỘT lần
 make reset-password USER_NAME=staff ROLE=staff    # tạo tài khoản thu ngân
 make reset-advanced-password                      # mật khẩu nâng cao (thiết lập pipeline, kiểm định)

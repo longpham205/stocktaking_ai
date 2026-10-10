@@ -36,7 +36,10 @@ from app.modules.orders.models import OrderItemRow, OrderRow
 from app.modules.pos_settings.models import SettingRow
 
 # emptied by --replace, children first
-WEB_TABLES = "change_log, captures, order_items, orders, shifts, users, product_prices, settings, config_overrides"
+WEB_TABLES = (
+    "change_log, captures, order_items, orders, shifts, users, product_prices, product_stock, settings, "
+    "config_overrides"
+)
 CATALOG_TABLES = "product_evidence, product, color_reference, catalog_meta"
 # the engine's tables are copied column for column (same definition on both sides)
 CATALOG_COPY = ("catalog_meta", "color_reference", "product", "product_evidence")

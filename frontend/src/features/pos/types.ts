@@ -72,6 +72,8 @@ export interface Product {
   name: string;
   barcode: string;
   price: number | null;
+  /** on hand; null: not tracked. Below 0: more was sold than counted */
+  stock: number | null;
   needs_naming: boolean;
   missing_color_reference: boolean;
 }

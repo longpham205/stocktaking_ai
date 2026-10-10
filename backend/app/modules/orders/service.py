@@ -1,5 +1,7 @@
-"""Orders: one open order per cashier at a time, lines merged per product, prices frozen at checkout."""
+"""Orders: one open order per cashier at a time, lines merged per product, prices frozen at checkout.
+Paying an order takes its quantities off the stock on hand; voiding a paid one puts them back."""
 
+from collections.abc import Iterable
 from typing import Any
 
 from app.core.clock import local_midnight_utc
@@ -37,6 +39,14 @@ async def merge_or_insert(unit: OrdersUnit, order_id: int, product_id: str, quan
         return await unit.insert_item(order_id, product_id, quantity, **values)
     await unit.update_item(line.id, quantity=min(MAX_QTY, line.quantity + quantity))
     return line.id
+
+
+def _per_product(lines: Iterable[tuple[str, int]], sign: int) -> dict[str, int]:
+    """The quantity of each product over an order's lines (a product may be on several), times `sign`."""
+    totals: dict[str, int] = {}
+    for product_id, quantity in lines:
+        totals[product_id] = totals.get(product_id, 0) + sign * quantity
+    return totals
 
 
 class OrdersService:
@@ -256,12 +266,14 @@ class OrdersService:
             for item in view.items:  # freeze the unit prices: a later price change leaves this receipt alone
                 await unit.update_item(item.id, unit_price=item.unit_price or 0)
             await unit.mark_paid(order_id, body.method, cash_given, change, total)
+            await unit.move_stock(_per_product(((item.product_id, item.quantity) for item in view.items), -1))
             await unit.add_to_shift(current.shift_id, total)
         return await self.get(current, order_id)
 
     async def void(self, current: CurrentUser, order_id: int) -> OrderOut:
         """Cancel an order. A cashier may cancel an open one; a paid one only an admin, and its
-        amount is taken back from the shift that collected it. Idempotent."""
+        amount is taken back from the shift that collected it and its quantities go back on the
+        stock. Idempotent."""
         async with self.repo.write() as unit:
             order = await self._visible(unit, current, order_id, lock=True)
             if order.status == "paid" and not current.is_admin:
@@ -269,5 +281,8 @@ class OrdersService:
             if order.status != "void":
                 if order.status == "paid" and order.shift_id is not None:
                     await unit.add_to_shift(order.shift_id, -(order.total_amount or 0))
+                if order.status == "paid":
+                    lines = await unit.items(order_id)
+                    await unit.move_stock(_per_product(((line.product_id, line.quantity) for line in lines), +1))
                 await unit.update_order(order_id, status="void")
         return await self.get(current, order_id)

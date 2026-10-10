@@ -11,6 +11,7 @@ export function parseList(text: string): string[] {
 
 export const FIELD_LABEL: Record<string, string> = {
   price: 'Giá',
+  stock: 'Tồn kho',
   barcode: 'Barcode',
   name: 'Tên',
   ocr_keywords: 'Từ khoá OCR',
@@ -22,6 +23,7 @@ export const FIELD_LABEL: Record<string, string> = {
 /** A change-log value as a person reads it (the log stores text, JSON for evidence). */
 export function showValue(field: string, value: string | null): string {
   if (field === 'price') return value === null ? 'chưa có' : formatVnd(Number(value));
+  if (field === 'stock') return value === null ? 'không theo dõi' : value;
   if (value === null || value === '') return '—';
   if (field in FIELD_LABEL && field !== 'barcode' && field !== 'name') {
     try {

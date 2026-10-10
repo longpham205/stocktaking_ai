@@ -37,7 +37,7 @@ from app.modules.catalog.schemas import (
 )
 
 SEARCH_LIMIT = 50
-ADMIN_FILTERS = ("", "missing_price", "missing_barcode", "needs_naming")
+ADMIN_FILTERS = ("", "missing_price", "missing_barcode", "needs_naming", "out_of_stock")
 GALLERY_LIMIT = 12
 GALLERY_MAX_SIDE = 1024
 _IMAGE_SUFFIXES = (".jpg", ".jpeg", ".png", ".bmp", ".webp")
@@ -56,6 +56,10 @@ def fold(text: str) -> str:
 def _catalog_order(product: Product) -> tuple[int, str]:
     # the engine's order: ids are numbers stored as text, so "2" comes before "10"
     return (len(product.id), product.id)
+
+
+def _out_of_stock(product: Product) -> bool:
+    return product.stock is not None and product.stock <= 0
 
 
 def _stale(what: str) -> Conflict:
@@ -117,7 +121,7 @@ class CatalogService:
         """The catalog on sale for the admin screen: search by name, id or barcode (a part of any),
         filter what still needs work, one page at a time."""
         if filter_ not in ADMIN_FILTERS:
-            raise Invalid("filter phải là missing_price|missing_barcode|needs_naming")
+            raise Invalid("filter phải là missing_price|missing_barcode|needs_naming|out_of_stock")
         products = sorted(await self.repo.active_products(), key=_catalog_order)
         query = fold(search.strip())
         rows = [
@@ -127,6 +131,7 @@ class CatalogService:
             and (filter_ != "missing_price" or p.price is None)
             and (filter_ != "missing_barcode" or not p.barcode)
             and (filter_ != "needs_naming" or p.needs_naming)
+            and (filter_ != "out_of_stock" or _out_of_stock(p))
         ]
         page, size = max(1, page), max(1, min(200, size))
         return AdminProductsOut(
@@ -137,6 +142,7 @@ class CatalogService:
             missing_price=sum(1 for p in products if p.price is None),
             missing_barcode=sum(1 for p in products if not p.barcode),
             needs_naming=sum(1 for p in products if p.needs_naming),
+            out_of_stock=sum(1 for p in products if _out_of_stock(p)),
         )
 
     async def _existing(self, product_id: str, missing: str = "Không thấy sản phẩm") -> Product:
@@ -157,16 +163,16 @@ class CatalogService:
                 raise Invalid("Tên sản phẩm 1–120 ký tự")
             fields["name"] = name
         if await asyncio.to_thread(self.edits.update_product, product_id, fields, current.user_id):
-            await self._changed()  # the price is the web's: it does not touch the recognizer
+            await self._changed()  # price and stock are the web's: they do not touch the recognizer
         return ProductOut(**asdict(await self._existing(product_id)))
 
     async def update(self, current: CurrentUser, product_id: str, body: ProductPatch) -> ProductOut:
         await self._existing(product_id)
         fields: dict[str, Any] = {
-            name: getattr(body, name) for name in ("price", "barcode", "name") if name in body.model_fields_set
+            name: getattr(body, name) for name in ("price", "stock", "barcode", "name") if name in body.model_fields_set
         }
         if not fields:
-            raise Invalid("Chỉ sửa được 'price', 'barcode' và 'name'")
+            raise Invalid("Chỉ sửa được 'price', 'stock', 'barcode' và 'name'")
         return await self._update_product(current, product_id, fields)
 
     # ---------------------------------------------------------------- admin: evidence and colours
@@ -332,12 +338,17 @@ class CatalogService:
     # ---------------------------------------------------------------- change-log reverters
 
     async def revert_product(self, current: CurrentUser, entry: ChangeEntry, _: RevertIn) -> None:
-        """Reverter for the `product` table: price, barcode, name."""
+        """Reverter for the `product` table: price, stock, barcode, name."""
         product = await self._existing(entry.record_id, "Sản phẩm không còn trong catalog")
         if entry.field == "price":
             if (None if product.price is None else str(product.price)) != entry.new:
                 raise _stale("Giá trị")
             target: Any = None if entry.old is None else int(entry.old)
+        elif entry.field == "stock":
+            # a sale since then moved the quantity: the count that was typed no longer applies
+            if (None if product.stock is None else str(product.stock)) != entry.new:
+                raise _stale("Tồn kho")
+            target = None if entry.old is None else int(entry.old)
         elif entry.field == "barcode":
             if product.barcode != (entry.new or ""):
                 raise _stale("Giá trị")

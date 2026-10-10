@@ -62,6 +62,7 @@ async def test_listing_shows_products_on_sale_in_catalog_order_with_prices(db_ap
         "name": "Sữa rửa mặt",
         "barcode": "8931000009999",
         "price": 45000,
+        "stock": None,
         "needs_naming": False,
         "missing_color_reference": False,
     }

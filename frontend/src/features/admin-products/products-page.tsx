@@ -32,16 +32,24 @@ function ProductRow({ product, saving, onSave, onGallery, onEvidence, onHistory 
   const [name, setName] = useState(product.name);
   const [barcode, setBarcode] = useState(product.barcode);
   const [price, setPrice] = useState(product.price === null ? '' : String(product.price));
+  const [stock, setStock] = useState(product.stock === null ? '' : String(product.stock));
   useEffect(() => {
     setName(product.name);
     setBarcode(product.barcode);
     setPrice(product.price === null ? '' : String(product.price));
+    setStock(product.stock === null ? '' : String(product.stock));
   }, [product]);
 
   function save() {
     const change: ProductChange = { price: parseMoney(price), barcode: barcode.trim() };
     const renamed = name.trim();
     if (renamed && renamed !== product.name) change.name = renamed; // the name only when it really changed
+    // the stock only when a new count was typed: sales move it while this page is open
+    const typed = stock.trim();
+    if (typed !== (product.stock === null ? '' : String(product.stock))) {
+      const counted = parseMoney(typed);
+      if (counted !== null || typed === '') change.stock = counted; // emptied: stop tracking
+    }
     onSave(change);
   }
 
@@ -74,6 +82,21 @@ function ProductRow({ product, saving, onSave, onGallery, onEvidence, onHistory 
           onChange={(event) => setPrice(event.target.value)}
         />
       </td>
+      <td className="py-2 pr-2">
+        <Input
+          className="w-24"
+          aria-label={`Tồn kho ${product.id}`}
+          inputMode="numeric"
+          placeholder="không theo dõi"
+          value={stock}
+          onChange={(event) => setStock(event.target.value)}
+        />
+        {product.stock !== null && product.stock <= 0 && (
+          <div className="mt-1">
+            <Badge variant="warning">{product.stock < 0 ? 'bán vượt tồn' : 'hết hàng'}</Badge>
+          </div>
+        )}
+      </td>
       <td className="py-2">
         <div className="flex gap-1">
           <Button size="sm" disabled={saving} onClick={save}>
@@ -96,7 +119,7 @@ function ProductRow({ product, saving, onSave, onGallery, onEvidence, onHistory 
 
 type Opened = { kind: 'gallery' | 'evidence' | 'history'; productId: string } | { kind: 'test' } | null;
 
-/** The catalog on sale: names, barcodes, prices, and each product's recognition evidence and history. */
+/** The catalog on sale: names, barcodes, prices, stock, and each product's recognition evidence and history. */
 export function ProductsPage() {
   const queryClient = useQueryClient();
   const [typed, setTyped] = useState('');
@@ -134,6 +157,7 @@ export function ProductsPage() {
     ['missing_price', `Thiếu giá (${products.missing_price})`],
     ['missing_barcode', `Thiếu barcode (${products.missing_barcode})`],
     ['needs_naming', `Chưa đặt tên (${products.needs_naming})`],
+    ['out_of_stock', `Hết hàng (${products.out_of_stock})`],
   ];
 
   return (
@@ -174,6 +198,7 @@ export function ProductsPage() {
               <th className="py-2 font-medium">Tên</th>
               <th className="py-2 font-medium">Barcode</th>
               <th className="py-2 font-medium">Giá (đ)</th>
+              <th className="py-2 font-medium">Tồn kho</th>
               <th />
             </tr>
           </thead>

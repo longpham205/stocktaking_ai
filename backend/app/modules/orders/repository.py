@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
 from app.modules.auth.models import ShiftRow, UserRow
 from app.modules.captures.models import CaptureRow
+from app.modules.inventory.repository import move_stock
 from app.modules.orders.models import OrderItemRow, OrderRow
 from app.modules.orders.ports import CaptureImage, HistoryEntry, Order, OrderItem
 
@@ -163,6 +164,10 @@ class OrdersUnit:
         """Add to what the shift collected (a negative amount takes back a voided sale, never below 0)."""
         collected = func.greatest(0, ShiftRow.total_collected + amount)
         await self.conn.execute(update(ShiftRow).where(ShiftRow.id == shift_id).values(total_collected=collected))
+
+    async def move_stock(self, deltas: dict[str, int]) -> None:
+        """Add to the stock on hand of the tracked products (negative: sold)."""
+        await move_stock(self.conn, deltas)
 
     async def history(self, cashier_id: int | None, since: datetime | None, limit: int) -> list[HistoryEntry]:
         """Paid and voided orders, newest first; of one cashier, or of everyone when `cashier_id` is None."""
