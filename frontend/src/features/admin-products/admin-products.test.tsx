@@ -30,6 +30,7 @@ const product = (id: string, overrides: Partial<Product> = {}): Product => ({
   name: `Sản phẩm ${id}`,
   barcode: '',
   price: null,
+  stock: null,
   needs_naming: false,
   missing_color_reference: false,
   ...overrides,
@@ -43,6 +44,7 @@ const listing = (items: Product[], overrides: Partial<AdminProducts> = {}): Admi
   missing_price: 8,
   missing_barcode: 38,
   needs_naming: 1,
+  out_of_stock: 0,
   ...overrides,
 });
 
@@ -63,6 +65,8 @@ describe('admin product helpers', () => {
   it('shows change-log values as a person reads them', () => {
     expect(showValue('price', null)).toBe('chưa có');
     expect(showValue('price', '15000')).toBe('15.000đ');
+    expect(showValue('stock', null)).toBe('không theo dõi');
+    expect(showValue('stock', '42')).toBe('42');
     expect(showValue('barcode', '')).toBe('—');
     expect(showValue('ocr_keywords', '["ABA", "KT42"]')).toBe('ABA, KT42');
     expect(showValue('color_code', '"BE203"')).toBe('BE203');
@@ -123,6 +127,33 @@ describe('admin products', () => {
     await userEvent.type(name, 'Bút chì chân mày');
     await userEvent.click(within(screen.getByTestId('product-2')).getByRole('button', { name: 'Lưu' }));
     await waitFor(() => expect(calls[1]?.body).toEqual({ price: 17500, barcode: '8931', name: 'Bút chì chân mày' }));
+  });
+
+  it('shows the stock on hand and sends it only when a new count was typed', async () => {
+    const calls: Call[] = [];
+    const oversold = product('2', { barcode: '8931', price: 15000, stock: -2 });
+    stubFetchRoutes({
+      '/api/me': adminMe,
+      '/api/admin/products?': () => jsonResponse(listing([oversold, product('3', { stock: 0 }), product('10')], { out_of_stock: 2 })),
+      '/api/admin/products/2': recording(calls, 'products/2', { PATCH: () => jsonResponse(oversold) }),
+      '/api/admin/products/10': recording(calls, 'products/10', { PATCH: () => jsonResponse(product('10')) }),
+    });
+    await renderApp('/admin/products');
+    const row = await screen.findByTestId('product-2');
+    expect(within(row).getByText('bán vượt tồn')).toBeInTheDocument();
+    expect(within(screen.getByTestId('product-3')).getByText('hết hàng')).toBeInTheDocument();
+    expect(within(screen.getByTestId('product-10')).getByLabelText('Tồn kho 10')).toHaveValue('');
+    expect(screen.getByRole('button', { name: 'Hết hàng (2)' })).toBeInTheDocument();
+
+    // saved without touching the stock: a sale may have moved it since the page loaded
+    await userEvent.click(within(row).getByRole('button', { name: 'Lưu' }));
+    await waitFor(() => expect(calls[0]?.body).toEqual({ price: 15000, barcode: '8931' }));
+
+    const stock = within(row).getByLabelText('Tồn kho 2');
+    await userEvent.clear(stock);
+    await userEvent.type(stock, '40');
+    await userEvent.click(within(row).getByRole('button', { name: 'Lưu' }));
+    await waitFor(() => expect(calls[1]?.body).toEqual({ price: 15000, barcode: '8931', stock: 40 }));
   });
 
   it('saves evidence only once confirmed: the colour reference first, then the evidence', async () => {
