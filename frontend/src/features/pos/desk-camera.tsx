@@ -1,5 +1,5 @@
 import { useRef, useState, type DragEvent } from 'react';
-import { Camera, ImageUp, Images } from 'lucide-react';
+import { Camera, Eye, EyeOff, ImageUp, Images } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { CaptureOverlay } from '@/features/pos/capture-overlay';
@@ -43,6 +43,8 @@ export function DeskCamera(props: DeskCameraProps) {
   const { camera, order, view, busy, progress } = props;
   const fileInput = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
+  // the small live camera over the photo can hide the boxes in its corner
+  const [pipHidden, setPipHidden] = useState(false);
   const captures = order?.captures ?? [];
   const showPhoto = view === 'photo' && captures.length > 0 && !busy;
   const last = captures[captures.length - 1];
@@ -122,6 +124,8 @@ export function DeskCamera(props: DeskCameraProps) {
             showPhoto
               ? 'absolute right-3 bottom-3 z-10 aspect-video w-56 cursor-pointer rounded-lg border-2 border-white shadow-lg'
               : 'absolute inset-0',
+            // hidden, not removed: the stream keeps running for the next photo
+            showPhoto && pipHidden && 'invisible',
           )}
           onClick={showPhoto ? () => props.onView('camera') : undefined}
           title={showPhoto ? 'Về camera' : undefined}
@@ -135,7 +139,27 @@ export function DeskCamera(props: DeskCameraProps) {
           ) : (
             <video ref={camera.videoRef} className="h-full w-full object-contain" playsInline muted autoPlay />
           )}
+          {showPhoto && !pipHidden && (
+            <button
+              type="button"
+              aria-label="Ẩn camera"
+              title="Ẩn camera"
+              className="absolute top-1 right-1 rounded-full bg-black/60 p-1 text-white hover:bg-black/80"
+              onClick={(event) => {
+                event.stopPropagation(); // not "back to the camera"
+                setPipHidden(true);
+              }}
+            >
+              <EyeOff className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
+        {showPhoto && pipHidden && (
+          <Button size="sm" variant="secondary" className="absolute right-3 bottom-3 z-10 shadow" onClick={() => setPipHidden(false)}>
+            <Eye className="h-4 w-4" />
+            Hiện camera
+          </Button>
+        )}
 
         {!showPhoto && !busy && !camera.failure && (
           <div className="pointer-events-none absolute top-3 left-1/2 -translate-x-1/2 rounded-full bg-black/60 px-3 py-1 text-xs text-white">
