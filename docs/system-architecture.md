@@ -74,7 +74,7 @@ backend/
 │   │                signed_url, uploads, clock, columns
 │   └── modules/     mỗi module một thư mục (bảng dưới)
 ├── engine/          pipeline nhận diện (thư mục `src/` cũ); CLI `python -m engine`
-├── migrations/      Alembic: 0001 bảng web, 0002 bảng catalog, 0003 kích thước ảnh + cảnh báo
+├── migrations/      Alembic: 0001 bảng web, 0002 bảng catalog, 0003 kích thước ảnh + cảnh báo, 0004 tồn kho
 ├── configs/         config.yaml (thật), config.demo.yaml (mock, CPU), legacy/
 ├── scripts/         công cụ của engine + smoke_api.py
 ├── tests/           test engine (phẳng) + tests/api/ (API trên Postgres thật)
@@ -89,7 +89,8 @@ backend/
 | `users` | quản trị nhân viên | (dùng `users`) |
 | `pos_settings` | cài đặt quầy, mật khẩu nâng cao | `settings` |
 | `catalog` | tìm sản phẩm, giá, barcode, bằng chứng nhận diện, màu tham chiếu, ảnh gallery | `product_prices` (đọc/ghi bảng catalog của engine) |
-| `orders` | đơn, dòng hàng, thanh toán, huỷ, lịch sử | `orders`, `order_items` |
+| `inventory` | tồn kho: bảng và hai hàm duy nhất đổi số tồn (bán/huỷ đơn, admin nhập số đếm); không có router riêng, số tồn hiện và sửa qua `catalog` | `product_stock` |
+| `orders` | đơn, dòng hàng, thanh toán (trừ tồn kho), huỷ (hoàn tồn kho), lịch sử | `orders`, `order_items` |
 | `captures` | nhận ảnh, idempotency, trạng thái job, URL ảnh có ký | `captures` |
 | `recognition` | `RecognizerPort`, `LocalRecognizer`, `FakeRecognizer`, `RecognitionWorker` | — |
 | `engine_config` | thiết lập nâng cao của pipeline: danh mục thông số, áp dụng, nạp lại | `config_overrides` |
@@ -152,7 +153,7 @@ sequenceDiagram
     W->>A: PATCH / POST / DELETE /api/orders/{id}/items...
     C->>W: thanh toán
     W->>A: POST /api/orders/{id}/checkout
-    A->>D: khoá dòng đơn, kiểm giá, đánh dấu đã thanh toán
+    A->>D: khoá dòng đơn, kiểm giá, đánh dấu đã thanh toán, trừ tồn kho
     A-->>W: hoá đơn
 ```
 
@@ -164,6 +165,7 @@ sequenceDiagram
 |---|---|
 | Sửa tên, barcode, bằng chứng, màu tham chiếu | ghi bảng catalog + `change_log` trong một giao dịch; bộ nhận diện nạp lại catalog trước lượt chụp kế tiếp |
 | Sửa giá, cài đặt quầy | ghi bảng web + `change_log`; hiệu lực ngay |
+| Nhập số tồn kho | ghi `product_stock` + `change_log`; để trống = không theo dõi sản phẩm đó. Hoàn tác bị từ chối nếu đã có đơn bán làm số tồn đổi |
 | Áp dụng thiết lập nâng cao | cần mật khẩu nâng cao; lưu vào `config_overrides`; dựng lại pipeline trên luồng nhận diện (ngừng nhận diện trong lúc đó); dựng lỗi thì quay về thiết lập cũ |
 | Kiểm định | cần mật khẩu nâng cao; chạy benchmark trên luồng nhận diện, lượt chụp bị từ chối trong lúc chạy; kết quả so với `data/baseline/` |
 | Hoàn tác | `POST /api/admin/change-log/{id}/revert`; từ chối nếu giá trị đã bị đổi sau đó |
@@ -171,9 +173,10 @@ sequenceDiagram
 ## 6. Dữ liệu
 
 - **Postgres** (schema do Alembic sở hữu, không tạo bảng lúc khởi động):
-  - bảng web: `users`, `shifts`, `orders`, `order_items`, `captures`, `product_prices`, `settings`, `config_overrides`, `change_log`;
+  - bảng web: `users`, `shifts`, `orders`, `order_items`, `captures`, `product_prices`, `product_stock`, `settings`, `config_overrides`, `change_log`;
   - bảng catalog của engine: `product`, `product_evidence`, `color_reference`, `catalog_meta`.
 - **Đĩa** (`backend/`, gắn vào container, không nằm trong image): `data/` hoặc `data_demo/` (gallery, index FAISS trong `cache/`, benchmark, baseline), `weights/` (chỉ đọc), `MEDIA_DIR` (ảnh chụp theo đơn: `<mã đơn>/<file>`).
+- **Tồn kho** (`product_stock`): thanh toán trừ số lượng của đơn, huỷ đơn đã thanh toán cộng lại, cùng giao dịch với đơn. Sản phẩm không có dòng trong bảng là không theo dõi. Số tồn được phép âm (bán vượt số đã đếm): không chặn thanh toán, trang Sản phẩm báo "hết hàng" / "bán vượt tồn". Chưa có lịch sử nhập/xuất; khi thêm thì ghi trong `inventory/repository.py`. Số ngẫu nhiên để demo: `make seed-stock`.
 - Ảnh chụp và ảnh gallery được trả qua URL có chữ ký HMAC và hạn dùng (`MEDIA_URL_SECRET`, `MEDIA_URL_TTL_SECONDS`), vì thẻ `<img>` không gửi được token.
 - Khi web chạy, pipeline đọc catalog từ Postgres (API truyền URL database vào `build_config`). Khi chạy `python -m engine` độc lập, nguồn catalog theo khối `catalog` của file config (SQLite hoặc snapshot).
 
