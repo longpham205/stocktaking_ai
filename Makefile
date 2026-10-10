@@ -2,7 +2,7 @@
 # On Windows run it from Git Bash (the recipes are POSIX shell).
 .PHONY: help setup docker-up docker-up-gpu docker-up-prod docker-up-data docker-down logs \
         migrate migration dev-api test lint format type-check check-env clean reset-password \
-        reset-advanced-password smoke test-web seed-demo import-legacy db-save db-restore purge-media assets
+        reset-advanced-password smoke test-web seed-demo seed-stock import-legacy db-save db-restore purge-media assets
 
 COMPOSE      := docker compose
 COMPOSE_GPU  := $(COMPOSE) -f docker-compose.yml -f docker-compose.gpu.yml
@@ -97,8 +97,11 @@ check-env:       ## what this installation has and lacks: tools, secrets, databa
 	cd backend && uv run python -m entrypoints.check_env
 	cd backend && uv run python scripts/set_device.py show
 
-seed-demo: migrate  ## demo catalog (50 products) and demo prices into DATABASE_URL; safe to run again
+seed-demo: migrate  ## demo catalog (50 products), demo prices and random stock into DATABASE_URL; safe to run again
 	cd backend && uv run python -m entrypoints.seed_demo
+
+seed-stock: migrate  ## random stock on hand (20..100) for products that have none; safe to run again
+	cd backend && uv run python -m entrypoints.seed_stock
 
 import-legacy: migrate  ## copy a web v1 SQLite database into DATABASE_URL: make import-legacy DATA_DIR=data_demo [REPLACE=1]
 	@test -n "$(DATA_DIR)" || (echo 'usage: make import-legacy DATA_DIR=data_demo [REPLACE=1]' && exit 1)

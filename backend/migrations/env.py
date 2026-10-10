@@ -22,6 +22,7 @@ from app.modules.auth import models as _auth  # noqa: F401  users, shifts
 from app.modules.captures import models as _captures  # noqa: F401  captures
 from app.modules.catalog import models as _catalog  # noqa: F401  product_prices
 from app.modules.engine_config import models as _engine_config  # noqa: F401  config_overrides
+from app.modules.inventory import models as _inventory  # noqa: F401  product_stock
 from app.modules.orders import models as _orders  # noqa: F401  orders, order_items
 from app.modules.pos_settings import models as _pos_settings  # noqa: F401  settings
 from engine.catalog import db as _engine_catalog  # noqa: F401  product, product_evidence, color_reference, catalog_meta

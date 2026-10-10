@@ -6,6 +6,8 @@ from pydantic import BaseModel, ConfigDict, Field, StrictInt
 
 # VND, no minor unit: the largest price (or typed-in price) a line may have
 MAX_PRICE = 100_000_000
+# the largest quantity on hand an admin may type
+MAX_STOCK = 1_000_000
 # the evidence an admin edits, in the order the screen shows it
 EVIDENCE_FIELDS = ("ocr_keywords", "color_code", "force_evidence", "confusable_with")
 # what the admin ticks to say they know an evidence edit changes the recognition
@@ -17,6 +19,8 @@ class ProductOut(BaseModel):
     name: str
     barcode: str
     price: int | None
+    # on hand; null: not tracked
+    stock: int | None
     needs_naming: bool
     missing_color_reference: bool
 
@@ -34,14 +38,17 @@ class AdminProductsOut(BaseModel):
     missing_price: int
     missing_barcode: int
     needs_naming: int
+    out_of_stock: int
 
 
 class ProductPatch(BaseModel):
-    """Only the fields sent are changed. `price: null` removes the price, `barcode: ""` the barcode."""
+    """Only the fields sent are changed. `price: null` removes the price, `barcode: ""` the barcode,
+    `stock: null` stops tracking the product's stock."""
 
     model_config = ConfigDict(extra="forbid")
 
     price: StrictInt | None = Field(None, ge=0, le=MAX_PRICE)
+    stock: StrictInt | None = Field(None, ge=0, le=MAX_STOCK)
     barcode: str | None = None
     name: str | None = None
 

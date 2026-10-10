@@ -122,6 +122,7 @@ async def test_price_update_validation_and_log(admin: httpx.AsyncClient, staff: 
         "name": "Bút chì chân mày",
         "barcode": "8931000001372",
         "price": 15000,
+        "stock": None,
         "needs_naming": False,
         "missing_color_reference": False,
     }

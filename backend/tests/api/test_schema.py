@@ -18,7 +18,10 @@ from app.modules.orders.models import OrderItemRow, OrderRow
 from app.modules.pos_settings.models import SettingRow
 from tests.api.conftest import alembic_config
 
-TABLES = "change_log, captures, order_items, orders, shifts, users, product_prices, settings, config_overrides"
+TABLES = (
+    "change_log, captures, order_items, orders, shifts, users, product_prices, product_stock, settings, "
+    "config_overrides"
+)
 
 
 def test_models_match_the_migrations(migrated_database_url: str) -> None:

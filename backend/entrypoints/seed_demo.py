@@ -1,10 +1,10 @@
-"""Fill the database with the demo catalog and its prices (`make seed-demo`), so a fresh
-`make docker-up` has products to sell.
+"""Fill the database with the demo catalog, its prices and a random stock on hand
+(`make seed-demo`), so a fresh `make docker-up` has products to sell.
 
     python -m entrypoints.seed_demo                      # data_demo/, into DATABASE_URL
 
 Safe to run again: the engine's catalog migrate only inserts what is missing, and a price that is
-already set is left alone (an admin may have changed it).
+already set is left alone (an admin may have changed it); so is a quantity on hand.
 """
 
 import argparse
@@ -16,6 +16,7 @@ from sqlalchemy import create_engine, text
 
 from app.core.config import BACKEND_DIR, get_settings
 from app.core.db import sync_database_url
+from entrypoints.seed_stock import seed_stock
 
 
 def seed_prices(sync_url: str, prices_file: Path) -> tuple[int, int]:
@@ -79,6 +80,7 @@ def main(argv: list[str] | None = None) -> int:
     print(
         f"Giá demo: chèn {inserted}, bỏ qua {skipped} (đã có giá, không có giá seed, hoặc SKU không có trong catalog)"
     )
+    print(f"Tồn kho demo: gán số ngẫu nhiên 20..100 cho {seed_stock(sync_url, 20, 100)} sản phẩm chưa có số tồn")
     print("Để ảnh gallery và pipeline demo khớp catalog này: PIPELINE_CONFIG=configs/config.demo.yaml")
     return 0
 
